@@ -26,6 +26,15 @@ Gouncer is a set of authentication primitives. It stays out of your
 transport, routing, and storage decisions, and grows by adding small,
 independent building blocks. You adopt only what you need.
 
+## Batteries
+
+Ready-made batteries live in this repository as separately versioned modules:
+
+- [`authkit`](authkit/) serves gouncer sessions over HTTP.
+- [`authkit/ratelimit`](authkit/ratelimit/) limits failed login attempts per client IP.
+
+Adopt them or write your own transport against the same primitives.
+
 ## Usage
 
 ```go
@@ -61,6 +70,9 @@ err = store.DeleteSession(ctx, gouncer.HashToken(token))
   the `__Host-` prefix. Never log the plain token.
 - Rate limit your login endpoint. Password verification is expensive by
   design.
+
+The [batteries](#batteries) implement these notes as maintained modules.
+Adopt them or keep the notes as your checklist.
 
 ## Reporting security issues
 

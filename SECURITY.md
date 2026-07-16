@@ -20,8 +20,5 @@ at v0.x there are no backport guarantees.
 
 ## Scope
 
-In scope: flaws in the code this module ships. Out of scope: how a
-consuming application wires gouncer into a transport. Cookie attributes,
-CSRF, rate limiting, timing-equalized login flows, and similar policy
-choices are the application's responsibility, and the README documents
-the recommended patterns.
+In scope: flaws in the code the modules in this repository ship. Out of
+scope: how a consuming application wires those modules into its stack.

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package ratelimit limits failed login attempts per client IP.
-//
-// The middleware counts only responses with status 401, holds successful
-// logins free of charge, and fails closed when its counter errors. Wrap
-// your login handler with Middleware and mount the result on your router.
 package ratelimit
 
 import (
