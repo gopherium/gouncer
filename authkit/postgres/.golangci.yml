@@ -1,0 +1,43 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - lll
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+  settings:
+    lll:
+      line-length: 120
+    revive:
+      rules:
+        - name: blank-imports
+          disabled: true
+        - name: exported
+    depguard:
+      rules:
+        store-purity:
+          list-mode: strict
+          files:
+            - "**/*.go"
+          allow:
+            - $gostd
+            - github.com/gopherium/gouncer
+            - github.com/google/uuid
+            - github.com/google/go-cmp
+            - github.com/jackc/pgx/v5
+            - github.com/pressly/goose/v3
+            - github.com/peterldowns/pgtestdb
+            - github.com/pashagolub/pgxmock/v4
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/gopherium/gouncer
