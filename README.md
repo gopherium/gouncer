@@ -31,6 +31,7 @@ independent building blocks. You adopt only what you need.
 Ready-made batteries live in this repository as separately versioned modules:
 
 - [`authkit`](authkit/) serves gouncer sessions over HTTP.
+- [`authkit/postgres`](authkit/postgres/) persists users and sessions in a PostgreSQL schema of its own.
 - [`authkit/ratelimit`](authkit/ratelimit/) limits failed login attempts per client IP.
 
 Adopt them or write your own transport against the same primitives.
