@@ -1,3 +1,6 @@
 cover.out
 go.work
 go.work.sum
+node_modules/
+dist/
+coverage/

@@ -1,0 +1,103 @@
+{
+  "name": "@gopherium/react-auth",
+  "version": "0.1.0",
+  "description": "Session authentication for React apps backed by gouncer's authkit.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gopherium/gouncer.git",
+    "directory": "react-auth"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./admin": {
+      "types": "./dist/admin/index.d.ts",
+      "default": "./dist/admin/index.js"
+    },
+    "./wpds": {
+      "types": "./dist/wpds/index.d.ts",
+      "default": "./dist/wpds/index.js"
+    },
+    "./wpds/style.css": "./dist/wpds/style.css",
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/wpds/style.css dist/wpds/style.css",
+    "cover": "vitest run --coverage",
+    "lint": "oxlint",
+    "prepublishOnly": "pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "^19.2.7",
+      "react-dom": "^19.2.7"
+    },
+    "patchedDependencies": {
+      "@wordpress/element@8.3.0": "patches/@wordpress__element@8.3.0.patch"
+    }
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.101.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@wordpress/ui": "^0.17.0",
+    "msw": "^2.15.0",
+    "react": "^19.2.7",
+    "vitest": "^4.1.10"
+  },
+  "peerDependenciesMeta": {
+    "@testing-library/jest-dom": {
+      "optional": true
+    },
+    "@testing-library/react": {
+      "optional": true
+    },
+    "@wordpress/ui": {
+      "optional": true
+    },
+    "msw": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.101.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.17",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@wordpress/ui": "^0.17.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-jsdoc": "^63.0.13",
+    "eslint-plugin-tsdoc": "^0.4.0",
+    "jsdom": "^29.1.1",
+    "msw": "^2.15.0",
+    "oxlint": "^1.71.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10"
+  }
+}
