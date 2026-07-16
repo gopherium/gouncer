@@ -54,6 +54,25 @@ jobs:
           version: v2.12
           working-directory: ${{ matrix.module }}
 
+  react-auth:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: react-auth
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run cover
+      - run: pnpm exec oxlint
+      - run: pnpm exec eslint .
+      - run: pnpm run build
+
   vulncheck:
     runs-on: ubuntu-latest
     strategy:

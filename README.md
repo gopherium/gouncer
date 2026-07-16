@@ -33,6 +33,7 @@ Ready-made batteries live in this repository as separately versioned modules:
 - [`authkit`](authkit/) serves gouncer sessions over HTTP.
 - [`authkit/postgres`](authkit/postgres/) persists users and sessions in a PostgreSQL schema of its own.
 - [`authkit/ratelimit`](authkit/ratelimit/) limits failed login attempts per client IP.
+- [`react-auth`](react-auth/) is the npm client, `@gopherium/react-auth`, for React frontends.
 
 Adopt them or write your own transport against the same primitives.
 
