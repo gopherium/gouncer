@@ -6,8 +6,16 @@ file. The format follows
 package follows [Semantic Versioning](https://semver.org/). While at
 0.x, minor releases may contain breaking changes.
 
-The package version lives in `package.json`; releases publish to npm
-and carry no git tags.
+Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
+npm-style tag stays invisible to the Go toolchain, unlike a
+`react-auth/vX.Y.Z` tag naming the directory's stub module.
+
+## [0.1.1] - 2026-07-16
+
+### Fixed
+
+- Relative imports in the published output carry explicit extensions,
+  so Node's ESM resolution can load the package outside a bundler.
 
 ## [0.1.0] - 2026-07-16
 
