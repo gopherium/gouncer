@@ -7,9 +7,9 @@ export {
 	fetchSession,
 	login,
 	logout,
-} from './api'
-export type { User } from './api'
-export { AuthGate } from './AuthGate'
-export { isSessionRevoked } from './probe'
-export { createAuthQueryClient } from './queryClient'
-export { sessionQueryKey, useLogout, useSession } from './session'
+} from './api.js'
+export type { User } from './api.js'
+export { AuthGate } from './AuthGate.js'
+export { isSessionRevoked } from './probe.js'
+export { createAuthQueryClient } from './queryClient.js'
+export { sessionQueryKey, useLogout, useSession } from './session.js'

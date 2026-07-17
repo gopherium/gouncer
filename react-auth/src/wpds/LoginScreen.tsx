@@ -4,8 +4,8 @@ import { useMutation } from '@tanstack/react-query'
 import { Button, Card, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
-import { InvalidCredentialsError, RateLimitedError, login } from '../api'
-import type { User } from '../api'
+import { InvalidCredentialsError, RateLimitedError, login } from '../api.js'
+import type { User } from '../api.js'
 
 /**
  * Maps a login attempt error to the message shown to the user.

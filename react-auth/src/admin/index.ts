@@ -2,7 +2,7 @@
 
 import { z } from 'zod'
 
-import { UnauthorizedError } from '../api'
+import { UnauthorizedError } from '../api.js'
 
 export const usersQueryKey = ['users'] as const
 

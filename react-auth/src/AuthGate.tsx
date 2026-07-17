@@ -3,8 +3,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
-import type { User } from './api'
-import { sessionQueryKey, useSession } from './session'
+import type { User } from './api.js'
+import { sessionQueryKey, useSession } from './session.js'
 
 /**
  * Guards its children behind a login session, rendering the given login

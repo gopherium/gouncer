@@ -2,7 +2,7 @@
 
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { fetchSession, logout } from './api'
+import { fetchSession, logout } from './api.js'
 
 /**
  * sessionQueryKey is the react-query key the login session is cached under.

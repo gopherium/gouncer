@@ -2,7 +2,7 @@
 
 import { Button, Stack, Text } from '@wordpress/ui'
 
-import { useLogout, useSession } from '../session'
+import { useLogout, useSession } from '../session.js'
 
 /**
  * Renders the signed-in user's identity with a logout control, or nothing

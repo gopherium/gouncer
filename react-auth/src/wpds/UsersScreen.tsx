@@ -4,9 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Stack, Text, VisuallyHidden } from '@wordpress/ui'
 import type { ReactElement } from 'react'
 
-import { fetchUsers, setUserDisabled, usersQueryKey } from '../admin'
-import type { User } from '../admin'
-import { useSession } from '../session'
+import { fetchUsers, setUserDisabled, usersQueryKey } from '../admin/index.js'
+import type { User } from '../admin/index.js'
+import { useSession } from '../session.js'
 
 /**
  * Renders one user row with status and a disable toggle, hidden for the

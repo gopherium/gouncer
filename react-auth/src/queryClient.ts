@@ -3,8 +3,8 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import type { DefaultOptions } from '@tanstack/react-query'
 
-import { UnauthorizedError } from './api'
-import { sessionQueryKey } from './session'
+import { UnauthorizedError } from './api.js'
+import { sessionQueryKey } from './session.js'
 
 /**
  * Builds a query client that drops the cached session whenever a query

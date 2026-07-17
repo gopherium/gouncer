@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
-import { EmailTakenError, ValidationError, createUser, usersQueryKey } from '../admin'
+import { EmailTakenError, ValidationError, createUser, usersQueryKey } from '../admin/index.js'
 
 /**
  * Maps a creation failure to the message shown under the form, surfacing

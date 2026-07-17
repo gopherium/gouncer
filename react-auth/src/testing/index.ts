@@ -7,8 +7,8 @@ import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
-import type { User } from '../api'
-import { sessionQueryKey } from '../session'
+import type { User } from '../api.js'
+import { sessionQueryKey } from '../session.js'
 
 export { http, HttpResponse } from 'msw'
 
