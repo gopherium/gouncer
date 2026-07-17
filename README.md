@@ -36,6 +36,8 @@ Ready-made batteries live in this repository as separately versioned modules:
 - [`react-auth`](react-auth/) is the npm client, `@gopherium/react-auth`, for React frontends.
 
 Adopt them or write your own transport against the same primitives.
+Guides and operational recipes live at
+[docs.gopherium.org](https://docs.gopherium.org).
 
 ## Usage
 
