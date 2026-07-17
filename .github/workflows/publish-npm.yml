@@ -2,12 +2,12 @@ name: publish-npm
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "react-auth/**"
+    tags:
+      - "react-auth@*"
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
@@ -24,17 +24,16 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: pnpm install --frozen-lockfile
-      - name: Skip if this version is already published
-        id: guard
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@^11.5.1
+      - name: Verify the tag matches the package version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "@gopherium/react-auth@$VERSION" version >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
+          tag_version="${GITHUB_REF_NAME#react-auth@}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "tag $tag_version does not match package.json version $pkg_version" >&2
+            exit 1
           fi
-      - if: steps.guard.outputs.published == 'false'
-        run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run cover
+      - run: npm publish
