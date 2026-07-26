@@ -7,6 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [0.2.0] - 2026-07-26
+
+### Added
+
+- `EnsureAdmin` creating a user account unless the email is already
+  taken, for non-interactive bootstrapping such as development seeders.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added
