@@ -8,6 +8,19 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [0.2.0] - 2026-07-26
+
+### Added
+
+- `RunCreateAdmin`, the complete createadmin subcommand: flag parsing,
+  auth-schema migration, and delegation to `authkit.CreateAdmin`, so a
+  consuming application's dispatch is a single call.
+
+### Changed
+
+- `authkit` is now a production dependency of this module (previously
+  test-only).
+
 ## [0.1.0] - 2026-07-16
 
 ### Added
@@ -21,4 +34,5 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 - `testdb` package with pgtestdb wiring that migrates test databases
   through `Migrate` itself.
 
+[0.2.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.2.0
 [0.1.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.1.0
