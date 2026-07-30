@@ -15,7 +15,7 @@ import (
 )
 
 // RunCreateAdmin provisions a user account from command-line arguments,
-// migrating the auth schema first and reading the password from stdin.
+// reading the password as one line from stdin.
 func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdin io.Reader, stdout io.Writer) error {
 	flags := flag.NewFlagSet("createadmin", flag.ContinueOnError)
 	flags.SetOutput(stdout)

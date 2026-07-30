@@ -10,6 +10,31 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [0.1.2]
+
+### Fixed
+
+- Widened the `@wordpress/ui` peer range to `>=0.17.0 <1.0.0`. It was
+  `^0.17.0`, which semver reads as `>=0.17.0 <0.18.0`, so every consumer on
+  0.18 or 0.19 was outside the declared range. Nothing warned, because the
+  peer is optional. Verified green against both 0.17.0 and 0.19.0.
+
+- Declared `@wordpress/theme` as an optional peer at `>=1.0.0 <2.0.0`. The
+  stylesheet at `react-auth/wpds/style.css` reads three `--wpds-` design
+  tokens, so a consumer without the theme rendered it unstyled with no
+  warning. Verified against 1.1.0.
+
+### Changed
+
+- Develops against `@wordpress/ui` 0.19.0, `@wordpress/theme` 1.1.0 and
+  `@wordpress/element` 8.4.0, matching the train both consuming products run.
+
+### Added
+
+- A test asserting every design token the stylesheet reads is declared by
+  the installed `@wordpress/theme`, so a train bump that renames a token
+  fails the build instead of degrading silently.
+
 ## [0.1.1] - 2026-07-16
 
 ### Fixed
