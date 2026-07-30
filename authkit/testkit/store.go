@@ -78,6 +78,19 @@ func (s *Store) UserByEmail(_ context.Context, email string) (gouncer.User, erro
 	return gouncer.User{}, gouncer.ErrUserNotFound
 }
 
+// UserByID returns the user with the given id, disabled or not, or
+// gouncer.ErrUserNotFound.
+func (s *Store) UserByID(_ context.Context, id uuid.UUID) (gouncer.User, error) {
+	if s.LookupErr != nil {
+		return gouncer.User{}, s.LookupErr
+	}
+	u, ok := s.Users[id]
+	if !ok {
+		return gouncer.User{}, gouncer.ErrUserNotFound
+	}
+	return u, nil
+}
+
 // CreateSession stores sess.
 func (s *Store) CreateSession(_ context.Context, sess gouncer.Session) error {
 	if s.CreateSessionErr != nil {

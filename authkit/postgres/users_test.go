@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 
 	"github.com/gopherium/gouncer"
 
@@ -201,6 +202,9 @@ func TestUserStoreReportsBackendFailures(t *testing.T) {
 	if _, err := store.UserByEmail(canceled, "ada@example.com"); err == nil {
 		t.Error("UserByEmail() error = nil, want a backend failure")
 	}
+	if _, err := store.UserByID(canceled, ada.ID); err == nil {
+		t.Error("UserByID() error = nil, want a backend failure")
+	}
 	if err := store.CreateSession(canceled, mustSession(t, ada)); err == nil {
 		t.Error("CreateSession() error = nil, want a backend failure")
 	}
@@ -375,5 +379,64 @@ func TestUserStoreSetUserDisabledUnknownUser(t *testing.T) {
 
 	if !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("SetUserDisabled() error = %v, want %v", err, gouncer.ErrUserNotFound)
+	}
+}
+
+func TestUserStoreUserByID(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	ada := mustUser(t)
+	if err := store.CreateUser(t.Context(), ada); err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+
+	got, err := store.UserByID(t.Context(), ada.ID)
+
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want nil", err)
+	}
+	if got.ID != ada.ID {
+		t.Errorf("ID = %v, want %v", got.ID, ada.ID)
+	}
+	if got.Email != ada.Email {
+		t.Errorf("Email = %q, want %q", got.Email, ada.Email)
+	}
+	if got.Name != ada.Name {
+		t.Errorf("Name = %q, want %q", got.Name, ada.Name)
+	}
+}
+
+func TestUserStoreUserByIDMissingUser(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+
+	_, err := store.UserByID(t.Context(), uuid.Must(uuid.NewV7()))
+
+	if !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("UserByID() error = %v, want %v", err, gouncer.ErrUserNotFound)
+	}
+}
+
+func TestUserStoreUserByIDReturnsDisabledUsers(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	ada := mustUser(t)
+	if err := store.CreateUser(t.Context(), ada); err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), ada.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	got, err := store.UserByID(t.Context(), ada.ID)
+
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want nil", err)
+	}
+	if !got.Disabled {
+		t.Error("Disabled = false, want the disabled flag reported to the caller")
 	}
 }

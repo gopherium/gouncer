@@ -9,6 +9,11 @@ SELECT id, email, name, password_hash, disabled, created_at
 FROM auth.users
 WHERE email = $1;
 
+-- name: GetUserByID :one
+SELECT id, email, name, password_hash, disabled, created_at
+FROM auth.users
+WHERE id = $1;
+
 -- name: ListUsers :many
 SELECT id, email, name, disabled, created_at
 FROM auth.users

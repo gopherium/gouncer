@@ -8,6 +8,13 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `UserStore.UserByID`, looking a user up by identifier and reporting the
+  disabled flag to the caller, matching how `UserByEmail` behaves.
+
 ## [0.2.0] - 2026-07-26
 
 ### Added

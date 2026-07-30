@@ -78,6 +78,19 @@ func (s *UserStore) UserByEmail(ctx context.Context, email string) (gouncer.User
 	return userFromRow(row), nil
 }
 
+// UserByID returns the user with the given id, disabled or not, or
+// [gouncer.ErrUserNotFound].
+func (s *UserStore) UserByID(ctx context.Context, id uuid.UUID) (gouncer.User, error) {
+	row, err := s.queries.GetUserByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return gouncer.User{}, gouncer.ErrUserNotFound
+	}
+	if err != nil {
+		return gouncer.User{}, fmt.Errorf("postgres: get user by id: %w", err)
+	}
+	return userFromRow(row), nil
+}
+
 // CreateSession stores a login session.
 func (s *UserStore) CreateSession(ctx context.Context, session gouncer.Session) error {
 	err := s.queries.CreateSession(ctx, db.CreateSessionParams{

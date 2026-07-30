@@ -7,6 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `testkit.Store.UserByID`, keeping the in-memory double aligned with the
+  postgres store.
+
 ## [0.2.0] - 2026-07-26
 
 ### Added
