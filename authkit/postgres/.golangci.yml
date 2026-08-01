@@ -3,13 +3,19 @@ version: "2"
 linters:
   default: standard
   enable:
+    - cyclop
     - depguard
+    - gocognit
     - lll
     - misspell
     - revive
     - unconvert
     - unparam
   settings:
+    cyclop:
+      max-complexity: 10
+    gocognit:
+      min-complexity: 15
     lll:
       line-length: 120
     revive:
@@ -32,6 +38,12 @@ linters:
             - github.com/pressly/goose/v3
             - github.com/peterldowns/pgtestdb
             - github.com/pashagolub/pgxmock/v4
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - gocognit
 
 formatters:
   enable:
