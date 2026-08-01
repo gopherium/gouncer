@@ -14,6 +14,7 @@ export default [
 		},
 		rules: {
 			'max-len': ['error', { code: 120, tabWidth: 1, ignoreUrls: true }],
+			complexity: ['warn', 5],
 		},
 	},
 	{
