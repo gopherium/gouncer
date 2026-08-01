@@ -46,35 +46,67 @@ func hashPassword(password string) (string, error) {
 // VerifyPassword reports whether password matches the argon2id PHC hash.
 // It never panics, a malformed or out-of-envelope hash never matches.
 func VerifyPassword(hash, password string) bool {
+	p, ok := parseArgonHash(hash)
+	if !ok {
+		return false
+	}
+	got := argon2.IDKey([]byte(password), p.salt, p.timeCost, p.memoryKiB, p.threads, uint32(len(p.key)))
+	return subtle.ConstantTimeCompare(got, p.key) == 1
+}
+
+// argonParams carries the decoded fields of an argon2id PHC hash.
+type argonParams struct {
+	memoryKiB uint32
+	timeCost  uint32
+	threads   uint8
+	salt      []byte
+	key       []byte
+}
+
+// parseArgonHash decodes an argon2id PHC hash, reporting whether it is well
+// formed and inside the accepted resource envelope.
+func parseArgonHash(hash string) (argonParams, bool) {
 	parts := strings.Split(hash, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		return false
+		return argonParams{}, false
 	}
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return false
+		return argonParams{}, false
 	}
-	var memoryKiB, timeCost uint32
-	var threads uint8
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memoryKiB, &timeCost, &threads); err != nil {
-		return false
+	var p argonParams
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &p.memoryKiB, &p.timeCost, &p.threads); err != nil {
+		return argonParams{}, false
 	}
-	if timeCost < 1 || timeCost > maxArgonTime ||
-		threads < 1 || threads > maxArgonThreads ||
-		memoryKiB < 1 || memoryKiB > maxArgonMemoryKiB {
-		return false
+	if !withinArgonEnvelope(p) {
+		return argonParams{}, false
 	}
-	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
-	if err != nil {
-		return false
+	salt, key, ok := decodeArgonFields(parts[4], parts[5])
+	if !ok {
+		return argonParams{}, false
 	}
-	want, err := base64.RawStdEncoding.DecodeString(parts[5])
-	if err != nil {
-		return false
+	p.salt, p.key = salt, key
+	return p, true
+}
+
+// withinArgonEnvelope reports whether the cost parameters are inside the
+// accepted resource envelope.
+func withinArgonEnvelope(p argonParams) bool {
+	return p.timeCost >= 1 && p.timeCost <= maxArgonTime &&
+		p.threads >= 1 && p.threads <= maxArgonThreads &&
+		p.memoryKiB >= 1 && p.memoryKiB <= maxArgonMemoryKiB
+}
+
+// decodeArgonFields decodes the salt and key of a PHC hash, rejecting an
+// unreadable or empty one.
+func decodeArgonFields(rawSalt, rawKey string) (salt, key []byte, ok bool) {
+	salt, err := base64.RawStdEncoding.DecodeString(rawSalt)
+	if err != nil || len(salt) == 0 {
+		return nil, nil, false
 	}
-	if len(salt) == 0 || len(want) == 0 {
-		return false
+	key, err = base64.RawStdEncoding.DecodeString(rawKey)
+	if err != nil || len(key) == 0 {
+		return nil, nil, false
 	}
-	got := argon2.IDKey([]byte(password), salt, timeCost, memoryKiB, threads, uint32(len(want)))
-	return subtle.ConstantTimeCompare(got, want) == 1
+	return salt, key, true
 }
