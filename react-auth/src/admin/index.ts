@@ -3,6 +3,7 @@
 import { z } from 'zod'
 
 import { UnauthorizedError } from '../api.js'
+import { resolveTransport } from '../transport.js'
 
 export const usersQueryKey = ['users'] as const
 
@@ -50,11 +51,11 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
 }
 
 /**
- * Returns every user account.
+ * Lists the accounts over REST.
  * @param signal - Aborts the in-flight request.
  * @returns The parsed list of users.
  */
-export async function fetchUsers(signal?: AbortSignal): Promise<User[]> {
+async function restFetchUsers(signal?: AbortSignal): Promise<User[]> {
 	const response = await fetch('/api/users', { signal })
 	if (response.status === 401) {
 		throw new UnauthorizedError('session expired')
@@ -66,11 +67,11 @@ export async function fetchUsers(signal?: AbortSignal): Promise<User[]> {
 }
 
 /**
- * Creates a user account and returns it.
+ * Creates an account over REST.
  * @param input - The email, name, and password of the new account.
  * @returns The created user.
  */
-export async function createUser(input: NewUser): Promise<User> {
+async function restCreateUser(input: NewUser): Promise<User> {
 	const response = await fetch('/api/users', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -92,11 +93,11 @@ export async function createUser(input: NewUser): Promise<User> {
 }
 
 /**
- * Sets whether a user may log in.
+ * Updates an account's disabled flag over REST.
  * @param id - The identifier of the user to update.
  * @param disabled - Whether the account should be disabled.
  */
-export async function setUserDisabled(id: string, disabled: boolean): Promise<void> {
+async function restSetUserDisabled(id: string, disabled: boolean): Promise<void> {
 	const response = await fetch(`/api/users/${id}`, {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
@@ -108,4 +109,31 @@ export async function setUserDisabled(id: string, disabled: boolean): Promise<vo
 	if (!response.ok) {
 		throw new Error(`updating user failed with status ${response.status}`)
 	}
+}
+
+/**
+ * Returns every user account.
+ * @param signal - Aborts the in-flight request.
+ * @returns The parsed list of users.
+ */
+export async function fetchUsers(signal?: AbortSignal): Promise<User[]> {
+	return resolveTransport('fetchUsers', restFetchUsers)(signal)
+}
+
+/**
+ * Creates a user account and returns it.
+ * @param input - The email, name, and password of the new account.
+ * @returns The created user.
+ */
+export async function createUser(input: NewUser): Promise<User> {
+	return resolveTransport('createUser', restCreateUser)(input)
+}
+
+/**
+ * Sets whether a user may log in.
+ * @param id - The identifier of the user to update.
+ * @param disabled - Whether the account should be disabled.
+ */
+export async function setUserDisabled(id: string, disabled: boolean): Promise<void> {
+	await resolveTransport('setUserDisabled', restSetUserDisabled)(id, disabled)
 }

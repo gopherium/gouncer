@@ -2,6 +2,8 @@
 
 import { z } from 'zod'
 
+import { resolveTransport } from './transport.js'
+
 const userSchema = z.object({
 	id: z.string(),
 	email: z.string(),
@@ -28,11 +30,11 @@ export class UnauthorizedError extends Error {}
 export class RateLimitedError extends Error {}
 
 /**
- * Returns the logged-in user, or null when no session is active.
+ * Loads the session over REST.
  * @param signal - Aborts the in-flight request.
  * @returns The current user, or null when unauthenticated.
  */
-export async function fetchSession(signal?: AbortSignal): Promise<User | null> {
+async function restFetchSession(signal?: AbortSignal): Promise<User | null> {
 	const response = await fetch('/api/auth/session', { signal })
 	if (response.status === 401) {
 		return null
@@ -44,12 +46,12 @@ export async function fetchSession(signal?: AbortSignal): Promise<User | null> {
 }
 
 /**
- * Logs in with the given credentials and returns the user.
+ * Logs in over REST.
  * @param email - The account email address.
  * @param password - The account password.
  * @returns The authenticated user.
  */
-export async function login(email: string, password: string): Promise<User> {
+async function restLogin(email: string, password: string): Promise<User> {
 	const response = await fetch('/api/auth/login', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -68,11 +70,37 @@ export async function login(email: string, password: string): Promise<User> {
 }
 
 /**
- * Ends the current session.
+ * Ends the session over REST.
  */
-export async function logout(): Promise<void> {
+async function restLogout(): Promise<void> {
 	const response = await fetch('/api/auth/logout', { method: 'POST' })
 	if (!response.ok) {
 		throw new Error(`logout failed with status ${response.status}`)
 	}
+}
+
+/**
+ * Returns the logged-in user, or null when no session is active.
+ * @param signal - Aborts the in-flight request.
+ * @returns The current user, or null when unauthenticated.
+ */
+export async function fetchSession(signal?: AbortSignal): Promise<User | null> {
+	return resolveTransport('fetchSession', restFetchSession)(signal)
+}
+
+/**
+ * Logs in with the given credentials and returns the user.
+ * @param email - The account email address.
+ * @param password - The account password.
+ * @returns The authenticated user.
+ */
+export async function login(email: string, password: string): Promise<User> {
+	return resolveTransport('login', restLogin)(email, password)
+}
+
+/**
+ * Ends the current session.
+ */
+export async function logout(): Promise<void> {
+	await resolveTransport('logout', restLogout)()
 }

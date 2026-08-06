@@ -10,6 +10,16 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Added
+
+- `configureAuthTransport`, `resetAuthTransport`, and the `AuthTransport`
+  type. Every backend call of the package resolves through a configurable
+  transport whose default is the unchanged REST implementation, so a
+  consumer can swap transports without touching the screens, hooks, or
+  error contract.
+
 ## [0.1.2]
 
 ### Fixed
