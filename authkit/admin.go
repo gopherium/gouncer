@@ -4,6 +4,7 @@ package authkit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -34,7 +35,8 @@ func NewAdmin(store AdminStore) *AdminHandlers {
 	return &AdminHandlers{store: store}
 }
 
-type userSummary struct {
+// Account is one user account as administration reports it.
+type Account struct {
 	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
@@ -42,9 +44,9 @@ type userSummary struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// newUserSummary builds a userSummary from a user, normalizing the timestamp to UTC.
-func newUserSummary(u gouncer.User) userSummary {
-	return userSummary{
+// newAccount builds an Account from a user, normalizing the timestamp to UTC.
+func newAccount(u gouncer.User) Account {
+	return Account{
 		ID:        u.ID,
 		Email:     u.Email,
 		Name:      u.Name,
@@ -53,18 +55,50 @@ func newUserSummary(u gouncer.User) userSummary {
 	}
 }
 
+// ErrSelfDisable reports an account disabling itself.
+var ErrSelfDisable = errors.New("authkit: cannot disable your own account")
+
+// ListAccounts returns every user account ordered for display.
+func (a *AdminHandlers) ListAccounts(ctx context.Context) ([]Account, error) {
+	users, err := a.store.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]Account, len(users))
+	for i, u := range users {
+		accounts[i] = newAccount(u)
+	}
+	return accounts, nil
+}
+
+// CreateAccount validates and persists a new user account.
+func (a *AdminHandlers) CreateAccount(ctx context.Context, email, name, password string) (Account, error) {
+	u, err := gouncer.NewUser(email, name, password)
+	if err != nil {
+		return Account{}, err
+	}
+	if err := a.store.CreateUser(ctx, u); err != nil {
+		return Account{}, err
+	}
+	return newAccount(u), nil
+}
+
+// SetAccountDisabled updates whether the account may log in, refusing an actor disabling itself.
+func (a *AdminHandlers) SetAccountDisabled(ctx context.Context, actorID, id uuid.UUID, disabled bool) error {
+	if disabled && actorID == id {
+		return ErrSelfDisable
+	}
+	return a.store.SetUserDisabled(ctx, id, disabled)
+}
+
 // List responds with every user account.
 func (a *AdminHandlers) List(w http.ResponseWriter, r *http.Request) {
-	users, err := a.store.ListUsers(r.Context())
+	accounts, err := a.ListAccounts(r.Context())
 	if err != nil {
 		respondAuthError(w, err)
 		return
 	}
-	summaries := make([]userSummary, len(users))
-	for i, u := range users {
-		summaries[i] = newUserSummary(u)
-	}
-	Respond(w, http.StatusOK, summaries)
+	Respond(w, http.StatusOK, accounts)
 }
 
 // Create decodes credentials, creates a user account, persists it, and
@@ -80,16 +114,12 @@ func (a *AdminHandlers) Create(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, http.StatusBadRequest, "malformed json")
 		return
 	}
-	u, err := gouncer.NewUser(req.Email, req.Name, req.Password)
+	account, err := a.CreateAccount(r.Context(), req.Email, req.Name, req.Password)
 	if err != nil {
 		respondAuthError(w, err)
 		return
 	}
-	if err := a.store.CreateUser(r.Context(), u); err != nil {
-		respondAuthError(w, err)
-		return
-	}
-	Respond(w, http.StatusCreated, newUserSummary(u))
+	Respond(w, http.StatusCreated, account)
 }
 
 // SetDisabled parses the user id from the request's "id" path value and
@@ -112,11 +142,13 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, http.StatusUnprocessableEntity, "disabled is required")
 		return
 	}
-	if *req.Disabled && IdentityFromContext(r.Context()).ID == id {
+	actor := IdentityFromContext(r.Context())
+	err = a.SetAccountDisabled(r.Context(), actor.ID, id, *req.Disabled)
+	if errors.Is(err, ErrSelfDisable) {
 		RespondError(w, http.StatusUnprocessableEntity, "cannot disable your own account")
 		return
 	}
-	if err := a.store.SetUserDisabled(r.Context(), id, *req.Disabled); err != nil {
+	if err != nil {
 		respondAuthError(w, err)
 		return
 	}

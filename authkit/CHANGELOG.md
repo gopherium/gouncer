@@ -13,6 +13,15 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 
 - `testkit.Store.UserByID`, keeping the in-memory double aligned with the
   postgres store.
+- `Handlers.Authenticate`, `Handlers.StartSession`, `Handlers.EndSession`,
+  `Handlers.SessionIdentity`, and `Handlers.CookieName`, the transport free
+  service seams the HTTP handlers now delegate to.
+- `ErrInvalidCredentials`, reported by `Authenticate` for unknown, wrong,
+  or disabled logins.
+- `Account`, `AdminHandlers.ListAccounts`, `AdminHandlers.CreateAccount`,
+  and `AdminHandlers.SetAccountDisabled`, the administration seams behind
+  the admin handlers.
+- `ErrSelfDisable`, reported when an account disables itself.
 
 ## [0.2.0] - 2026-07-26
 

@@ -5,7 +5,6 @@ package authkit
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,10 +74,8 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, http.StatusBadRequest, "malformed login request")
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(body.Email))
-	u, err := h.store.UserByEmail(r.Context(), email)
-	if errors.Is(err, gouncer.ErrUserNotFound) {
-		gouncer.VerifyPassword(dummyPasswordHash, body.Password)
+	identity, err := h.Authenticate(r.Context(), body.Email, body.Password)
+	if errors.Is(err, ErrInvalidCredentials) {
 		RespondError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -86,33 +83,27 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		RespondError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	if !gouncer.VerifyPassword(u.PasswordHash, body.Password) || u.Disabled {
-		RespondError(w, http.StatusUnauthorized, "invalid credentials")
-		return
-	}
-	session, err := h.newSession(u.ID)
+	cookie, err := h.StartSession(r.Context(), identity.ID)
 	if err != nil {
 		RespondError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	session.ExpiresAt = session.CreatedAt.Add(h.ttl)
-	if err := h.store.CreateSession(r.Context(), session); err != nil {
-		RespondError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	http.SetCookie(w, sessionCookie(h.cookieName, session.Token, int(h.ttl.Seconds())))
-	Respond(w, http.StatusOK, Identity{ID: u.ID, Email: u.Email, Name: u.Name})
+	http.SetCookie(w, cookie)
+	Respond(w, http.StatusOK, identity)
 }
 
 // Logout deletes the current session and clears its cookie.
 func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
+	token := ""
 	if cookie, err := r.Cookie(h.cookieName); err == nil {
-		if err := h.store.DeleteSession(r.Context(), gouncer.HashToken(cookie.Value)); err != nil {
-			RespondError(w, http.StatusInternalServerError, "internal error")
-			return
-		}
+		token = cookie.Value
 	}
-	http.SetCookie(w, sessionCookie(h.cookieName, "", -1))
+	clearing, err := h.EndSession(r.Context(), token)
+	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	http.SetCookie(w, clearing)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -122,20 +113,16 @@ func (h *Handlers) Session(w http.ResponseWriter, r *http.Request) {
 	Respond(w, http.StatusOK, IdentityFromContext(r.Context()))
 }
 
-// sessionUser returns the user owning the request's session cookie.
-func (h *Handlers) sessionUser(r *http.Request) (gouncer.User, error) {
-	cookie, err := r.Cookie(h.cookieName)
-	if err != nil {
-		return gouncer.User{}, gouncer.ErrSessionNotFound
-	}
-	return h.store.UserBySession(r.Context(), gouncer.HashToken(cookie.Value), time.Now().UTC())
-}
-
 // RequireSession admits only requests carrying a usable session cookie,
 // passing the authenticated identity down through the request context.
 func (h *Handlers) RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, err := h.sessionUser(r)
+		cookie, err := r.Cookie(h.cookieName)
+		if err != nil {
+			RespondError(w, http.StatusUnauthorized, "no session")
+			return
+		}
+		identity, err := h.SessionIdentity(r.Context(), cookie.Value)
 		if errors.Is(err, gouncer.ErrSessionNotFound) {
 			RespondError(w, http.StatusUnauthorized, "no session")
 			return
@@ -144,7 +131,6 @@ func (h *Handlers) RequireSession(next http.Handler) http.Handler {
 			RespondError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-		identity := Identity{ID: u.ID, Email: u.Email, Name: u.Name}
 		next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), identity)))
 	})
 }
