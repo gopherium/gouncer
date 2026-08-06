@@ -47,6 +47,47 @@ func (cfg Config) limitAndWindow() (int, time.Duration) {
 	return limit, window
 }
 
+// Limiter counts login failures per key outside the HTTP middleware.
+type Limiter struct {
+	limiter *httprate.RateLimiter
+	limit   int
+	window  time.Duration
+}
+
+// NewLimiter returns a key based limiter enforcing cfg's budget.
+func NewLimiter(cfg Config) *Limiter {
+	_, window := cfg.limitAndWindow()
+	return newLimiterUsing(cfg, httprate.NewLocalLimitCounter(window))
+}
+
+// newLimiterUsing returns a key based limiter tracking failures in counter.
+func newLimiterUsing(cfg Config, counter httprate.LimitCounter) *Limiter {
+	limit, window := cfg.limitAndWindow()
+	return &Limiter{
+		limiter: httprate.NewRateLimiter(limit, window, httprate.WithLimitCounter(counter)),
+		limit:   limit,
+		window:  window,
+	}
+}
+
+// Check reports whether key may attempt a login, and the wait when it may not.
+func (l *Limiter) Check(key string) (bool, time.Duration, error) {
+	_, rate, err := l.limiter.Status(key)
+	if err != nil {
+		return false, 0, err
+	}
+	if int(math.Round(rate)) >= l.limit {
+		return false, 2 * l.window, nil
+	}
+	return true, 0, nil
+}
+
+// RecordFailure counts one failed login for key.
+func (l *Limiter) RecordFailure(key string) error {
+	bucket := time.Now().UTC().Truncate(l.window)
+	return l.limiter.Counter().IncrementBy(key, bucket, 1)
+}
+
 // Middleware returns middleware that limits failed login attempts per client IP.
 func Middleware(cfg Config) func(http.Handler) http.Handler {
 	_, window := cfg.limitAndWindow()
@@ -56,35 +97,41 @@ func Middleware(cfg Config) func(http.Handler) http.Handler {
 // middlewareUsing returns middleware that limits failed login attempts
 // per client IP, tracking them in counter.
 func middlewareUsing(cfg Config, counter httprate.LimitCounter) func(http.Handler) http.Handler {
-	limit, window := cfg.limitAndWindow()
-	limiter := httprate.NewRateLimiter(limit, window,
-		httprate.WithLimitCounter(counter),
-	)
+	limiter := newLimiterUsing(cfg, counter)
 	resolve := clientIPResolver(cfg.TrustedProxies)
 	limitStage := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := keyByRemoteIP(r)
-			_, rate, err := limiter.Status(key)
+			allowed, retryAfter, err := limiter.Check(key)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "internal error")
 				return
 			}
-			if int(math.Round(rate)) >= limit {
-				w.Header().Set("Retry-After", strconv.Itoa(int((2 * window).Seconds())))
+			if !allowed {
+				w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 				writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
 				return
 			}
 			recorder := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			next.ServeHTTP(recorder, r)
 			if recorder.Status() == http.StatusUnauthorized {
-				bucket := time.Now().UTC().Truncate(window)
-				_ = limiter.Counter().IncrementBy(key, bucket, 1)
+				_ = limiter.RecordFailure(key)
 			}
 		})
 	}
 	return func(next http.Handler) http.Handler {
 		return resolve(limitStage(next))
 	}
+}
+
+// ResolveClientIP returns middleware recording the request's client IP under the trusted proxy rules.
+func ResolveClientIP(trustedProxies []string) func(http.Handler) http.Handler {
+	return clientIPResolver(trustedProxies)
+}
+
+// ClientIP returns the request's canonical client IP for rate limiting.
+func ClientIP(r *http.Request) string {
+	return keyByRemoteIP(r)
 }
 
 // clientIPResolver returns middleware that records a request's client IP for rate limiting.

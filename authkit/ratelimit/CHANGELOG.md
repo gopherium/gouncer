@@ -8,6 +8,16 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/ratelimit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Limiter` with `NewLimiter`, `Check`, and `RecordFailure`, the key based
+  API beside the middleware with the same budget, windows, and retry
+  values. The middleware now runs on it.
+- `ClientIP` and `ResolveClientIP`, exporting the canonical client IP
+  resolution with the trusted proxy rules.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added
