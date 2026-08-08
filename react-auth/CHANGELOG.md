@@ -10,6 +10,17 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [0.3.0]
+
+### Changed
+
+- The log in and log out buttons show the design system busy state while
+  their request is in flight, instead of only dimming.
+- The `@wordpress/ui` peer range narrowed to `>=0.19.0 <0.20.0`, the one
+  window this release is built and tested against. The busy state needs
+  the `loading` prop, so a consumer on an older design system would have
+  seen a button that neither spins nor blocks a second click.
+
 ## [0.2.0] - 2026-08-06
 
 ### Added

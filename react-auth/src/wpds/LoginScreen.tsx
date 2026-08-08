@@ -73,6 +73,7 @@ export function LoginScreen({
 								disabled={
 									email.trim() === '' || password === '' || attempt.isPending
 								}
+								loading={attempt.isPending}
 							>
 								Log in
 							</Button>

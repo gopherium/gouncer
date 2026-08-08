@@ -3,11 +3,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http } from 'msw'
 import { expect, test } from 'vitest'
 
 import { sessionQueryKey } from '../src/session'
 import { logoutFailure, logoutOk, seedSession, server } from '../src/testing'
 import { AccountPanel } from '../src/wpds'
+import { busyClasses } from './busy'
 
 function renderPanel(signedIn = true) {
 	const client = new QueryClient({
@@ -24,6 +26,23 @@ function renderPanel(signedIn = true) {
 	)
 	return client
 }
+
+test('shows the log out button busy while the session is ending', async () => {
+	const busy = busyClasses()
+	expect(busy.length).toBeGreaterThan(0)
+	server.use(http.post('/api/auth/logout', () => new Promise(() => {})))
+	renderPanel()
+
+	await userEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+
+	const out = screen.getByRole('button', { name: 'Log out' })
+	await waitFor(() => {
+		for (const token of busy) {
+			expect([...out.classList]).toContain(token)
+		}
+	})
+	expect(out).toHaveAttribute('aria-disabled', 'true')
+})
 
 test('shows the signed-in user and a logout control', async () => {
 	renderPanel()

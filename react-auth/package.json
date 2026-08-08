@@ -1,6 +1,6 @@
 {
   "name": "@gopherium/react-auth",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Session authentication for React apps backed by gouncer's authkit.",
   "license": "Apache-2.0",
   "type": "module",
@@ -48,7 +48,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@wordpress/theme": ">=1.0.0 <2.0.0",
-    "@wordpress/ui": ">=0.17.0 <1.0.0",
+    "@wordpress/ui": ">=0.19.0 <0.20.0",
     "msw": "^2.15.0",
     "react": "^19.2.7",
     "vitest": "^4.1.10"

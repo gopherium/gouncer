@@ -22,7 +22,7 @@ export function AccountPanel({ className }: { className?: string }) {
 			<Text>{user.name}</Text>
 			<Button
 				variant="outline"
-				disabled={signOut.isPending}
+				loading={signOut.isPending}
 				onClick={() => signOut.mutate()}
 			>
 				Log out

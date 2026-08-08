@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http } from 'msw'
 import { expect, test, vi } from 'vitest'
 
 import {
@@ -14,6 +15,7 @@ import {
 	server,
 } from '../src/testing'
 import { LoginScreen } from '../src/wpds'
+import { busyClasses } from './busy'
 
 function renderLogin() {
 	const client = new QueryClient({
@@ -33,6 +35,23 @@ async function submitCredentials(email: string, password: string) {
 	await userEvent.type(screen.getByLabelText('Password'), password)
 	await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
 }
+
+test('shows the log in button busy and still refuses a second submit', async () => {
+	const busy = busyClasses()
+	expect(busy.length).toBeGreaterThan(0)
+	server.use(http.post('/api/auth/login', () => new Promise(() => {})))
+	renderLogin()
+
+	await submitCredentials('maria@example.com', 'correct horse battery')
+
+	const submit = screen.getByRole('button', { name: 'Log in' })
+	await waitFor(() => {
+		for (const token of busy) {
+			expect([...submit.classList]).toContain(token)
+		}
+	})
+	expect(submit).toHaveAttribute('aria-disabled', 'true')
+})
 
 test('shows the login form under the given brand', () => {
 	renderLogin()
