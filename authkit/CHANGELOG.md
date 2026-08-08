@@ -7,12 +7,10 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-06
 
 ### Added
 
-- `testkit.Store.UserByID`, keeping the in-memory double aligned with the
-  postgres store.
 - `Handlers.Authenticate`, `Handlers.StartSession`, `Handlers.EndSession`,
   `Handlers.SessionIdentity`, and `Handlers.CookieName`, the transport free
   service seams the HTTP handlers now delegate to.
@@ -22,6 +20,13 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   and `AdminHandlers.SetAccountDisabled`, the administration seams behind
   the admin handlers.
 - `ErrSelfDisable`, reported when an account disables itself.
+
+## [0.3.0] - 2026-07-30
+
+### Added
+
+- `testkit.Store.UserByID`, keeping the in-memory double aligned with the
+  postgres store.
 
 ## [0.2.0] - 2026-07-26
 
@@ -49,4 +54,7 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `testkit.Store`, an in-memory store double encoding the gouncer
   contract semantics.
 
+[0.4.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.4.0
+[0.3.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.3.0
+[0.2.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.2.0
 [0.1.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.1.0

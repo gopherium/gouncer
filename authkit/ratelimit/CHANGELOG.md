@@ -8,7 +8,7 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/ratelimit/vX.Y.Z`.
 
-## [Unreleased]
+## [0.2.0] - 2026-08-06
 
 ### Added
 
@@ -27,4 +27,5 @@ Releases of this module are tagged `authkit/ratelimit/vX.Y.Z`.
 - `Config` with a configurable limit, window, and trusted proxies.
 - `ParseTrustedProxies` validating comma-separated CIDR lists.
 
+[0.2.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fratelimit%2Fv0.2.0
 [0.1.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fratelimit%2Fv0.1.0
