@@ -71,21 +71,21 @@ type credentials struct {
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	body, err := Decode[credentials](w, r)
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "malformed login request")
+		respondDecodeError(w, err, "malformed login request")
 		return
 	}
 	identity, err := h.Authenticate(r.Context(), body.Email, body.Password)
 	if errors.Is(err, ErrInvalidCredentials) {
-		RespondError(w, http.StatusUnauthorized, "invalid credentials")
+		RespondRefusal(w, http.StatusUnauthorized, Refusal{Message: "invalid credentials", Code: "credentials_invalid"})
 		return
 	}
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, "internal error")
+		RespondRefusal(w, http.StatusInternalServerError, Refusal{Message: "internal error", Code: "internal"})
 		return
 	}
 	cookie, err := h.StartSession(r.Context(), identity.ID)
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, "internal error")
+		RespondRefusal(w, http.StatusInternalServerError, Refusal{Message: "internal error", Code: "internal"})
 		return
 	}
 	http.SetCookie(w, cookie)
@@ -100,7 +100,7 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	clearing, err := h.EndSession(r.Context(), token)
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, "internal error")
+		RespondRefusal(w, http.StatusInternalServerError, Refusal{Message: "internal error", Code: "internal"})
 		return
 	}
 	http.SetCookie(w, clearing)
@@ -119,16 +119,16 @@ func (h *Handlers) RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(h.cookieName)
 		if err != nil {
-			RespondError(w, http.StatusUnauthorized, "no session")
+			RespondRefusal(w, http.StatusUnauthorized, Refusal{Message: "no session", Code: "session_absent"})
 			return
 		}
 		identity, err := h.SessionIdentity(r.Context(), cookie.Value)
 		if errors.Is(err, gouncer.ErrSessionNotFound) {
-			RespondError(w, http.StatusUnauthorized, "no session")
+			RespondRefusal(w, http.StatusUnauthorized, Refusal{Message: "no session", Code: "session_absent"})
 			return
 		}
 		if err != nil {
-			RespondError(w, http.StatusInternalServerError, "internal error")
+			RespondRefusal(w, http.StatusInternalServerError, Refusal{Message: "internal error", Code: "internal"})
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), identity)))

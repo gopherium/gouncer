@@ -111,7 +111,7 @@ func (a *AdminHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	req, err := Decode[request](w, r)
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "malformed json")
+		respondDecodeError(w, err, "malformed json")
 		return
 	}
 	account, err := a.CreateAccount(r.Context(), req.Email, req.Name, req.Password)
@@ -130,22 +130,28 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "malformed user id")
+		RespondRefusal(w, http.StatusBadRequest, Refusal{
+			Message: "malformed user id", Code: "user_id_malformed",
+		})
 		return
 	}
 	req, err := Decode[request](w, r)
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "malformed json")
+		respondDecodeError(w, err, "malformed json")
 		return
 	}
 	if req.Disabled == nil {
-		RespondError(w, http.StatusUnprocessableEntity, "disabled is required")
+		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+			Message: "disabled is required", Code: "body_field_required", Meta: map[string]any{"field": "disabled"},
+		})
 		return
 	}
 	actor := IdentityFromContext(r.Context())
 	err = a.SetAccountDisabled(r.Context(), actor.ID, id, *req.Disabled)
 	if errors.Is(err, ErrSelfDisable) {
-		RespondError(w, http.StatusUnprocessableEntity, "cannot disable your own account")
+		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+			Message: "cannot disable your own account", Code: "self_disable_refused",
+		})
 		return
 	}
 	if err != nil {
