@@ -104,12 +104,12 @@ func middlewareUsing(cfg Config, counter httprate.LimitCounter) func(http.Handle
 			key := keyByRemoteIP(r)
 			allowed, retryAfter, err := limiter.Check(key)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, "internal error")
+				writeError(w, http.StatusInternalServerError, "internal error", "internal")
 				return
 			}
 			if !allowed {
 				w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-				writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
+				writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later", "login_rate_limited")
 				return
 			}
 			recorder := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
@@ -171,9 +171,9 @@ func ParseTrustedProxies(raw string) ([]string, error) {
 	return prefixes, nil
 }
 
-// writeError writes a JSON error response with the given status code and message.
-func writeError(w http.ResponseWriter, status int, message string) {
+// writeError writes a JSON error response naming the reason as a code beside its message.
+func writeError(w http.ResponseWriter, status int, message, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, _ = fmt.Fprintf(w, `{"error":%q}`, message)
+	_, _ = fmt.Fprintf(w, `{"error":%q,"code":%q}`, message, code)
 }
