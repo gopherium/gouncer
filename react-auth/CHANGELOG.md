@@ -10,6 +10,24 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [0.4.0] - 2026-08-17
+
+### Added
+
+- Every rendered string is translatable under the text domain
+  `gopherium-react-auth`, exported as `DOMAIN`.
+- `catalogFor(locale)` and the `Catalog` type, reading the compiled
+  catalogue the package ships under `dist/languages`.
+- An `es-ES` catalogue covering all 32 messages.
+
+### Changed
+
+- `usersNavItem.label` became a getter, so it follows the catalogue the
+  consumer loaded.
+- `@wordpress/i18n` is a required peer at `>=6.26.0 <7.0.0`.
+- The `Enable` and `Disable` row labels carry the name as a placeholder
+  instead of joining it.
+
 ## [0.3.0] - 2026-08-08
 
 ### Changed
