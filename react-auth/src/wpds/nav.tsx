@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { _x } from '@wordpress/i18n'
 import type { ComponentProps, ReactElement } from 'react'
+
+import { DOMAIN } from '../domain.js'
 
 const usersIcon = (
 	<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
@@ -18,4 +21,10 @@ export const usersNavItem: {
 	label: string
 	to: string
 	icon: ReactElement<ComponentProps<'svg'>>
-} = { label: 'Users', to: '/users', icon: usersIcon }
+} = {
+	get label() {
+		return _x('Users', 'admin section', DOMAIN)
+	},
+	to: '/users',
+	icon: usersIcon,
+}

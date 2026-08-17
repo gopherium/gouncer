@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { __ } from '@wordpress/i18n'
 import { z } from 'zod'
 
 import { UnauthorizedError } from '../api.js'
+import { DOMAIN } from '../domain.js'
 import { resolveTransport } from '../transport.js'
 
 export const usersQueryKey = ['users'] as const
@@ -84,7 +86,7 @@ async function restCreateUser(input: NewUser): Promise<User> {
 		throw new EmailTakenError('email already in use')
 	}
 	if (response.status === 422) {
-		throw new ValidationError(await errorMessage(response, 'invalid user details'))
+		throw new ValidationError(await errorMessage(response, __('invalid user details', DOMAIN)))
 	}
 	if (!response.ok) {
 		throw new Error(`creating user failed with status ${response.status}`)

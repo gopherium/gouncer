@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useMutation } from '@tanstack/react-query'
+import { __, _x } from '@wordpress/i18n'
 import { Button, Card, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
 import { InvalidCredentialsError, RateLimitedError, login } from '../api.js'
 import type { User } from '../api.js'
+import { DOMAIN } from '../domain.js'
 
 /**
  * Maps a login attempt error to the message shown to the user.
@@ -14,12 +16,12 @@ import type { User } from '../api.js'
  */
 function loginErrorMessage(error: unknown): string {
 	if (error instanceof InvalidCredentialsError) {
-		return 'Invalid email or password.'
+		return __('Invalid email or password.', DOMAIN)
 	}
 	if (error instanceof RateLimitedError) {
-		return 'Too many attempts. Please wait a minute and try again.'
+		return __('Too many attempts. Please wait a minute and try again.', DOMAIN)
 	}
-	return 'Login failed, please try again.'
+	return __('Login failed, please try again.', DOMAIN)
 }
 
 /**
@@ -57,13 +59,13 @@ export function LoginScreen({
 								{brand}
 							</Text>
 							<InputControl
-								label="Email"
+								label={_x('Email', 'field label', DOMAIN)}
 								type="email"
 								value={email}
 								onChange={(event) => setEmail(event.target.value)}
 							/>
 							<InputControl
-								label="Password"
+								label={__('Password', DOMAIN)}
 								type="password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
@@ -75,7 +77,7 @@ export function LoginScreen({
 								}
 								loading={attempt.isPending}
 							>
-								Log in
+								{__('Log in', DOMAIN)}
 							</Button>
 							{attempt.isError ? (
 								<Text role="alert">{loginErrorMessage(attempt.error)}</Text>

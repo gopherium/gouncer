@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { __, _x } from '@wordpress/i18n'
 import { Button, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
 import { EmailTakenError, ValidationError, createUser, usersQueryKey } from '../admin/index.js'
+import { DOMAIN } from '../domain.js'
 
 /**
  * Maps a creation failure to the message shown under the form, surfacing
@@ -14,12 +16,12 @@ import { EmailTakenError, ValidationError, createUser, usersQueryKey } from '../
  */
 function createErrorMessage(error: Error): string {
 	if (error instanceof EmailTakenError) {
-		return 'That email is already in use.'
+		return __('That email is already in use.', DOMAIN)
 	}
 	if (error instanceof ValidationError) {
 		return error.message
 	}
-	return 'The user could not be created.'
+	return __('The user could not be created.', DOMAIN)
 }
 
 /**
@@ -48,7 +50,7 @@ export function NewUserScreen({
 	return (
 		<Stack direction="column" gap="lg">
 			<Text variant="heading-lg" render={<h1 />}>
-				New user
+				{_x('New user', 'page heading', DOMAIN)}
 			</Text>
 			<form
 				onSubmit={(event) => {
@@ -58,20 +60,20 @@ export function NewUserScreen({
 			>
 				<Stack direction="column" gap="md">
 					<InputControl
-						label="Email"
+						label={_x('Email', 'field label', DOMAIN)}
 						type="email"
 						autoComplete="off"
 						value={email}
 						onChange={(event) => setEmail(event.target.value)}
 					/>
 					<InputControl
-						label="Name"
+						label={_x('Name', 'field label', DOMAIN)}
 						autoComplete="off"
 						value={name}
 						onChange={(event) => setName(event.target.value)}
 					/>
 					<InputControl
-						label="Password"
+						label={__('Password', DOMAIN)}
 						type="password"
 						autoComplete="new-password"
 						value={password}
@@ -86,7 +88,7 @@ export function NewUserScreen({
 							create.isPending
 						}
 					>
-						Create user
+						{__('Create user', DOMAIN)}
 					</Button>
 					{create.isError ? (
 						<Text role="alert">{createErrorMessage(create.error)}</Text>

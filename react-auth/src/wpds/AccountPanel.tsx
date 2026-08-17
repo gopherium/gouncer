@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { __ } from '@wordpress/i18n'
 import { Button, Stack, Text } from '@wordpress/ui'
 
+import { DOMAIN } from '../domain.js'
 import { useLogout, useSession } from '../session.js'
 
 /**
@@ -25,10 +27,10 @@ export function AccountPanel({ className }: { className?: string }) {
 				loading={signOut.isPending}
 				onClick={() => signOut.mutate()}
 			>
-				Log out
+				{__('Log out', DOMAIN)}
 			</Button>
 			{signOut.isError ? (
-				<Text role="alert">Logout failed, please try again.</Text>
+				<Text role="alert">{__('Logout failed, please try again.', DOMAIN)}</Text>
 			) : null}
 		</Stack>
 	)

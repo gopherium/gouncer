@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQueryClient } from '@tanstack/react-query'
+import { __ } from '@wordpress/i18n'
 import type { ReactNode } from 'react'
 
 import type { User } from './api.js'
+import { DOMAIN } from './domain.js'
 import { sessionQueryKey, useSession } from './session.js'
 
 /**
@@ -18,8 +20,8 @@ import { sessionQueryKey, useSession } from './session.js'
 export function AuthGate({
 	children,
 	loginScreen,
-	loading = <p role="status">Loading…</p>,
-	error = <p role="alert">Something went wrong.</p>,
+	loading = <p role="status">{__('Loading…', DOMAIN)}</p>,
+	error = <p role="alert">{__('Something went wrong.', DOMAIN)}</p>,
 }: {
 	children: ReactNode
 	loginScreen: (onLogin: (user: User) => void | Promise<void>) => ReactNode

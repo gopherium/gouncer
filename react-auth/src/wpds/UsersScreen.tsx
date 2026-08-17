@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { __, _x, sprintf } from '@wordpress/i18n'
 import { Badge, Button, Stack, Text, VisuallyHidden } from '@wordpress/ui'
 import type { ReactElement } from 'react'
 
 import { fetchUsers, setUserDisabled, usersQueryKey } from '../admin/index.js'
 import type { User } from '../admin/index.js'
+import { DOMAIN } from '../domain.js'
 import { useSession } from '../session.js'
 
 /**
@@ -28,7 +30,7 @@ function UserRow({ user, isSelf }: { user: User; isSelf: boolean }) {
 			<td>{user.email}</td>
 			<td>
 				<Badge intent={user.disabled ? 'draft' : 'stable'}>
-					{user.disabled ? 'Disabled' : 'Active'}
+					{user.disabled ? __('Disabled', DOMAIN) : __('Active', DOMAIN)}
 				</Badge>
 			</td>
 			<td>
@@ -36,13 +38,17 @@ function UserRow({ user, isSelf }: { user: User; isSelf: boolean }) {
 					<Stack direction="column" gap="xs">
 						<Button
 							variant="outline"
-							aria-label={`${user.disabled ? 'Enable' : 'Disable'} ${user.name}`}
+							aria-label={
+								user.disabled
+									? sprintf(__('Enable %s', DOMAIN), user.name)
+									: sprintf(__('Disable %s', DOMAIN), user.name)
+							}
 							disabled={toggle.isPending}
 							onClick={() => toggle.mutate()}
 						>
-							{user.disabled ? 'Enable' : 'Disable'}
+							{user.disabled ? __('Enable', DOMAIN) : __('Disable', DOMAIN)}
 						</Button>
-						{toggle.isError ? <Text role="alert">Update failed.</Text> : null}
+						{toggle.isError ? <Text role="alert">{__('Update failed.', DOMAIN)}</Text> : null}
 					</Stack>
 				)}
 			</td>
@@ -69,27 +75,29 @@ export function UsersScreen({
 	})
 
 	if (users.isPending) {
-		return <Text role="status">Loading users…</Text>
+		return <Text role="status">{__('Loading users…', DOMAIN)}</Text>
 	}
 	if (users.isError) {
-		return <Text role="alert">Users could not be loaded.</Text>
+		return <Text role="alert">{__('Users could not be loaded.', DOMAIN)}</Text>
 	}
 	return (
 		<Stack direction="column" gap="lg">
 			<Stack direction="row" align="center" gap="md">
 				<Text variant="heading-lg" render={<h1 />}>
-					Users
+					{_x('Users', 'page heading', DOMAIN)}
 				</Text>
-				{newUserRender ? <Button render={newUserRender}>New user</Button> : null}
+				{newUserRender ? (
+					<Button render={newUserRender}>{_x('New user', 'button', DOMAIN)}</Button>
+				) : null}
 			</Stack>
 			<table className="gopherium-users">
 				<thead>
 					<tr>
-						<th scope="col">Name</th>
-						<th scope="col">Email</th>
-						<th scope="col">Status</th>
+						<th scope="col">{_x('Name', 'column', DOMAIN)}</th>
+						<th scope="col">{_x('Email', 'column', DOMAIN)}</th>
+						<th scope="col">{_x('Status', 'column', DOMAIN)}</th>
 						<th scope="col">
-							<VisuallyHidden>Actions</VisuallyHidden>
+							<VisuallyHidden>{__('Actions', DOMAIN)}</VisuallyHidden>
 						</th>
 					</tr>
 				</thead>

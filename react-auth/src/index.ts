@@ -10,6 +10,7 @@ export {
 } from './api.js'
 export type { User } from './api.js'
 export { AuthGate } from './AuthGate.js'
+export { DOMAIN } from './domain.js'
 export { isSessionRevoked } from './probe.js'
 export { createAuthQueryClient } from './queryClient.js'
 export { sessionQueryKey, useLogout, useSession } from './session.js'
