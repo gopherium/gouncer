@@ -11,6 +11,8 @@ export {
 export type { User } from './api.js'
 export { AuthGate } from './AuthGate.js'
 export { DOMAIN } from './domain.js'
+export { catalogFor } from './languages.js'
+export type { Catalog } from './languages.js'
 export { isSessionRevoked } from './probe.js'
 export { createAuthQueryClient } from './queryClient.js'
 export { sessionQueryKey, useLogout, useSession } from './session.js'

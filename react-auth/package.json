@@ -1,6 +1,6 @@
 {
   "name": "@gopherium/react-auth",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Session authentication for React apps backed by gouncer's authkit.",
   "license": "Apache-2.0",
   "type": "module",
@@ -26,14 +26,17 @@
       "default": "./dist/wpds/index.js"
     },
     "./wpds/style.css": "./dist/wpds/style.css",
+    "./languages/*": "./dist/languages/*",
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && cp src/wpds/style.css dist/wpds/style.css",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/wpds/style.css dist/wpds/style.css && cp -R src/languages dist/languages",
+    "catalogs": "node scripts/write-catalogs.ts",
     "cover": "vitest run --coverage",
+    "pot": "node scripts/write-pot.ts",
     "lint": "oxlint",
     "prepublishOnly": "pnpm run build"
   },
@@ -45,9 +48,9 @@
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.101.2",
-    "@wordpress/i18n": ">=6.26.0 <7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@wordpress/i18n": ">=6.26.0 <7.0.0",
     "@wordpress/theme": ">=1.0.0 <2.0.0",
     "@wordpress/ui": ">=0.19.0 <0.20.0",
     "msw": "^2.15.0",
@@ -79,6 +82,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/gettext-parser": "9.0.0",
     "@types/react": "^19.2.17",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
@@ -89,6 +93,8 @@
     "eslint-plugin-jsdoc": "^63.0.13",
     "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-tsdoc": "^0.4.0",
+    "gettext-extractor": "4.0.6",
+    "gettext-parser": "9.1.1",
     "jsdom": "^29.1.1",
     "msw": "^2.15.0",
     "oxlint": "^1.71.0",

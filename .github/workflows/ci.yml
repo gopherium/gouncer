@@ -71,7 +71,11 @@ jobs:
       - run: pnpm run cover
       - run: pnpm exec oxlint
       - run: pnpm exec eslint .
+      - run: pnpm run pot
+      - run: pnpm run catalogs
+      - run: git diff --exit-code -- languages src/languages
       - run: pnpm run build
+      - run: node --input-type=module -e "const { catalogFor } = await import('./dist/languages.js'); if ((await catalogFor('es-ES')) === undefined) { process.exit(1) }"
 
   vulncheck:
     runs-on: ubuntu-latest

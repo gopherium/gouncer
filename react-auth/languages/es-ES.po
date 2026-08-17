@@ -1,0 +1,114 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gopherium-react-auth\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: gopherium-react-auth\n"
+"Language: es-ES\n"
+
+msgid "Actions"
+msgstr "Acciones"
+
+msgid "Active"
+msgstr "Activo"
+
+msgid "Create user"
+msgstr "Crear usuario"
+
+msgid "Disable"
+msgstr "Desactivar"
+
+msgid "Disable %s"
+msgstr "Desactivar a %s"
+
+msgid "Disabled"
+msgstr "Desactivado"
+
+msgid "Enable"
+msgstr "Activar"
+
+msgid "Enable %s"
+msgstr "Activar a %s"
+
+msgid "Invalid email or password."
+msgstr "Correo o contraseña no válidos."
+
+msgid "Loading users…"
+msgstr "Cargando usuarios…"
+
+msgid "Loading…"
+msgstr "Cargando…"
+
+msgid "Log in"
+msgstr "Iniciar sesión"
+
+msgid "Log out"
+msgstr "Cerrar sesión"
+
+msgid "Login failed, please try again."
+msgstr "No se pudo iniciar sesión, inténtalo de nuevo."
+
+msgid "Logout failed, please try again."
+msgstr "No se pudo cerrar sesión, inténtalo de nuevo."
+
+msgid "Password"
+msgstr "Contraseña"
+
+msgid "Something went wrong."
+msgstr "Algo ha ido mal."
+
+msgid "That email is already in use."
+msgstr "Ese correo ya está en uso."
+
+msgid "The user could not be created."
+msgstr "No se pudo crear el usuario."
+
+msgid "Too many attempts. Please wait a minute and try again."
+msgstr "Demasiados intentos. Espera un minuto e inténtalo de nuevo."
+
+msgid "Update failed."
+msgstr "No se pudo actualizar."
+
+msgid "Users could not be loaded."
+msgstr "No se pudieron cargar los usuarios."
+
+msgid "invalid user details"
+msgstr "datos de usuario no válidos"
+
+msgctxt "admin section"
+msgid "Users"
+msgstr "Usuarios"
+
+msgctxt "button"
+msgid "New user"
+msgstr "Nuevo usuario"
+
+msgctxt "column"
+msgid "Email"
+msgstr "Correo"
+
+msgctxt "column"
+msgid "Name"
+msgstr "Nombre"
+
+msgctxt "column"
+msgid "Status"
+msgstr "Estado"
+
+msgctxt "field label"
+msgid "Email"
+msgstr "Correo"
+
+msgctxt "field label"
+msgid "Name"
+msgstr "Nombre"
+
+msgctxt "page heading"
+msgid "New user"
+msgstr "Nuevo usuario"
+
+msgctxt "page heading"
+msgid "Users"
+msgstr "Usuarios"
