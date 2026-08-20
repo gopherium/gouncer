@@ -7,6 +7,31 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [0.6.0] - 2026-08-20
+
+### Added
+
+- `Identity.Rank`, the rank the authenticated account holds, resolved by
+  both `Authenticate` and `SessionIdentity`.
+- `Config.Privileged`, the ranks a gate admits, copied on construction so
+  a caller mutating its own slice cannot widen a gate.
+- `Handlers.RequirePrivilege`, refusing a request whose identity holds no
+  privileged rank with the code `rank_insufficient`. Configuring no ranks
+  admits every request.
+
+### Changed
+
+- Requires `gouncer` v0.2.0 for its rank vocabulary.
+- The toolchain moves to go1.26.7, which carries the standard library
+  fixes for GO-2026-5972, GO-2026-6088 and GO-2026-6090.
+
+## [0.5.0] - 2026-08-17
+
+### Added
+
+- A stable `Code` on every refusal, so a consumer can answer a refusal in
+  its own words rather than matching on message text.
+
 ## [0.4.0] - 2026-08-06
 
 ### Added
@@ -54,6 +79,8 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `testkit.Store`, an in-memory store double encoding the gouncer
   contract semantics.
 
+[0.6.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.6.0
+[0.5.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.5.0
 [0.4.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.4.0
 [0.3.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.3.0
 [0.2.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.2.0
