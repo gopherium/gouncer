@@ -138,6 +138,9 @@ func (s *UserStore) disable(ctx context.Context, queries *db.Queries, id uuid.UU
 
 // GrantRankToRankless gives a rank to every account holding none, reporting how many took it.
 func (s *UserStore) GrantRankToRankless(ctx context.Context, rank string) (int64, error) {
+	if rank == "" {
+		return 0, gouncer.ErrEmptyRank
+	}
 	granted, err := s.queries.GrantRankToRankless(ctx, rank)
 	if err != nil {
 		return 0, fmt.Errorf("postgres: grant rank: %w", err)

@@ -218,3 +218,26 @@ func TestGrantRankToRanklessAccountsIsIdempotent(t *testing.T) {
 		t.Errorf("second run granted = %d, want 0", granted)
 	}
 }
+
+func TestGrantRankToRanklessRefusesTheEmptyRank(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	ada := addRanked(t, store, "ada@example.com", "")
+
+	granted, err := store.GrantRankToRankless(t.Context(), "")
+
+	if !errors.Is(err, gouncer.ErrEmptyRank) {
+		t.Fatalf("GrantRankToRankless() error = %v, want ErrEmptyRank", err)
+	}
+	if granted != 0 {
+		t.Errorf("granted = %d, want 0", granted)
+	}
+	held, readErr := store.UserByID(t.Context(), ada.ID)
+	if readErr != nil {
+		t.Fatalf("UserByID() error = %v, want nil", readErr)
+	}
+	if held.Rank != "" {
+		t.Errorf("rank = %q, want the refused grant to leave it unranked", held.Rank)
+	}
+}
