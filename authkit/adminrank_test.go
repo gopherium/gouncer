@@ -214,3 +214,32 @@ func TestDisablingRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 		t.Errorf("code = %q, want %q", code, "last_privileged_refused")
 	}
 }
+
+func TestGuardedWritesCarryTheConfiguredPrivilegedRanks(t *testing.T) {
+	t.Parallel()
+
+	for _, held := range []struct {
+		name   string
+		method string
+		target func(id string) string
+		body   string
+	}{
+		{"rank", http.MethodPut, func(id string) string { return "/api/users/" + id + "/rank" }, `{"rank":"editor"}`},
+		{"disable", http.MethodPatch, func(id string) string { return "/api/users/" + id }, `{"disabled":true}`},
+	} {
+		t.Run(held.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := testkit.NewStore()
+			srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+			maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
+
+			doRequest(t, srv, held.method, held.target(maria.ID.String()), held.body)
+
+			if len(store.CoverGiven) != 1 || store.CoverGiven[0] != "admin" {
+				t.Errorf("cover handed to the guard = %v, want the configured ranks, or the rail runs uncovered",
+					store.CoverGiven)
+			}
+		})
+	}
+}
