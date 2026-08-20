@@ -5,6 +5,22 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/). While
 at v0.x, minor releases may contain breaking changes.
 
+## [0.2.0] - 2026-08-20
+
+### Added
+
+- `Ranks`, a set of rank names, and `Holds`, which never admits an
+  unranked account.
+- `User.Rank`, the rank an account holds, as open text an application
+  names for itself.
+- `ErrLastPrivileged` for a write leaving no enabled account under a
+  privileged rank, and `ErrEmptyRank` for a rank name that is empty.
+
+### Changed
+
+- The toolchain moves to go1.26.7, which carries the standard library
+  fixes for GO-2026-5972, GO-2026-6088 and GO-2026-6090.
+
 ## [0.1.0] - 2026-07-10
 
 ### Added
@@ -15,4 +31,5 @@ at v0.x, minor releases may contain breaking changes.
   stored only as digests.
 - Storage-agnostic `Store` interface with sentinel errors.
 
+[0.2.0]: https://github.com/gopherium/gouncer/releases/tag/v0.2.0
 [0.1.0]: https://github.com/gopherium/gouncer/releases/tag/v0.1.0
