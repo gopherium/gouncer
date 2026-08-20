@@ -8,6 +8,19 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [0.6.0] - 2026-08-20
+
+### Added
+
+- `RunGrantRank`, giving a rank to every account holding none, which an
+  installation adopting ranks runs once out of band.
+
+### Changed
+
+- **Breaking.** `RunCreateAdmin` takes a `-rank` flag naming the rank the
+  new account starts under, and refuses without it.
+- Requires `authkit` v0.8.0.
+
 ## [0.5.0] - 2026-08-20
 
 ### Changed
@@ -67,6 +80,7 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 - `testdb` package with pgtestdb wiring that migrates test databases
   through `Migrate` itself.
 
+[0.6.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.6.0
 [0.5.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.5.0
 [0.4.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.4.0
 [0.3.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.3.0
