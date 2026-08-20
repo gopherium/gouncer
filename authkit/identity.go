@@ -6,6 +6,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
+	"github.com/gopherium/gouncer"
 )
 
 // Identity is the authenticated user exposed to handlers, deliberately
@@ -14,6 +16,12 @@ type Identity struct {
 	ID    uuid.UUID `json:"id"`
 	Email string    `json:"email"`
 	Name  string    `json:"name"`
+	Rank  string    `json:"rank"`
+}
+
+// identityOf returns the identity a user is known by, without its credentials.
+func identityOf(u gouncer.User) Identity {
+	return Identity{ID: u.ID, Email: u.Email, Name: u.Name, Rank: u.Rank}
 }
 
 type contextKey int
