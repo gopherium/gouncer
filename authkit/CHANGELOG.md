@@ -7,6 +7,32 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [0.7.0] - 2026-08-20
+
+### Added
+
+- `AdminConfig`, naming the store an administration serves and the ranks
+  it admits.
+- `Account.Rank`, the rank a listed account holds, and a `rank` field on
+  the account a create takes.
+- `AdminHandlers.SetRank` and `AdminHandlers.SetAccountRank`, writing the
+  rank an account holds, refusing an actor changing its own with the code
+  `self_rank_refused`.
+- `ErrSelfRank`, reported when an account changes its own rank.
+- The refusal code `last_privileged_refused`, answering a write that
+  would leave no enabled account under a privileged rank.
+
+### Changed
+
+- **Breaking.** `NewAdmin` takes an `AdminConfig` rather than a store.
+- **Breaking.** `CreateAccount` takes the rank the account starts under.
+- **Breaking.** `AdminStore` requires `SetUserDisabledUnderCover` and
+  `SetUserRank` in place of `SetUserDisabled`, so every disable an
+  administration performs passes the privileged guard.
+- Every administration route refuses an actor holding no privileged rank
+  with the code `rank_insufficient`. Configuring no ranks admits every
+  actor, so a consumer is unaffected until it names them.
+
 ## [0.6.0] - 2026-08-20
 
 ### Added
@@ -79,6 +105,7 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `testkit.Store`, an in-memory store double encoding the gouncer
   contract semantics.
 
+[0.7.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.7.0
 [0.6.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.6.0
 [0.5.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.5.0
 [0.4.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.4.0
