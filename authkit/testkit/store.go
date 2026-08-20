@@ -30,6 +30,10 @@ type Store struct {
 	ListUsersErr     error
 	CreateUserErr    error
 	SetDisabledErr   error
+	SetRankErr       error
+
+	// DisabledUnderCover counts the disables that went through the guarded write.
+	DisabledUnderCover int
 }
 
 // NewStore returns an empty Store.
@@ -160,4 +164,29 @@ func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) 
 		})
 	}
 	return nil
+}
+
+// SetUserRank writes the rank an account holds, or returns the configured error.
+func (s *Store) SetUserRank(_ context.Context, id uuid.UUID, rank string, _ gouncer.Ranks) error {
+	if s.SetRankErr != nil {
+		return s.SetRankErr
+	}
+	u, ok := s.Users[id]
+	if !ok {
+		return gouncer.ErrUserNotFound
+	}
+	u.Rank = rank
+	s.Users[id] = u
+	return nil
+}
+
+// SetUserDisabledUnderCover disables an account under the guard, counting the call.
+func (s *Store) SetUserDisabledUnderCover(
+	ctx context.Context,
+	id uuid.UUID,
+	disabled bool,
+	_ gouncer.Ranks,
+) error {
+	s.DisabledUnderCover++
+	return s.SetUserDisabled(ctx, id, disabled)
 }
