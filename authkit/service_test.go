@@ -101,9 +101,9 @@ func TestAccountSeams(t *testing.T) {
 
 	store := testkit.NewStore()
 	actor := store.AddUser(t, "ada@example.com", "Ada Lovelace", servicePassword)
-	admin := authkit.NewAdmin(store)
+	admin := authkit.NewAdmin(authkit.AdminConfig{Store: store})
 
-	created, err := admin.CreateAccount(t.Context(), "maria@example.com", "Maria Perez", "password1234")
+	created, err := admin.CreateAccount(t.Context(), "maria@example.com", "Maria Perez", "password1234", "")
 	if err != nil {
 		t.Fatalf("CreateAccount() error = %v, want nil", err)
 	}
@@ -126,7 +126,7 @@ func TestAccountSeams(t *testing.T) {
 		t.Errorf("self disable error = %v, want ErrSelfDisable", err)
 	}
 
-	if _, err := admin.CreateAccount(t.Context(), "not-an-email", "Maria Perez", "password1234"); err == nil {
+	if _, err := admin.CreateAccount(t.Context(), "not-an-email", "Maria Perez", "password1234", ""); err == nil {
 		t.Error("CreateAccount(bad email) error = nil, want a validation error")
 	}
 }
