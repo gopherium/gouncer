@@ -31,7 +31,7 @@ func (h *Handlers) Authenticate(ctx context.Context, email, password string) (Id
 	if !gouncer.VerifyPassword(u.PasswordHash, password) || u.Disabled {
 		return Identity{}, ErrInvalidCredentials
 	}
-	return Identity{ID: u.ID, Email: u.Email, Name: u.Name}, nil
+	return identityOf(u), nil
 }
 
 // StartSession issues and persists a session for userID, returning its cookie.
@@ -63,7 +63,7 @@ func (h *Handlers) SessionIdentity(ctx context.Context, token string) (Identity,
 	if err != nil {
 		return Identity{}, err
 	}
-	return Identity{ID: u.ID, Email: u.Email, Name: u.Name}, nil
+	return identityOf(u), nil
 }
 
 // CookieName reports the configured session cookie name.
