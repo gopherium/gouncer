@@ -12,16 +12,20 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
-// CreateAdmin provisions a user account for command-line bootstrapping,
-// reading the password as one line from stdin.
+// CreateAdmin provisions a user account under a rank for command-line
+// bootstrapping, reading the password as one line from stdin.
 func CreateAdmin(
 	ctx context.Context,
 	store gouncer.Store,
 	email string,
 	name string,
+	rank string,
 	stdin io.Reader,
 	stdout io.Writer,
 ) error {
+	if rank == "" {
+		return gouncer.ErrEmptyRank
+	}
 	_, _ = fmt.Fprint(stdout, "Password: ")
 	scanner := bufio.NewScanner(stdin)
 	if !scanner.Scan() {
@@ -35,6 +39,7 @@ func CreateAdmin(
 	if err != nil {
 		return err
 	}
+	u.Rank = rank
 	if err := store.CreateUser(ctx, u); err != nil {
 		return err
 	}

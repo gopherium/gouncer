@@ -30,6 +30,7 @@ func TestCreateAdminProvisionsAUser(t *testing.T) {
 		store,
 		" Admin@Example.com ",
 		"Admin",
+		"admin",
 		strings.NewReader("correct horse battery\n"),
 		&stdout,
 	)
@@ -58,13 +59,15 @@ func TestCreateAdminRejectsDuplicateEmail(t *testing.T) {
 	store := testkit.NewStore()
 
 	if err := authkit.CreateAdmin(
-		t.Context(), store, "admin@example.com", "Admin", strings.NewReader("correct horse battery\n"), io.Discard,
+		t.Context(), store, "admin@example.com", "Admin", "admin",
+		strings.NewReader("correct horse battery\n"), io.Discard,
 	); err != nil {
 		t.Fatalf("first CreateAdmin() error = %v, want nil", err)
 	}
 
 	err := authkit.CreateAdmin(
-		t.Context(), store, "admin@example.com", "Admin", strings.NewReader("correct horse battery\n"), io.Discard,
+		t.Context(), store, "admin@example.com", "Admin", "admin",
+		strings.NewReader("correct horse battery\n"), io.Discard,
 	)
 
 	if !errors.Is(err, gouncer.ErrEmailTaken) {
@@ -91,7 +94,7 @@ func TestCreateAdminValidatesItsInput(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			err := authkit.CreateAdmin(t.Context(), testkit.NewStore(), tc.email, tc.name, tc.stdin, io.Discard)
+			err := authkit.CreateAdmin(t.Context(), testkit.NewStore(), tc.email, tc.name, "admin", tc.stdin, io.Discard)
 
 			if err == nil {
 				t.Fatal("CreateAdmin() error = nil, want a failure")

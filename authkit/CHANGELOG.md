@@ -7,6 +7,14 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** `CreateAdmin` and `EnsureAdmin` take the rank the account
+  starts under, refusing an empty one. Neither reads the privileged ranks,
+  so the caller names a rank its own gate admits.
+
 ## [0.7.0] - 2026-08-20
 
 ### Added
