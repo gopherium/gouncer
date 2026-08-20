@@ -16,7 +16,7 @@ func TestEnsureAdminCreatesTheAccount(t *testing.T) {
 
 	store := testkit.NewStore()
 
-	created, err := authkit.EnsureAdmin(t.Context(), store, " Admin@Example.com ", "Admin", "password1234")
+	created, err := authkit.EnsureAdmin(t.Context(), store, " Admin@Example.com ", "Admin", "password1234", "admin")
 
 	if err != nil {
 		t.Fatalf("EnsureAdmin() error = %v, want nil", err)
@@ -37,11 +37,12 @@ func TestEnsureAdminKeepsAnExistingAccount(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	if _, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "first password"); err != nil {
+	_, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "first password", "admin")
+	if err != nil {
 		t.Fatalf("first EnsureAdmin() error = %v, want nil", err)
 	}
 
-	created, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "second password")
+	created, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "second password", "admin")
 
 	if err != nil {
 		t.Fatalf("second EnsureAdmin() error = %v, want nil", err)
@@ -73,7 +74,7 @@ func TestEnsureAdminRejectsInvalidInput(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			created, err := authkit.EnsureAdmin(t.Context(), testkit.NewStore(), tc.email, "Admin", tc.password)
+			created, err := authkit.EnsureAdmin(t.Context(), testkit.NewStore(), tc.email, "Admin", tc.password, "admin")
 
 			if err == nil {
 				t.Fatal("EnsureAdmin() error = nil, want a validation failure")
@@ -91,7 +92,7 @@ func TestEnsureAdminReportsStoreFailure(t *testing.T) {
 	store := testkit.NewStore()
 	store.CreateUserErr = errors.New("store down")
 
-	created, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "password1234")
+	created, err := authkit.EnsureAdmin(t.Context(), store, "admin@example.com", "Admin", "password1234", "admin")
 
 	if !errors.Is(err, store.CreateUserErr) {
 		t.Fatalf("EnsureAdmin() error = %v, want the store failure", err)
