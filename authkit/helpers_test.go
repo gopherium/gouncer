@@ -42,7 +42,7 @@ func newAuthServer(store *testkit.Store) http.Handler {
 // newConfiguredServer mounts the handlers built from cfg, administering store.
 func newConfiguredServer(cfg authkit.Config, store *testkit.Store) http.Handler {
 	h := authkit.New(cfg)
-	admin := authkit.NewAdmin(store)
+	admin := authkit.NewAdmin(authkit.AdminConfig{Store: store, Privileged: cfg.Privileged})
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/login", h.Login)
 	mux.HandleFunc("POST /api/auth/logout", h.Logout)
