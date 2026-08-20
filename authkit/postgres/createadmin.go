@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/gopherium/gouncer"
 	"github.com/gopherium/gouncer/authkit"
 )
 
@@ -26,6 +27,9 @@ func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdi
 		return fmt.Errorf("postgres: parse flags: %w", err)
 	}
 
+	if *rank == "" {
+		return gouncer.ErrEmptyRank
+	}
 	if databaseURL == "" {
 		return errors.New("postgres: database url is required")
 	}
