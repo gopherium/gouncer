@@ -7,13 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
-## [0.8.0] - 2026-08-21
+## [Unreleased]
 
 ### Changed
 
 - **Breaking.** `CreateAdmin` and `EnsureAdmin` take the rank the account
-  starts under, refusing an empty one, so a bootstrap can never leave an
-  installation nobody is able to administer.
+  starts under, refusing an empty one. Neither reads the privileged ranks,
+  so the caller names a rank its own gate admits.
 
 ## [0.7.0] - 2026-08-20
 
@@ -113,7 +113,6 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `testkit.Store`, an in-memory store double encoding the gouncer
   contract semantics.
 
-[0.8.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.8.0
 [0.7.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.7.0
 [0.6.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.6.0
 [0.5.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.5.0
