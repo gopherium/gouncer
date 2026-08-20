@@ -5,6 +5,7 @@ package authkit
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,7 +57,7 @@ func New(cfg Config) *Handlers {
 		store:      cfg.Store,
 		cookieName: cookieName,
 		ttl:        ttl,
-		privileged: cfg.Privileged,
+		privileged: slices.Clone(cfg.Privileged),
 		newSession: gouncer.NewSession,
 	}
 }

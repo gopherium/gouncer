@@ -105,6 +105,27 @@ func TestRequirePrivilegeAdmitsARankInsideTheCover(t *testing.T) {
 	}
 }
 
+func TestRequirePrivilegeKeepsItsOwnCopyOfTheConfiguredRanks(t *testing.T) {
+	t.Parallel()
+
+	configured := gouncer.Ranks{"admin"}
+	handlers := authkit.New(authkit.Config{Store: testkit.NewStore(), Privileged: configured})
+	configured[0] = "editor"
+	guarded := handlers.RequirePrivilege(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Rank: "editor"}))
+	recorder := httptest.NewRecorder()
+
+	guarded.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d, a caller mutating its own slice must not widen the gate",
+			recorder.Code, http.StatusForbidden)
+	}
+}
+
 func TestRequirePrivilegeAdmitsEveryoneWhenNoCoverIsConfigured(t *testing.T) {
 	t.Parallel()
 
