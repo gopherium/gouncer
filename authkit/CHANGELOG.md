@@ -13,8 +13,8 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 
 - `AdminConfig`, naming the store an administration serves and the ranks
   it admits.
-- `Account.Rank`, the rank a listed account holds, and a `rank` field on
-  the account a create takes.
+- `Account.Rank`, the rank a listed account holds, and a `rank` field in
+  the body that creates an account, naming the rank it starts under.
 - `AdminHandlers.SetRank` and `AdminHandlers.SetAccountRank`, writing the
   rank an account holds, refusing an actor changing its own with the code
   `self_rank_refused`.
