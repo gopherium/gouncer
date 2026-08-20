@@ -12,17 +12,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/gopherium/gouncer"
-	"github.com/gopherium/gouncer/authkit"
 )
 
-// RunCreateAdmin provisions a user account from command-line arguments,
-// reading the password as one line from stdin.
-func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdin io.Reader, stdout io.Writer) error {
-	flags := flag.NewFlagSet("createadmin", flag.ContinueOnError)
+// RunGrantRank gives a rank to every account holding none, from command-line arguments.
+func RunGrantRank(ctx context.Context, databaseURL string, args []string, stdout io.Writer) error {
+	flags := flag.NewFlagSet("grantrank", flag.ContinueOnError)
 	flags.SetOutput(stdout)
-	email := flags.String("email", "", "email address of the new user")
-	name := flags.String("name", "", "display name of the new user")
-	rank := flags.String("rank", "", "rank the new user starts under")
+	rank := flags.String("rank", "", "rank to give every account holding none")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("postgres: parse flags: %w", err)
 	}
@@ -42,5 +38,10 @@ func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdi
 		return err
 	}
 
-	return authkit.CreateAdmin(ctx, NewUserStore(pool), *email, *name, *rank, stdin, stdout)
+	granted, err := NewUserStore(pool).GrantRankToRankless(ctx, *rank)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "granted %s to %d accounts\n", *rank, granted)
+	return nil
 }

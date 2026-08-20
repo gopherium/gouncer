@@ -33,7 +33,7 @@ func TestRunCreateAdminProvisionsAUser(t *testing.T) {
 	err := authkitpg.RunCreateAdmin(
 		t.Context(),
 		databaseURL,
-		[]string{"-email", " Admin@Example.com ", "-name", "Admin"},
+		[]string{"-email", " Admin@Example.com ", "-name", "Admin", "-rank", "admin"},
 		strings.NewReader("correct horse battery\n"),
 		&stdout,
 	)
@@ -63,7 +63,7 @@ func TestRunCreateAdminRejectsDuplicateEmail(t *testing.T) {
 	t.Parallel()
 
 	databaseURL := emptyDatabaseURL(t)
-	args := []string{"-email", "admin@example.com", "-name", "Admin"}
+	args := []string{"-email", "admin@example.com", "-name", "Admin", "-rank", "admin"}
 
 	if err := authkitpg.RunCreateAdmin(
 		t.Context(), databaseURL, args, strings.NewReader("correct horse battery\n"), io.Discard,
@@ -89,7 +89,7 @@ func TestRunCreateAdminValidatesItsInput(t *testing.T) {
 	}{
 		"missing database url": {
 			databaseURL: "",
-			args:        []string{"-email", "admin@example.com", "-name", "Admin"},
+			args:        []string{"-email", "admin@example.com", "-name", "Admin", "-rank", "admin"},
 		},
 		"unknown flag": {
 			databaseURL: "postgres://localhost/db",
@@ -97,11 +97,11 @@ func TestRunCreateAdminValidatesItsInput(t *testing.T) {
 		},
 		"malformed database url": {
 			databaseURL: "not a url \x00",
-			args:        []string{"-email", "admin@example.com", "-name", "Admin"},
+			args:        []string{"-email", "admin@example.com", "-name", "Admin", "-rank", "admin"},
 		},
 		"unreachable database": {
 			databaseURL: unreachableDatabaseURL,
-			args:        []string{"-email", "admin@example.com", "-name", "Admin"},
+			args:        []string{"-email", "admin@example.com", "-name", "Admin", "-rank", "admin"},
 		},
 	}
 
