@@ -8,6 +8,20 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `RunGrantRank`, giving a rank to every account holding none and
+  reporting how many took it, which an installation adopting ranks runs
+  once from the command line.
+
+### Changed
+
+- **Breaking.** `RunCreateAdmin` takes a `-rank` flag naming the rank the
+  new account starts under, and refuses without it.
+- Requires `authkit` v0.8.0.
+
 ## [0.5.0] - 2026-08-20
 
 ### Changed
