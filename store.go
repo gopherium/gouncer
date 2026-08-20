@@ -14,6 +14,12 @@ var ErrUserNotFound = errors.New("gouncer: user not found")
 // ErrEmailTaken reports that another user already owns the email.
 var ErrEmailTaken = errors.New("gouncer: email already taken")
 
+// ErrLastPrivileged reports a write that would leave no enabled account holding a privileged rank.
+var ErrLastPrivileged = errors.New("gouncer: last privileged account")
+
+// ErrEmptyRank reports a rank name that is empty, which no account may be granted.
+var ErrEmptyRank = errors.New("gouncer: empty rank")
+
 // ErrSessionNotFound reports that no usable session exists for a token:
 // it is unknown, expired, or its user is disabled.
 var ErrSessionNotFound = errors.New("gouncer: session not found")
