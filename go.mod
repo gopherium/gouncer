@@ -2,7 +2,7 @@ module github.com/gopherium/gouncer
 
 go 1.25.0
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 require (
 	github.com/google/uuid v1.6.0

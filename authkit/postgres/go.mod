@@ -2,7 +2,7 @@ module github.com/gopherium/gouncer/authkit/postgres
 
 go 1.25.7
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 require (
 	github.com/google/go-cmp v0.7.0
