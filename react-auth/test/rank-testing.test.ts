@@ -41,3 +41,16 @@ describe('a canned session', () => {
 		expect(held?.rank).toBe('admin')
 	})
 })
+
+describe('a canned account identifier', () => {
+	it('differs for ranks holding the same letters in another order', () => {
+		expect(rankedUser('ab').id).not.toBe(rankedUser('ba').id)
+	})
+
+	it('differs for every rank the ladder holds', () => {
+		const ranks = ['admin', 'editor', 'author', 'contributor', 'subscriber']
+		const ids = new Set(ranks.map((rank) => rankedUser(rank).id))
+
+		expect(ids.size).toBe(ranks.length)
+	})
+})

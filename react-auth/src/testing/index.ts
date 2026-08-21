@@ -42,7 +42,12 @@ export const defaultUser: User = {
  * @returns The account.
  */
 export function rankedUser(rank: string): User {
-	const held = [...rank].reduce((sum, letter) => sum + letter.charCodeAt(0), 0)
+	let held = 2166136261
+	for (const letter of rank) {
+		held ^= letter.charCodeAt(0)
+		held = Math.imul(held, 16777619)
+	}
+	held >>>= 0
 	return {
 		id: `0198b2f0-0000-7000-8000-${String(held).padStart(12, '0')}`,
 		email: `${rank}@example.com`,
