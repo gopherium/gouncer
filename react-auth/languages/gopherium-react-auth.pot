@@ -76,6 +76,9 @@ msgstr ""
 msgid "invalid user details"
 msgstr ""
 
+msgid "the account could not be updated"
+msgstr ""
+
 msgctxt "admin section"
 msgid "Users"
 msgstr ""
