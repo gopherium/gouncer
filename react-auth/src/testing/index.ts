@@ -33,6 +33,35 @@ export const defaultUser: User = {
 	id: '0198b2f0-0000-7000-8000-000000000001',
 	email: 'grace@example.com',
 	name: 'Grace Hopper',
+	rank: '',
+}
+
+/**
+ * Returns a canned account holding the given rank, one identifier per rank.
+ * @param rank - The rank the account holds.
+ * @returns The account.
+ */
+export function rankedUser(rank: string): User {
+	let held = 2166136261
+	for (const letter of rank) {
+		held ^= letter.charCodeAt(0)
+		held = Math.imul(held, 16777619)
+	}
+	held >>>= 0
+	return {
+		id: `0198b2f0-0000-7000-8000-${String(held).padStart(12, '0')}`,
+		email: `${rank}@example.com`,
+		name: `Maria Perez the ${rank}`,
+		rank,
+	}
+}
+
+/**
+ * Accepts a rank change.
+ * @returns The msw handler.
+ */
+export function rankOk() {
+	return http.put('/api/users/:id/rank', () => new HttpResponse(null, { status: 204 }))
 }
 
 /**

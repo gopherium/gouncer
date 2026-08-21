@@ -14,6 +14,7 @@ const userSchema = z.object({
 	email: z.string(),
 	name: z.string(),
 	disabled: z.boolean(),
+	rank: z.string().default(''),
 	created_at: z.coerce.date(),
 })
 
@@ -23,6 +24,7 @@ export interface NewUser {
 	email: string
 	name: string
 	password: string
+	rank?: string
 }
 
 /**
@@ -36,7 +38,23 @@ export class EmailTakenError extends Error {}
  */
 export class ValidationError extends Error {}
 
-const errorSchema = z.object({ error: z.string() })
+/**
+ * RankRefusedError is thrown when the actor holds no rank the server admits.
+ */
+export class RankRefusedError extends Error {}
+
+/**
+ * SelfRankError is thrown when an account changes its own rank.
+ */
+export class SelfRankError extends Error {}
+
+/**
+ * LastPrivilegedError is thrown when a write would leave no enabled
+ * account holding a privileged rank.
+ */
+export class LastPrivilegedError extends Error {}
+
+const errorSchema = z.object({ error: z.string(), code: z.string().optional() })
 
 /**
  * Extracts the backend's explanation from a failed response body.
@@ -114,6 +132,50 @@ async function restSetUserDisabled(id: string, disabled: boolean): Promise<void>
 }
 
 /**
+ * Writes the rank an account holds over REST.
+ * @param id - The identifier of the account to update.
+ * @param rank - The rank the account is to hold.
+ */
+async function restSetUserRank(id: string, rank: string): Promise<void> {
+	const response = await fetch(`/api/users/${id}/rank`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ rank }),
+	})
+	if (response.ok) {
+		return
+	}
+	if (response.status === 401) {
+		throw new UnauthorizedError('session expired')
+	}
+	const refusal = await refusalOf(response)
+	if (refusal.code === 'rank_insufficient') {
+		throw new RankRefusedError(refusal.message)
+	}
+	if (refusal.code === 'self_rank_refused') {
+		throw new SelfRankError(refusal.message)
+	}
+	if (refusal.code === 'last_privileged_refused') {
+		throw new LastPrivilegedError(refusal.message)
+	}
+	throw new Error(`updating rank failed with status ${response.status}`)
+}
+
+/**
+ * Returns the code and message a refused response carries.
+ * @param response - The refused HTTP response.
+ * @returns The refusal code, if any, and its message.
+ */
+async function refusalOf(response: Response): Promise<{ code?: string, message: string }> {
+	try {
+		const held = errorSchema.parse(await response.json())
+		return { code: held.code, message: held.error }
+	} catch {
+		return { message: __('the account could not be updated', DOMAIN) }
+	}
+}
+
+/**
  * Returns every user account.
  * @param signal - Aborts the in-flight request.
  * @returns The parsed list of users.
@@ -138,4 +200,13 @@ export async function createUser(input: NewUser): Promise<User> {
  */
 export async function setUserDisabled(id: string, disabled: boolean): Promise<void> {
 	await resolveTransport('setUserDisabled', restSetUserDisabled)(id, disabled)
+}
+
+/**
+ * Sets the rank an account holds.
+ * @param id - The identifier of the account to update.
+ * @param rank - The rank the account is to hold.
+ */
+export async function setUserRank(id: string, rank: string): Promise<void> {
+	await resolveTransport('setUserRank', restSetUserRank)(id, rank)
 }

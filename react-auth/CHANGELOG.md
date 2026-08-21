@@ -10,6 +10,25 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Added
+
+- `rank` on the session and on every listed account, empty when the
+  server sends none, so a screen can tell one account apart from another.
+- `rank` on the account a create names, and `setUserRank` writing the
+  rank an account holds.
+- `RankRefusedError`, `SelfRankError` and `LastPrivilegedError`, thrown
+  for the refusals the server answers a rank write with.
+- `rankedUser` and `rankOk` in the testing harness, canning an account
+  per rank and answering a rank change, so a consumer can walk both
+  sides of a gate.
+
+### Changed
+
+- `AuthTransport` carries `setUserRank`, so a consumer replacing the
+  transport implements it.
+
 ## [0.4.0] - 2026-08-17
 
 ### Added
