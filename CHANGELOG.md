@@ -9,9 +9,9 @@ at v0.x, minor releases may contain breaking changes.
 
 ### Changed
 
-- **Breaking.** Decision to rename concept from `Ranks` becomes
-  `Roles`, `User.Rank` becomes `User.Role`, and `ErrEmptyRank` becomes
-  `ErrEmptyRole`. No alias keeps the old names.
+- **Breaking.** `Ranks` becomes `Roles`, `User.Rank` becomes
+  `User.Role`, and `ErrEmptyRank` becomes `ErrEmptyRole`, with no
+  alias for the old names.
 
 ## [0.2.0] - 2026-08-20
 
