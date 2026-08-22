@@ -8,6 +8,26 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** The concept is named role, never rank. Migration `00003`
+  adds `auth.users.role` and `users_role_idx`, where through 0.6.0 it
+  added `rank` and `users_rank_idx`. Goose records no checksum, so a
+  database migrated by 0.5.0 or 0.6.0 keeps the old names and no
+  migration will correct it. Recreate that database, or rename by hand
+  with `ALTER TABLE auth.users RENAME COLUMN rank TO role;` and
+  `ALTER INDEX auth.users_rank_idx RENAME TO users_role_idx;`.
+- **Breaking.** `UserStore.SetUserRank` becomes `SetUserRole` and
+  `UserStore.GrantRankToRankless` becomes `GrantRoleToRoleless`. No alias
+  keeps the old names.
+- **Breaking.** The `grantrank` subcommand becomes `grantrole`, run by
+  `RunGrantRole`, and both it and `RunCreateAdmin` take `-role` in place
+  of `-rank`.
+- Requires `gouncer` v0.3.0 and `authkit` v0.9.0 for their role
+  vocabulary.
+
 ## [0.6.0] - 2026-08-21
 
 ### Added
