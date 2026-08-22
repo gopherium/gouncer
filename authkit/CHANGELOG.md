@@ -7,6 +7,23 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** The concept is named role, never rank. `Identity.Rank`
+  becomes `Identity.Role` and `Account.Rank` becomes `Account.Role`, both
+  carrying `role` on the wire, `SetAccountRank` becomes `SetAccountRole`,
+  the `SetRank` handler becomes `SetRole`, `AdminStore.SetUserRank`
+  becomes `SetUserRole`, and `ErrSelfRank` becomes `ErrSelfRole`.
+  `CreateAccount`, `CreateAdmin` and `EnsureAdmin` keep their names and
+  take a role. No alias keeps the old names.
+- **Breaking.** The refusal codes `rank_insufficient` and
+  `self_rank_refused` become `role_insufficient` and `self_role_refused`,
+  and the body a role write requires names `role`.
+- `testkit.Store` matches, with `SetRoleErr` in place of `SetRankErr`.
+- Requires `gouncer` v0.3.0 for its role vocabulary.
+
 ## [0.8.0] - 2026-08-21
 
 ### Changed

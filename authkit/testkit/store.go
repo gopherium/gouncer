@@ -30,12 +30,12 @@ type Store struct {
 	ListUsersErr     error
 	CreateUserErr    error
 	SetDisabledErr   error
-	SetRankErr       error
+	SetRoleErr       error
 
 	// DisabledUnderCover counts the disables that went through the guarded write.
 	DisabledUnderCover int
-	// CoverGiven holds the privileged ranks the last guarded write was handed.
-	CoverGiven gouncer.Ranks
+	// CoverGiven holds the privileged roles the last guarded write was handed.
+	CoverGiven gouncer.Roles
 }
 
 // NewStore returns an empty Store.
@@ -168,17 +168,17 @@ func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) 
 	return nil
 }
 
-// SetUserRank writes the rank an account holds, or returns the configured error.
-func (s *Store) SetUserRank(_ context.Context, id uuid.UUID, rank string, privileged gouncer.Ranks) error {
+// SetUserRole writes the role an account holds, or returns the configured error.
+func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privileged gouncer.Roles) error {
 	s.CoverGiven = privileged
-	if s.SetRankErr != nil {
-		return s.SetRankErr
+	if s.SetRoleErr != nil {
+		return s.SetRoleErr
 	}
 	u, ok := s.Users[id]
 	if !ok {
 		return gouncer.ErrUserNotFound
 	}
-	u.Rank = rank
+	u.Role = role
 	s.Users[id] = u
 	return nil
 }
@@ -188,7 +188,7 @@ func (s *Store) SetUserDisabledUnderCover(
 	ctx context.Context,
 	id uuid.UUID,
 	disabled bool,
-	privileged gouncer.Ranks,
+	privileged gouncer.Roles,
 ) error {
 	s.CoverGiven = privileged
 	s.DisabledUnderCover++

@@ -27,9 +27,9 @@ type Config struct {
 	// SessionTTL bounds issued sessions and their cookie alike. Zero
 	// applies gouncer.DefaultSessionDuration.
 	SessionTTL time.Duration
-	// Privileged names the ranks RequirePrivilege admits and the guard
-	// keeps an enabled account holding. Empty admits every rank.
-	Privileged gouncer.Ranks
+	// Privileged names the roles RequirePrivilege admits and the guard
+	// keeps an enabled account holding. Empty admits every role.
+	Privileged gouncer.Roles
 }
 
 // Handlers serves login sessions over HTTP.
@@ -37,7 +37,7 @@ type Handlers struct {
 	store      gouncer.Store
 	cookieName string
 	ttl        time.Duration
-	privileged gouncer.Ranks
+	privileged gouncer.Roles
 	// newSession issues login sessions; a field so failure paths stay
 	// testable.
 	newSession func(userID uuid.UUID) (gouncer.Session, error)
@@ -119,12 +119,12 @@ func (h *Handlers) Session(w http.ResponseWriter, r *http.Request) {
 	Respond(w, http.StatusOK, IdentityFromContext(r.Context()))
 }
 
-// RequirePrivilege refuses a request whose identity holds no privileged rank.
+// RequirePrivilege refuses a request whose identity holds no privileged role.
 func (h *Handlers) RequirePrivilege(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(h.privileged) > 0 && !h.privileged.Holds(IdentityFromContext(r.Context()).Rank) {
+		if len(h.privileged) > 0 && !h.privileged.Holds(IdentityFromContext(r.Context()).Role) {
 			RespondRefusal(w, http.StatusForbidden, Refusal{
-				Message: "rank insufficient", Code: "rank_insufficient",
+				Message: "role insufficient", Code: "role_insufficient",
 			})
 			return
 		}

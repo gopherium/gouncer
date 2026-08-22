@@ -14,12 +14,12 @@ import (
 	"github.com/gopherium/gouncer/authkit/testkit"
 )
 
-func TestSessionIdentityCarriesTheRankTheStoreHolds(t *testing.T) {
+func TestSessionIdentityCarriesTheRoleTheStoreHolds(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
 	ada := addAda(t, store)
-	ada.Rank = "admin"
+	ada.Role = "admin"
 	store.Users[ada.ID] = ada
 	handlers := authkit.New(authkit.Config{Store: store})
 	session, err := gouncer.NewSession(ada.ID)
@@ -36,17 +36,17 @@ func TestSessionIdentityCarriesTheRankTheStoreHolds(t *testing.T) {
 		t.Fatalf("SessionIdentity() error = %v, want nil", err)
 	}
 
-	if identity.Rank != "admin" {
-		t.Errorf("rank = %q, want %q", identity.Rank, "admin")
+	if identity.Role != "admin" {
+		t.Errorf("role = %q, want %q", identity.Role, "admin")
 	}
 }
 
-func TestAuthenticateCarriesTheRankTheStoreHolds(t *testing.T) {
+func TestAuthenticateCarriesTheRoleTheStoreHolds(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
 	ada := addAda(t, store)
-	ada.Rank = "editor"
+	ada.Role = "editor"
 	store.Users[ada.ID] = ada
 	handlers := authkit.New(authkit.Config{Store: store})
 
@@ -55,23 +55,23 @@ func TestAuthenticateCarriesTheRankTheStoreHolds(t *testing.T) {
 		t.Fatalf("Authenticate() error = %v, want nil", err)
 	}
 
-	if identity.Rank != "editor" {
-		t.Errorf("rank = %q, want %q", identity.Rank, "editor")
+	if identity.Role != "editor" {
+		t.Errorf("role = %q, want %q", identity.Role, "editor")
 	}
 }
 
-func TestRequirePrivilegeRefusesARankOutsideTheCover(t *testing.T) {
+func TestRequirePrivilegeRefusesARoleOutsideTheCover(t *testing.T) {
 	t.Parallel()
 
 	handlers := authkit.New(authkit.Config{
 		Store:      testkit.NewStore(),
-		Privileged: gouncer.Ranks{"admin"},
+		Privileged: gouncer.Roles{"admin"},
 	})
 	guarded := handlers.RequirePrivilege(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Rank: "editor"}))
+	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Role: "editor"}))
 	recorder := httptest.NewRecorder()
 
 	guarded.ServeHTTP(recorder, request)
@@ -79,23 +79,23 @@ func TestRequirePrivilegeRefusesARankOutsideTheCover(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
 	}
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "rank_insufficient" {
-		t.Errorf("code = %q, want %q", code, "rank_insufficient")
+	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "role_insufficient" {
+		t.Errorf("code = %q, want %q", code, "role_insufficient")
 	}
 }
 
-func TestRequirePrivilegeAdmitsARankInsideTheCover(t *testing.T) {
+func TestRequirePrivilegeAdmitsARoleInsideTheCover(t *testing.T) {
 	t.Parallel()
 
 	handlers := authkit.New(authkit.Config{
 		Store:      testkit.NewStore(),
-		Privileged: gouncer.Ranks{"admin", "owner"},
+		Privileged: gouncer.Roles{"admin", "owner"},
 	})
 	guarded := handlers.RequirePrivilege(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Rank: "owner"}))
+	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Role: "owner"}))
 	recorder := httptest.NewRecorder()
 
 	guarded.ServeHTTP(recorder, request)
@@ -105,17 +105,17 @@ func TestRequirePrivilegeAdmitsARankInsideTheCover(t *testing.T) {
 	}
 }
 
-func TestRequirePrivilegeKeepsItsOwnCopyOfTheConfiguredRanks(t *testing.T) {
+func TestRequirePrivilegeKeepsItsOwnCopyOfTheConfiguredRoles(t *testing.T) {
 	t.Parallel()
 
-	configured := gouncer.Ranks{"admin"}
+	configured := gouncer.Roles{"admin"}
 	handlers := authkit.New(authkit.Config{Store: testkit.NewStore(), Privileged: configured})
 	configured[0] = "editor"
 	guarded := handlers.RequirePrivilege(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
-	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Rank: "editor"}))
+	request = request.WithContext(authkit.WithIdentity(request.Context(), authkit.Identity{Role: "editor"}))
 	recorder := httptest.NewRecorder()
 
 	guarded.ServeHTTP(recorder, request)
@@ -140,6 +140,6 @@ func TestRequirePrivilegeAdmitsEveryoneWhenNoCoverIsConfigured(t *testing.T) {
 	guarded.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d when no privileged ranks are configured", recorder.Code, http.StatusOK)
+		t.Errorf("status = %d, want %d when no privileged roles are configured", recorder.Code, http.StatusOK)
 	}
 }

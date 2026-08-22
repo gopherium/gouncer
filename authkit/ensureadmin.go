@@ -9,17 +9,17 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
-// EnsureAdmin creates a user account under a rank unless the email is
+// EnsureAdmin creates a user account under a role unless the email is
 // already taken, reporting whether it created the account.
-func EnsureAdmin(ctx context.Context, store gouncer.Store, email, name, password, rank string) (bool, error) {
-	if rank == "" {
-		return false, gouncer.ErrEmptyRank
+func EnsureAdmin(ctx context.Context, store gouncer.Store, email, name, password, role string) (bool, error) {
+	if role == "" {
+		return false, gouncer.ErrEmptyRole
 	}
 	u, err := gouncer.NewUser(email, name, password)
 	if err != nil {
 		return false, err
 	}
-	u.Rank = rank
+	u.Role = role
 	err = store.CreateUser(ctx, u)
 	if errors.Is(err, gouncer.ErrEmailTaken) {
 		return false, nil
