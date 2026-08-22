@@ -17,7 +17,7 @@ export interface AuthTransport {
 	fetchUsers(signal?: AbortSignal): Promise<Account[]>
 	createUser(input: NewUser): Promise<Account>
 	setUserDisabled(id: string, disabled: boolean): Promise<void>
-	setUserRank(id: string, rank: string): Promise<void>
+	setUserRole(id: string, role: string): Promise<void>
 }
 
 let overrides: Partial<AuthTransport> = {}
