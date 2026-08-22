@@ -16,8 +16,8 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 
 - **Breaking.** The concept is named role, never rank. `rank` becomes
   `role` on the session user, on every listed account and on the account
-  a create names, `setUserRank` becomes `setUserRole`, and the transport
-  method it resolves is `setUserRole`.
+  `createUser` creates, `setUserRank` becomes `setUserRole`, and the
+  transport method it resolves is `setUserRole`.
 - **Breaking.** `RankRefusedError` becomes `RoleRefusedError` and
   `SelfRankError` becomes `SelfRoleError`, thrown for the renamed
   refusal codes `role_insufficient` and `self_role_refused`.
