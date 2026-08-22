@@ -20,7 +20,8 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   take a role. No alias keeps the old names.
 - **Breaking.** The refusal codes `rank_insufficient` and
   `self_rank_refused` become `role_insufficient` and `self_role_refused`,
-  and the body a role write requires names `role`.
+  and the `rank` field in the body that creates an account or writes the
+  role of one becomes `role`, which the role write requires.
 - `testkit.Store` matches, with `SetRoleErr` in place of `SetRankErr`.
 - Requires `gouncer` v0.3.0 for its role vocabulary.
 
