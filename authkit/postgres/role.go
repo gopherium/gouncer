@@ -14,23 +14,23 @@ import (
 	"github.com/gopherium/gouncer/authkit/postgres/internal/db"
 )
 
-// holdPrivileged locks every account holding a privileged rank, in a settled order.
-const holdPrivileged = `SELECT id FROM auth.users WHERE rank = ANY($1) ORDER BY id FOR UPDATE`
+// holdPrivileged locks every account holding a privileged role, in a settled order.
+const holdPrivileged = `SELECT id FROM auth.users WHERE role = ANY($1) ORDER BY id FOR UPDATE`
 
-// countCover counts the enabled accounts holding a privileged rank, apart from one.
-const countCover = `SELECT count(*) FROM auth.users WHERE rank = ANY($1) AND NOT disabled AND id <> $2`
+// countCover counts the enabled accounts holding a privileged role, apart from one.
+const countCover = `SELECT count(*) FROM auth.users WHERE role = ANY($1) AND NOT disabled AND id <> $2`
 
-// SetUserRank writes an account's rank, refusing to leave no enabled account under a privileged one.
-func (s *UserStore) SetUserRank(
+// SetUserRole writes an account's role, refusing to leave no enabled account under a privileged one.
+func (s *UserStore) SetUserRole(
 	ctx context.Context,
 	id uuid.UUID,
-	rank string,
-	privileged gouncer.Ranks,
+	role string,
+	privileged gouncer.Roles,
 ) error {
-	return s.underCover(ctx, id, privileged, !privileged.Holds(rank), func(queries *db.Queries) error {
-		count, err := queries.SetUserRank(ctx, db.SetUserRankParams{ID: id, Rank: rank})
+	return s.underCover(ctx, id, privileged, !privileged.Holds(role), func(queries *db.Queries) error {
+		count, err := queries.SetUserRole(ctx, db.SetUserRoleParams{ID: id, Role: role})
 		if err != nil {
-			return fmt.Errorf("postgres: set user rank: %w", err)
+			return fmt.Errorf("postgres: set user role: %w", err)
 		}
 		if count == 0 {
 			return gouncer.ErrUserNotFound
@@ -44,7 +44,7 @@ func (s *UserStore) SetUserDisabledUnderCover(
 	ctx context.Context,
 	id uuid.UUID,
 	disabled bool,
-	privileged gouncer.Ranks,
+	privileged gouncer.Roles,
 ) error {
 	return s.underCover(ctx, id, privileged, disabled, func(queries *db.Queries) error {
 		return s.disable(ctx, queries, id, disabled)
@@ -55,7 +55,7 @@ func (s *UserStore) SetUserDisabledUnderCover(
 func (s *UserStore) underCover(
 	ctx context.Context,
 	id uuid.UUID,
-	privileged gouncer.Ranks,
+	privileged gouncer.Roles,
 	removesCover bool,
 	write func(*db.Queries) error,
 ) error {
@@ -81,7 +81,7 @@ func (s *UserStore) refuseUncovered(
 	ctx context.Context,
 	tx pgx.Tx,
 	id uuid.UUID,
-	privileged gouncer.Ranks,
+	privileged gouncer.Roles,
 	removesCover bool,
 ) error {
 	if len(privileged) == 0 || !removesCover {
@@ -104,17 +104,17 @@ func (s *UserStore) refuseUncovered(
 	return nil
 }
 
-// holdsPrivilege reports whether an enabled account currently holds a privileged rank.
+// holdsPrivilege reports whether an enabled account currently holds a privileged role.
 func (s *UserStore) holdsPrivilege(
 	ctx context.Context,
 	tx pgx.Tx,
 	id uuid.UUID,
-	privileged gouncer.Ranks,
+	privileged gouncer.Roles,
 ) (bool, error) {
-	const query = `SELECT count(*) FROM auth.users WHERE id = $1 AND rank = ANY($2) AND NOT disabled`
+	const query = `SELECT count(*) FROM auth.users WHERE id = $1 AND role = ANY($2) AND NOT disabled`
 	var held int
 	if err := tx.QueryRow(ctx, query, id, []string(privileged)).Scan(&held); err != nil {
-		return false, fmt.Errorf("postgres: read rank: %w", err)
+		return false, fmt.Errorf("postgres: read role: %w", err)
 	}
 	return held > 0, nil
 }
@@ -136,14 +136,14 @@ func (s *UserStore) disable(ctx context.Context, queries *db.Queries, id uuid.UU
 	return nil
 }
 
-// GrantRankToRankless gives a rank to every account holding none, reporting how many took it.
-func (s *UserStore) GrantRankToRankless(ctx context.Context, rank string) (int64, error) {
-	if rank == "" {
-		return 0, gouncer.ErrEmptyRank
+// GrantRoleToRoleless gives a role to every account holding none, reporting how many took it.
+func (s *UserStore) GrantRoleToRoleless(ctx context.Context, role string) (int64, error) {
+	if role == "" {
+		return 0, gouncer.ErrEmptyRole
 	}
-	granted, err := s.queries.GrantRankToRankless(ctx, rank)
+	granted, err := s.queries.GrantRoleToRoleless(ctx, role)
 	if err != nil {
-		return 0, fmt.Errorf("postgres: grant rank: %w", err)
+		return 0, fmt.Errorf("postgres: grant role: %w", err)
 	}
 	return granted, nil
 }

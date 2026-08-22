@@ -1,21 +1,21 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- name: CreateUser :exec
-INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, rank)
+INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, role)
 VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: GetUserByEmail :one
-SELECT id, email, name, password_hash, disabled, created_at, rank
+SELECT id, email, name, password_hash, disabled, created_at, role
 FROM auth.users
 WHERE email = $1;
 
 -- name: GetUserByID :one
-SELECT id, email, name, password_hash, disabled, created_at, rank
+SELECT id, email, name, password_hash, disabled, created_at, role
 FROM auth.users
 WHERE id = $1;
 
 -- name: ListUsers :many
-SELECT id, email, name, disabled, created_at, rank
+SELECT id, email, name, disabled, created_at, role
 FROM auth.users
 ORDER BY name, id;
 
@@ -33,7 +33,7 @@ INSERT INTO auth.sessions (token_hash, user_id, created_at, expires_at)
 VALUES ($1, $2, $3, $4);
 
 -- name: GetUserBySession :one
-SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.rank
+SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.role
 FROM auth.sessions s
 JOIN auth.users u ON u.id = s.user_id
 WHERE s.token_hash = $1 AND s.expires_at > $2 AND NOT u.disabled;
@@ -46,12 +46,12 @@ WHERE token_hash = $1;
 DELETE FROM auth.sessions
 WHERE expires_at <= $1;
 
--- name: SetUserRank :execrows
+-- name: SetUserRole :execrows
 UPDATE auth.users
-SET rank = $2
+SET role = $2
 WHERE id = $1;
 
--- name: GrantRankToRankless :execrows
+-- name: GrantRoleToRoleless :execrows
 UPDATE auth.users
-SET rank = $1
-WHERE rank = '';
+SET role = $1
+WHERE role = '';

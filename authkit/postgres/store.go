@@ -53,7 +53,7 @@ func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
 		Name:         u.Name,
 		PasswordHash: u.PasswordHash,
 		Disabled:     u.Disabled,
-		Rank:         u.Rank,
+		Role:         u.Role,
 		CreatedAt:    u.CreatedAt,
 	})
 	var pgErr *pgconn.PgError
@@ -136,7 +136,7 @@ func (s *UserStore) ListUsers(ctx context.Context) ([]gouncer.User, error) {
 			Email:     row.Email,
 			Name:      row.Name,
 			Disabled:  row.Disabled,
-			Rank:      row.Rank,
+			Role:      row.Role,
 			CreatedAt: row.CreatedAt,
 		}
 	}
@@ -198,7 +198,7 @@ func userFromRow(row db.AuthUser) gouncer.User {
 		Name:         row.Name,
 		PasswordHash: row.PasswordHash,
 		Disabled:     row.Disabled,
-		Rank:         row.Rank,
+		Role:         row.Role,
 		CreatedAt:    row.CreatedAt,
 	}
 }

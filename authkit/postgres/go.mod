@@ -7,8 +7,8 @@ toolchain go1.26.7
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/gopherium/gouncer v0.2.0
-	github.com/gopherium/gouncer/authkit v0.8.0
+	github.com/gopherium/gouncer v0.3.0
+	github.com/gopherium/gouncer/authkit v0.9.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/peterldowns/pgtestdb v0.1.1
