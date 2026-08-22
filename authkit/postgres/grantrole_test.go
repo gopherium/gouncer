@@ -64,7 +64,7 @@ func TestRunGrantRoleReachesEveryAccountHoldingNone(t *testing.T) {
 	if kept, _ := store.UserByID(t.Context(), grace.ID); kept.Role != "editor" {
 		t.Errorf("account with a role = %q, want it left at %q", kept.Role, "editor")
 	}
-	if !strings.Contains(stdout.String(), "to 1 accounts") {
+	if stdout.String() != "granted admin to 1 account\n" {
 		t.Errorf("stdout = %q, want it to report the one account that took the role", stdout.String())
 	}
 
@@ -72,7 +72,7 @@ func TestRunGrantRoleReachesEveryAccountHoldingNone(t *testing.T) {
 	if err := authkitpg.RunGrantRole(t.Context(), databaseURL, []string{"-role", "admin"}, &again); err != nil {
 		t.Fatalf("second RunGrantRole() error = %v, want nil", err)
 	}
-	if !strings.Contains(again.String(), "to 0 accounts") {
+	if again.String() != "granted admin to 0 accounts\n" {
 		t.Errorf("second run said %q, want it to report granting nothing", again.String())
 	}
 	if held, _ := store.UserByID(t.Context(), ada.ID); held.Role != "admin" {

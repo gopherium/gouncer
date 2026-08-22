@@ -42,6 +42,14 @@ func RunGrantRole(ctx context.Context, databaseURL string, args []string, stdout
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "granted %s to %d accounts\n", *role, granted)
+	_, _ = fmt.Fprintf(stdout, "granted %s to %d %s\n", *role, granted, accountNoun(granted))
 	return nil
+}
+
+// accountNoun names the account noun matching the count.
+func accountNoun(granted int64) string {
+	if granted == 1 {
+		return "account"
+	}
+	return "accounts"
 }
