@@ -36,7 +36,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 
 const createUser = `-- name: CreateUser :exec
 
-INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, rank)
+INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, role)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
@@ -47,7 +47,7 @@ type CreateUserParams struct {
 	PasswordHash string
 	Disabled     bool
 	CreatedAt    time.Time
-	Rank         string
+	Role         string
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -59,7 +59,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.PasswordHash,
 		arg.Disabled,
 		arg.CreatedAt,
-		arg.Rank,
+		arg.Role,
 	)
 	return err
 }
@@ -98,7 +98,7 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) erro
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, password_hash, disabled, created_at, rank
+SELECT id, email, name, password_hash, disabled, created_at, role
 FROM auth.users
 WHERE email = $1
 `
@@ -113,13 +113,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (AuthUser, e
 		&i.PasswordHash,
 		&i.Disabled,
 		&i.CreatedAt,
-		&i.Rank,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, name, password_hash, disabled, created_at, rank
+SELECT id, email, name, password_hash, disabled, created_at, role
 FROM auth.users
 WHERE id = $1
 `
@@ -134,13 +134,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (AuthUser, erro
 		&i.PasswordHash,
 		&i.Disabled,
 		&i.CreatedAt,
-		&i.Rank,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserBySession = `-- name: GetUserBySession :one
-SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.rank
+SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.role
 FROM auth.sessions s
 JOIN auth.users u ON u.id = s.user_id
 WHERE s.token_hash = $1 AND s.expires_at > $2 AND NOT u.disabled
@@ -161,19 +161,19 @@ func (q *Queries) GetUserBySession(ctx context.Context, arg GetUserBySessionPara
 		&i.PasswordHash,
 		&i.Disabled,
 		&i.CreatedAt,
-		&i.Rank,
+		&i.Role,
 	)
 	return i, err
 }
 
-const grantRankToRankless = `-- name: GrantRankToRankless :execrows
+const grantRoleToRoleless = `-- name: GrantRoleToRoleless :execrows
 UPDATE auth.users
-SET rank = $1
-WHERE rank = ''
+SET role = $1
+WHERE role = ''
 `
 
-func (q *Queries) GrantRankToRankless(ctx context.Context, rank string) (int64, error) {
-	result, err := q.db.Exec(ctx, grantRankToRankless, rank)
+func (q *Queries) GrantRoleToRoleless(ctx context.Context, role string) (int64, error) {
+	result, err := q.db.Exec(ctx, grantRoleToRoleless, role)
 	if err != nil {
 		return 0, err
 	}
@@ -181,7 +181,7 @@ func (q *Queries) GrantRankToRankless(ctx context.Context, rank string) (int64, 
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, name, disabled, created_at, rank
+SELECT id, email, name, disabled, created_at, role
 FROM auth.users
 ORDER BY name, id
 `
@@ -192,7 +192,7 @@ type ListUsersRow struct {
 	Name      string
 	Disabled  bool
 	CreatedAt time.Time
-	Rank      string
+	Role      string
 }
 
 func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
@@ -210,7 +210,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.Name,
 			&i.Disabled,
 			&i.CreatedAt,
-			&i.Rank,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
@@ -241,19 +241,19 @@ func (q *Queries) SetUserDisabled(ctx context.Context, arg SetUserDisabledParams
 	return result.RowsAffected(), nil
 }
 
-const setUserRank = `-- name: SetUserRank :execrows
+const setUserRole = `-- name: SetUserRole :execrows
 UPDATE auth.users
-SET rank = $2
+SET role = $2
 WHERE id = $1
 `
 
-type SetUserRankParams struct {
+type SetUserRoleParams struct {
 	ID   uuid.UUID
-	Rank string
+	Role string
 }
 
-func (q *Queries) SetUserRank(ctx context.Context, arg SetUserRankParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setUserRank, arg.ID, arg.Rank)
+func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserRole, arg.ID, arg.Role)
 	if err != nil {
 		return 0, err
 	}

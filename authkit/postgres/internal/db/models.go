@@ -24,5 +24,5 @@ type AuthUser struct {
 	PasswordHash string
 	Disabled     bool
 	CreatedAt    time.Time
-	Rank         string
+	Role         string
 }
