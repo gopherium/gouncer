@@ -46,7 +46,7 @@ type User struct {
 	Name         string
 	PasswordHash string
 	Disabled     bool
-	Rank         string
+	Role         string
 	CreatedAt    time.Time
 }
 

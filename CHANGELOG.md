@@ -5,6 +5,14 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/). While
 at v0.x, minor releases may contain breaking changes.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** `Ranks` becomes `Roles`, `User.Rank` becomes
+  `User.Role`, and `ErrEmptyRank` becomes `ErrEmptyRole`, with no
+  alias for the old names.
+
 ## [0.2.0] - 2026-08-20
 
 ### Added
