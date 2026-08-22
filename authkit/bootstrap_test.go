@@ -13,7 +13,7 @@ import (
 	"github.com/gopherium/gouncer/authkit/testkit"
 )
 
-func TestCreateAdminStartsTheAccountUnderTheRankItIsGiven(t *testing.T) {
+func TestCreateAdminStartsTheAccountUnderTheRoleItIsGiven(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
@@ -29,12 +29,13 @@ func TestCreateAdminStartsTheAccountUnderTheRankItIsGiven(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserByEmail() error = %v, want nil", err)
 	}
-	if held.Rank != "admin" {
-		t.Errorf("rank = %q, want %q, a bootstrap that ranks nobody leaves nobody able to administer", held.Rank, "admin")
+	if held.Role != "admin" {
+		t.Errorf("role = %q, want %q, a bootstrap giving nobody a role leaves nobody able to administer",
+			held.Role, "admin")
 	}
 }
 
-func TestCreateAdminRefusesAnEmptyRank(t *testing.T) {
+func TestCreateAdminRefusesAnEmptyRole(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
@@ -43,15 +44,15 @@ func TestCreateAdminRefusesAnEmptyRank(t *testing.T) {
 	err := authkit.CreateAdmin(t.Context(), store, "maria@example.com", "Maria Perez", "",
 		strings.NewReader(testPassword+"\n"), &out)
 
-	if !errors.Is(err, gouncer.ErrEmptyRank) {
-		t.Fatalf("CreateAdmin() error = %v, want ErrEmptyRank", err)
+	if !errors.Is(err, gouncer.ErrEmptyRole) {
+		t.Fatalf("CreateAdmin() error = %v, want ErrEmptyRole", err)
 	}
 	if _, err := store.UserByEmail(t.Context(), "maria@example.com"); !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Error("the account was created, want the refused bootstrap to create nothing")
 	}
 }
 
-func TestEnsureAdminStartsTheAccountUnderTheRankItIsGiven(t *testing.T) {
+func TestEnsureAdminStartsTheAccountUnderTheRoleItIsGiven(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
@@ -65,20 +66,20 @@ func TestEnsureAdminStartsTheAccountUnderTheRankItIsGiven(t *testing.T) {
 	}
 
 	held, _ := store.UserByEmail(t.Context(), "maria@example.com")
-	if held.Rank != "admin" {
-		t.Errorf("rank = %q, want %q", held.Rank, "admin")
+	if held.Role != "admin" {
+		t.Errorf("role = %q, want %q", held.Role, "admin")
 	}
 }
 
-func TestEnsureAdminRefusesAnEmptyRank(t *testing.T) {
+func TestEnsureAdminRefusesAnEmptyRole(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
 
 	_, err := authkit.EnsureAdmin(t.Context(), store, "maria@example.com", "Maria Perez", testPassword, "")
 
-	if !errors.Is(err, gouncer.ErrEmptyRank) {
-		t.Errorf("EnsureAdmin() error = %v, want ErrEmptyRank", err)
+	if !errors.Is(err, gouncer.ErrEmptyRole) {
+		t.Errorf("EnsureAdmin() error = %v, want ErrEmptyRole", err)
 	}
 }
 
@@ -87,7 +88,7 @@ func TestEnsureAdminLeavesAnAccountItAlreadyHolds(t *testing.T) {
 
 	store := testkit.NewStore()
 	existing := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
-	existing.Rank = "editor"
+	existing.Role = "editor"
 	store.Users[existing.ID] = existing
 
 	created, err := authkit.EnsureAdmin(t.Context(), store, "maria@example.com", "Maria Perez", testPassword, "admin")
@@ -98,7 +99,7 @@ func TestEnsureAdminLeavesAnAccountItAlreadyHolds(t *testing.T) {
 	if created {
 		t.Error("created = true, want false when the email is already taken")
 	}
-	if held, _ := store.UserByEmail(t.Context(), "maria@example.com"); held.Rank != "editor" {
-		t.Errorf("rank = %q, want the rank the account already held", held.Rank)
+	if held, _ := store.UserByEmail(t.Context(), "maria@example.com"); held.Role != "editor" {
+		t.Errorf("role = %q, want the role the account already held", held.Role)
 	}
 }

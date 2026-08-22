@@ -16,12 +16,12 @@ type Identity struct {
 	ID    uuid.UUID `json:"id"`
 	Email string    `json:"email"`
 	Name  string    `json:"name"`
-	Rank  string    `json:"rank"`
+	Role  string    `json:"role"`
 }
 
 // identityOf returns the identity a user is known by, without its credentials.
 func identityOf(u gouncer.User) Identity {
-	return Identity{ID: u.ID, Email: u.Email, Name: u.Name, Rank: u.Rank}
+	return Identity{ID: u.ID, Email: u.Email, Name: u.Name, Role: u.Role}
 }
 
 type contextKey int

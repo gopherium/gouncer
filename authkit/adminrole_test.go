@@ -14,16 +14,16 @@ import (
 // uuidZero is an account identifier no store holds.
 const uuidZero = "00000000-0000-0000-0000-000000000000"
 
-// privilegedServer mounts the admin routes gated on the given ranks, signed in as the given rank.
+// privilegedServer mounts the admin routes gated on the given roles, signed in as the given role.
 func privilegedServer(
 	t *testing.T,
 	store *testkit.Store,
-	privileged gouncer.Ranks,
-	actorRank string,
+	privileged gouncer.Roles,
+	actorRole string,
 ) http.Handler {
 	t.Helper()
 	actor := addAda(t, store)
-	actor.Rank = actorRank
+	actor.Role = actorRole
 	store.Users[actor.ID] = actor
 	cfg := authkit.Config{Store: store, Privileged: privileged}
 	h := authkit.New(cfg)
@@ -33,15 +33,15 @@ func privilegedServer(
 	mux.Handle("GET /api/users", h.RequireSession(http.HandlerFunc(admin.List)))
 	mux.Handle("POST /api/users", h.RequireSession(http.HandlerFunc(admin.Create)))
 	mux.Handle("PATCH /api/users/{id}", h.RequireSession(http.HandlerFunc(admin.SetDisabled)))
-	mux.Handle("PUT /api/users/{id}/rank", h.RequireSession(http.HandlerFunc(admin.SetRank)))
+	mux.Handle("PUT /api/users/{id}/role", h.RequireSession(http.HandlerFunc(admin.SetRole)))
 	return cookiedServer(mux, loginCookie(t, mux))
 }
 
-func TestAdminRoutesRefuseAnActorHoldingNoPrivilegedRank(t *testing.T) {
+func TestAdminRoutesRefuseAnActorHoldingNoPrivilegedRole(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "editor")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "editor")
 
 	for _, held := range []struct {
 		method string
@@ -52,24 +52,24 @@ func TestAdminRoutesRefuseAnActorHoldingNoPrivilegedRank(t *testing.T) {
 		{http.MethodPost, "/api/users",
 			`{"email":"maria@example.com","name":"Maria Perez","password":"correct horse battery"}`},
 		{http.MethodPatch, "/api/users/" + uuidZero, `{"disabled":true}`},
-		{http.MethodPut, "/api/users/" + uuidZero + "/rank", `{"rank":"admin"}`},
+		{http.MethodPut, "/api/users/" + uuidZero + "/role", `{"role":"admin"}`},
 	} {
 		recorder := doRequest(t, srv, held.method, held.target, held.body)
 
 		if recorder.Code != http.StatusForbidden {
 			t.Errorf("%s %s status = %d, want %d", held.method, held.target, recorder.Code, http.StatusForbidden)
 		}
-		if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "rank_insufficient" {
-			t.Errorf("%s %s code = %q, want %q", held.method, held.target, code, "rank_insufficient")
+		if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "role_insufficient" {
+			t.Errorf("%s %s code = %q, want %q", held.method, held.target, code, "role_insufficient")
 		}
 	}
 }
 
-func TestAdminRoutesAdmitAnActorHoldingAPrivilegedRank(t *testing.T) {
+func TestAdminRoutesAdmitAnActorHoldingAPrivilegedRole(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 
 	recorder := doRequest(t, srv, http.MethodGet, "/api/users", "")
 
@@ -78,7 +78,7 @@ func TestAdminRoutesAdmitAnActorHoldingAPrivilegedRank(t *testing.T) {
 	}
 }
 
-func TestAdminRoutesAdmitEveryoneWhenNoRanksAreConfigured(t *testing.T) {
+func TestAdminRoutesAdmitEveryoneWhenNoRolesAreConfigured(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
@@ -87,93 +87,93 @@ func TestAdminRoutesAdmitEveryoneWhenNoRanksAreConfigured(t *testing.T) {
 	recorder := doRequest(t, srv, http.MethodGet, "/api/users", "")
 
 	if recorder.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d when the consumer configures no ranks", recorder.Code, http.StatusOK)
+		t.Errorf("status = %d, want %d when the consumer configures no roles", recorder.Code, http.StatusOK)
 	}
 }
 
-func TestListedAccountsCarryTheRankTheyHold(t *testing.T) {
+func TestListedAccountsCarryTheRoleTheyHold(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 
 	recorder := doRequest(t, srv, http.MethodGet, "/api/users", "")
 
-	listed := decodeBody[[]authkit.Account](t, recorder)
+	listed := decodeBody[[]map[string]any](t, recorder)
 	if len(listed) != 1 {
 		t.Fatalf("accounts = %d, want 1", len(listed))
 	}
-	if listed[0].Rank != "admin" {
-		t.Errorf("rank = %q, want %q", listed[0].Rank, "admin")
+	if listed[0]["role"] != "admin" {
+		t.Errorf("role = %v, want %q under the %q key", listed[0]["role"], "admin", "role")
 	}
 }
 
-func TestCreatingAnAccountTakesTheRankItIsGiven(t *testing.T) {
+func TestCreatingAnAccountTakesTheRoleItIsGiven(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 
 	recorder := doRequest(t, srv, http.MethodPost, "/api/users",
-		`{"email":"maria@example.com","name":"Maria Perez","password":"correct horse battery","rank":"editor"}`)
+		`{"email":"maria@example.com","name":"Maria Perez","password":"correct horse battery","role":"editor"}`)
 
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusCreated)
 	}
-	if rank := decodeBody[authkit.Account](t, recorder).Rank; rank != "editor" {
-		t.Errorf("rank = %q, want %q", rank, "editor")
+	if role := decodeBody[authkit.Account](t, recorder).Role; role != "editor" {
+		t.Errorf("role = %q, want %q", role, "editor")
 	}
 }
 
-func TestSetRankWritesTheRankAnAccountHolds(t *testing.T) {
+func TestSetRoleWritesTheRoleAnAccountHolds(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 	maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
 
-	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+maria.ID.String()+"/rank", `{"rank":"editor"}`)
+	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+maria.ID.String()+"/role", `{"role":"editor"}`)
 
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
-	if held := store.Users[maria.ID].Rank; held != "editor" {
-		t.Errorf("rank = %q, want %q", held, "editor")
+	if held := store.Users[maria.ID].Role; held != "editor" {
+		t.Errorf("role = %q, want %q", held, "editor")
 	}
 }
 
-func TestSetRankRefusesAnActorChangingItsOwnRank(t *testing.T) {
+func TestSetRoleRefusesAnActorChangingItsOwnRole(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 	var actor gouncer.User
 	for _, held := range store.Users {
 		actor = held
 	}
 
-	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+actor.ID.String()+"/rank", `{"rank":"editor"}`)
+	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+actor.ID.String()+"/role", `{"role":"editor"}`)
 
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnprocessableEntity)
 	}
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "self_rank_refused" {
-		t.Errorf("code = %q, want %q", code, "self_rank_refused")
+	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "self_role_refused" {
+		t.Errorf("code = %q, want %q", code, "self_role_refused")
 	}
-	if held := store.Users[actor.ID].Rank; held != "admin" {
-		t.Errorf("rank = %q, want the refused write to leave %q", held, "admin")
+	if held := store.Users[actor.ID].Role; held != "admin" {
+		t.Errorf("role = %q, want the refused write to leave %q", held, "admin")
 	}
 }
 
-func TestSetRankRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
+func TestSetRoleRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	store.SetRankErr = gouncer.ErrLastPrivileged
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	store.SetRoleErr = gouncer.ErrLastPrivileged
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 	maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
 
-	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+maria.ID.String()+"/rank", `{"rank":"editor"}`)
+	recorder := doRequest(t, srv, http.MethodPut, "/api/users/"+maria.ID.String()+"/role", `{"role":"editor"}`)
 
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnprocessableEntity)
@@ -187,7 +187,7 @@ func TestDisablingAnAccountGoesThroughTheGuardedWrite(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 	maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
 
 	recorder := doRequest(t, srv, http.MethodPatch, "/api/users/"+maria.ID.String(), `{"disabled":true}`)
@@ -205,7 +205,7 @@ func TestDisablingRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 
 	store := testkit.NewStore()
 	store.SetDisabledErr = gouncer.ErrLastPrivileged
-	srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+	srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 	maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
 
 	recorder := doRequest(t, srv, http.MethodPatch, "/api/users/"+maria.ID.String(), `{"disabled":true}`)
@@ -215,7 +215,7 @@ func TestDisablingRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 	}
 }
 
-func TestGuardedWritesCarryTheConfiguredPrivilegedRanks(t *testing.T) {
+func TestGuardedWritesCarryTheConfiguredPrivilegedRoles(t *testing.T) {
 	t.Parallel()
 
 	for _, held := range []struct {
@@ -224,20 +224,20 @@ func TestGuardedWritesCarryTheConfiguredPrivilegedRanks(t *testing.T) {
 		target func(id string) string
 		body   string
 	}{
-		{"rank", http.MethodPut, func(id string) string { return "/api/users/" + id + "/rank" }, `{"rank":"editor"}`},
+		{"role", http.MethodPut, func(id string) string { return "/api/users/" + id + "/role" }, `{"role":"editor"}`},
 		{"disable", http.MethodPatch, func(id string) string { return "/api/users/" + id }, `{"disabled":true}`},
 	} {
 		t.Run(held.name, func(t *testing.T) {
 			t.Parallel()
 
 			store := testkit.NewStore()
-			srv := privilegedServer(t, store, gouncer.Ranks{"admin"}, "admin")
+			srv := privilegedServer(t, store, gouncer.Roles{"admin"}, "admin")
 			maria := store.AddUser(t, "maria@example.com", "Maria Perez", testPassword)
 
 			doRequest(t, srv, held.method, held.target(maria.ID.String()), held.body)
 
 			if len(store.CoverGiven) != 1 || store.CoverGiven[0] != "admin" {
-				t.Errorf("cover handed to the guard = %v, want the configured ranks, or the rail runs uncovered",
+				t.Errorf("cover handed to the guard = %v, want the configured roles, or the rail runs uncovered",
 					store.CoverGiven)
 			}
 		})

@@ -18,7 +18,9 @@ func TestLoginIssuesASessionCookie(t *testing.T) {
 	t.Parallel()
 
 	store := testkit.NewStore()
-	addAda(t, store)
+	ada := addAda(t, store)
+	ada.Role = "admin"
+	store.Users[ada.ID] = ada
 	handler := newAuthServer(store)
 
 	recorder := doLogin(t, handler, `{"email":" ADA@Example.com ","password":"correct horse battery"}`)
@@ -38,8 +40,8 @@ func TestLoginIssuesASessionCookie(t *testing.T) {
 		t.Errorf("session lifetime = %v, want %v", got, gouncer.DefaultSessionDuration)
 	}
 	body := decodeBody[map[string]any](t, recorder)
-	if body["email"] != "ada@example.com" || body["name"] != "Ada Lovelace" {
-		t.Errorf("body = %v, want the logged-in user's email and name", body)
+	if body["email"] != "ada@example.com" || body["name"] != "Ada Lovelace" || body["role"] != "admin" {
+		t.Errorf("body = %v, want the logged-in user's email, name and role", body)
 	}
 	if _, exposed := body["password_hash"]; exposed {
 		t.Error("response exposes password_hash")
