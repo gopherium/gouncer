@@ -14,17 +14,17 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
-// RunGrantRank gives a rank to every account holding none, from command-line arguments.
-func RunGrantRank(ctx context.Context, databaseURL string, args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("grantrank", flag.ContinueOnError)
+// RunGrantRole gives a role to every account holding none, from command-line arguments.
+func RunGrantRole(ctx context.Context, databaseURL string, args []string, stdout io.Writer) error {
+	flags := flag.NewFlagSet("grantrole", flag.ContinueOnError)
 	flags.SetOutput(stdout)
-	rank := flags.String("rank", "", "rank to give every account holding none")
+	role := flags.String("role", "", "role to give every account holding none")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("postgres: parse flags: %w", err)
 	}
 
-	if *rank == "" {
-		return gouncer.ErrEmptyRank
+	if *role == "" {
+		return gouncer.ErrEmptyRole
 	}
 	if databaseURL == "" {
 		return errors.New("postgres: database url is required")
@@ -38,10 +38,10 @@ func RunGrantRank(ctx context.Context, databaseURL string, args []string, stdout
 		return err
 	}
 
-	granted, err := NewUserStore(pool).GrantRankToRankless(ctx, *rank)
+	granted, err := NewUserStore(pool).GrantRoleToRoleless(ctx, *role)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "granted %s to %d accounts\n", *rank, granted)
+	_, _ = fmt.Fprintf(stdout, "granted %s to %d accounts\n", *role, granted)
 	return nil
 }

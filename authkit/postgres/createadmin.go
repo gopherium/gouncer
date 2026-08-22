@@ -22,13 +22,13 @@ func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdi
 	flags.SetOutput(stdout)
 	email := flags.String("email", "", "email address of the new user")
 	name := flags.String("name", "", "display name of the new user")
-	rank := flags.String("rank", "", "rank the new user starts under")
+	role := flags.String("role", "", "role the new user starts under")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("postgres: parse flags: %w", err)
 	}
 
-	if *rank == "" {
-		return gouncer.ErrEmptyRank
+	if *role == "" {
+		return gouncer.ErrEmptyRole
 	}
 	if databaseURL == "" {
 		return errors.New("postgres: database url is required")
@@ -42,5 +42,5 @@ func RunCreateAdmin(ctx context.Context, databaseURL string, args []string, stdi
 		return err
 	}
 
-	return authkit.CreateAdmin(ctx, NewUserStore(pool), *email, *name, *rank, stdin, stdout)
+	return authkit.CreateAdmin(ctx, NewUserStore(pool), *email, *name, *role, stdin, stdout)
 }
