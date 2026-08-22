@@ -99,12 +99,12 @@ func TestListedAccountsCarryTheRoleTheyHold(t *testing.T) {
 
 	recorder := doRequest(t, srv, http.MethodGet, "/api/users", "")
 
-	listed := decodeBody[[]authkit.Account](t, recorder)
+	listed := decodeBody[[]map[string]any](t, recorder)
 	if len(listed) != 1 {
 		t.Fatalf("accounts = %d, want 1", len(listed))
 	}
-	if listed[0].Role != "admin" {
-		t.Errorf("role = %q, want %q", listed[0].Role, "admin")
+	if listed[0]["role"] != "admin" {
+		t.Errorf("role = %v, want %q under the %q key", listed[0]["role"], "admin", "role")
 	}
 }
 
