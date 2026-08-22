@@ -26,7 +26,7 @@ const ada = {
 	id: '0198b2f0-0000-7000-8000-000000000001',
 	email: 'ada@example.com',
 	name: 'Ada Lovelace',
-	rank: '',
+	role: '',
 }
 
 describe('fetchSession', () => {

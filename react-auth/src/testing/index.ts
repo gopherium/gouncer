@@ -33,35 +33,35 @@ export const defaultUser: User = {
 	id: '0198b2f0-0000-7000-8000-000000000001',
 	email: 'grace@example.com',
 	name: 'Grace Hopper',
-	rank: '',
+	role: '',
 }
 
 /**
- * Returns a canned account holding the given rank, one identifier per rank.
- * @param rank - The rank the account holds.
+ * Returns a canned account holding the given role, one identifier per role.
+ * @param role - The role the account holds.
  * @returns The account.
  */
-export function rankedUser(rank: string): User {
+export function userWithRole(role: string): User {
 	let held = 2166136261
-	for (const letter of rank) {
+	for (const letter of role) {
 		held ^= letter.charCodeAt(0)
 		held = Math.imul(held, 16777619)
 	}
 	held >>>= 0
 	return {
 		id: `0198b2f0-0000-7000-8000-${String(held).padStart(12, '0')}`,
-		email: `${rank}@example.com`,
-		name: `Maria Perez the ${rank}`,
-		rank,
+		email: `${role}@example.com`,
+		name: `Maria Perez the ${role}`,
+		role,
 	}
 }
 
 /**
- * Accepts a rank change.
+ * Accepts a role change.
  * @returns The msw handler.
  */
-export function rankOk() {
-	return http.put('/api/users/:id/rank', () => new HttpResponse(null, { status: 204 }))
+export function roleOk() {
+	return http.put('/api/users/:id/role', () => new HttpResponse(null, { status: 204 }))
 }
 
 /**

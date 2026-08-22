@@ -14,7 +14,7 @@ const userSchema = z.object({
 	email: z.string(),
 	name: z.string(),
 	disabled: z.boolean(),
-	rank: z.string().default(''),
+	role: z.string().default(''),
 	created_at: z.coerce.date(),
 })
 
@@ -24,7 +24,7 @@ export interface NewUser {
 	email: string
 	name: string
 	password: string
-	rank?: string
+	role?: string
 }
 
 /**
@@ -39,18 +39,18 @@ export class EmailTakenError extends Error {}
 export class ValidationError extends Error {}
 
 /**
- * RankRefusedError is thrown when the actor holds no rank the server admits.
+ * RoleRefusedError is thrown when the actor holds no role the server admits.
  */
-export class RankRefusedError extends Error {}
+export class RoleRefusedError extends Error {}
 
 /**
- * SelfRankError is thrown when an account changes its own rank.
+ * SelfRoleError is thrown when an account changes its own role.
  */
-export class SelfRankError extends Error {}
+export class SelfRoleError extends Error {}
 
 /**
  * LastPrivilegedError is thrown when a write would leave no enabled
- * account holding a privileged rank.
+ * account holding a privileged role.
  */
 export class LastPrivilegedError extends Error {}
 
@@ -132,15 +132,15 @@ async function restSetUserDisabled(id: string, disabled: boolean): Promise<void>
 }
 
 /**
- * Writes the rank an account holds over REST.
+ * Writes the role an account holds over REST.
  * @param id - The identifier of the account to update.
- * @param rank - The rank the account is to hold.
+ * @param role - The role the account is to hold.
  */
-async function restSetUserRank(id: string, rank: string): Promise<void> {
-	const response = await fetch(`/api/users/${id}/rank`, {
+async function restSetUserRole(id: string, role: string): Promise<void> {
+	const response = await fetch(`/api/users/${id}/role`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ rank }),
+		body: JSON.stringify({ role }),
 	})
 	if (response.ok) {
 		return
@@ -149,16 +149,16 @@ async function restSetUserRank(id: string, rank: string): Promise<void> {
 		throw new UnauthorizedError('session expired')
 	}
 	const refusal = await refusalOf(response)
-	if (refusal.code === 'rank_insufficient') {
-		throw new RankRefusedError(refusal.message)
+	if (refusal.code === 'role_insufficient') {
+		throw new RoleRefusedError(refusal.message)
 	}
-	if (refusal.code === 'self_rank_refused') {
-		throw new SelfRankError(refusal.message)
+	if (refusal.code === 'self_role_refused') {
+		throw new SelfRoleError(refusal.message)
 	}
 	if (refusal.code === 'last_privileged_refused') {
 		throw new LastPrivilegedError(refusal.message)
 	}
-	throw new Error(`updating rank failed with status ${response.status}`)
+	throw new Error(`updating role failed with status ${response.status}`)
 }
 
 /**
@@ -203,10 +203,10 @@ export async function setUserDisabled(id: string, disabled: boolean): Promise<vo
 }
 
 /**
- * Sets the rank an account holds.
+ * Sets the role an account holds.
  * @param id - The identifier of the account to update.
- * @param rank - The rank the account is to hold.
+ * @param role - The role the account is to hold.
  */
-export async function setUserRank(id: string, rank: string): Promise<void> {
-	await resolveTransport('setUserRank', restSetUserRank)(id, rank)
+export async function setUserRole(id: string, role: string): Promise<void> {
+	await resolveTransport('setUserRole', restSetUserRole)(id, role)
 }

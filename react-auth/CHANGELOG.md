@@ -10,6 +10,23 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** The concept is named role, never rank. `rank` becomes
+  `role` on the session user, on every listed account and on the account
+  `createUser` creates, `setUserRank` becomes `setUserRole`, and the
+  transport method it resolves is `setUserRole`.
+- **Breaking.** `RankRefusedError` becomes `RoleRefusedError` and
+  `SelfRankError` becomes `SelfRoleError`, thrown for the renamed
+  refusal codes `role_insufficient` and `self_role_refused`.
+- **Breaking.** The route a role write takes is
+  `PUT /api/users/{id}/role`, carrying `role` in its body. A server
+  older than `authkit` v0.9.0 answers it with 404.
+- **Breaking.** `rankedUser` becomes `userWithRole` and `rankOk` becomes
+  `roleOk` in the testing harness. No alias keeps the old names.
+
 ## [0.5.0] - 2026-08-21
 
 ### Added
