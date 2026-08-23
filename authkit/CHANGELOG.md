@@ -7,6 +7,19 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [0.10.0] - 2026-08-23
+
+### Changed
+
+- **Breaking.** The error body is named for what it is. `Refusal` becomes
+  `ErrorResponse` and carries its JSON tags itself, `RespondRefusal`
+  folds into `RespondError`, which now takes the struct instead of a
+  bare message, and `RefusalForAuthError` becomes
+  `ErrorResponseForAuthError`. No alias keeps the old names.
+- Nothing on the wire changes. The envelope stays `{error, code, meta}`
+  and every code keeps its value, `self_disable_refused`,
+  `self_role_refused` and `last_privileged_refused` included.
+
 ## [0.9.0] - 2026-08-22
 
 ### Changed
