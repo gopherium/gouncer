@@ -59,7 +59,7 @@ func TestAdminRoutesRefuseAnActorHoldingNoPrivilegedRole(t *testing.T) {
 		if recorder.Code != http.StatusForbidden {
 			t.Errorf("%s %s status = %d, want %d", held.method, held.target, recorder.Code, http.StatusForbidden)
 		}
-		if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "role_insufficient" {
+		if code := decodeBody[authkit.ErrorResponse](t, recorder).Code; code != "role_insufficient" {
 			t.Errorf("%s %s code = %q, want %q", held.method, held.target, code, "role_insufficient")
 		}
 	}
@@ -157,7 +157,7 @@ func TestSetRoleRefusesAnActorChangingItsOwnRole(t *testing.T) {
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnprocessableEntity)
 	}
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "self_role_refused" {
+	if code := decodeBody[authkit.ErrorResponse](t, recorder).Code; code != "self_role_refused" {
 		t.Errorf("code = %q, want %q", code, "self_role_refused")
 	}
 	if held := store.Users[actor.ID].Role; held != "admin" {
@@ -178,7 +178,7 @@ func TestSetRoleRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnprocessableEntity)
 	}
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "last_privileged_refused" {
+	if code := decodeBody[authkit.ErrorResponse](t, recorder).Code; code != "last_privileged_refused" {
 		t.Errorf("code = %q, want %q", code, "last_privileged_refused")
 	}
 }
@@ -210,7 +210,7 @@ func TestDisablingRefusesRemovingTheLastPrivilegedAccount(t *testing.T) {
 
 	recorder := doRequest(t, srv, http.MethodPatch, "/api/users/"+maria.ID.String(), `{"disabled":true}`)
 
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "last_privileged_refused" {
+	if code := decodeBody[authkit.ErrorResponse](t, recorder).Code; code != "last_privileged_refused" {
 		t.Errorf("code = %q, want %q", code, "last_privileged_refused")
 	}
 }

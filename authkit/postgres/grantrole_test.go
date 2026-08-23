@@ -103,7 +103,7 @@ func TestRunGrantRoleRefusesWithoutADatabase(t *testing.T) {
 	err := authkitpg.RunGrantRole(t.Context(), "", []string{"-role", "admin"}, &stdout)
 
 	if err == nil {
-		t.Error("RunGrantRole() error = nil, want a refusal naming the missing database")
+		t.Error("RunGrantRole() error = nil, want an error naming the missing database")
 	}
 }
 

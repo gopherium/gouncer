@@ -18,19 +18,12 @@ import (
 // errNotAnAuthError stands for a failure the auth mapping does not recognize.
 var errNotAnAuthError = errors.New("authkit: not an auth error")
 
-// refusalBody is the error shape a client reads.
-type refusalBody struct {
-	Error string         `json:"error"`
-	Code  string         `json:"code"`
-	Meta  map[string]any `json:"meta"`
-}
-
-// decodeRefusal reads the recorded error response.
-func decodeRefusal(t *testing.T, recorder *httptest.ResponseRecorder) refusalBody {
+// decodeError reads the recorded error response.
+func decodeError(t *testing.T, recorder *httptest.ResponseRecorder) errorBody {
 	t.Helper()
-	var body refusalBody
+	var body errorBody
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decoding the refusal: %v, want nil", err)
+		t.Fatalf("decoding the error body: %v, want nil", err)
 	}
 	return body
 }
@@ -40,19 +33,19 @@ func TestRespondErrorCarriesNoCode(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	authkit.RespondError(recorder, http.StatusBadRequest, "malformed json")
+	authkit.RespondError(recorder, http.StatusBadRequest, authkit.ErrorResponse{Message: "malformed json"})
 
 	if got := recorder.Body.String(); got != `{"error":"malformed json"}` {
 		t.Errorf("body = %s, want the shape a pinned client already reads", got)
 	}
 }
 
-func TestRespondRefusalCarriesTheCodeBesideTheMessage(t *testing.T) {
+func TestRespondErrorCarriesTheCodeBesideTheMessage(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
 
-	authkit.RespondRefusal(recorder, http.StatusUnprocessableEntity, authkit.Refusal{
+	authkit.RespondError(recorder, http.StatusUnprocessableEntity, authkit.ErrorResponse{
 		Message: "invalid email address",
 		Code:    "email_invalid",
 	})
@@ -60,65 +53,65 @@ func TestRespondRefusalCarriesTheCodeBesideTheMessage(t *testing.T) {
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnprocessableEntity)
 	}
-	body := decodeRefusal(t, recorder)
+	body := decodeError(t, recorder)
 	if body.Error != "invalid email address" || body.Code != "email_invalid" {
 		t.Errorf("body = %+v, want the message and the code together", body)
 	}
 }
 
-func TestRespondRefusalCarriesTheDynamicPartAsData(t *testing.T) {
+func TestRespondErrorCarriesTheDynamicPartAsData(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
 
-	authkit.RespondRefusal(recorder, http.StatusUnprocessableEntity, authkit.Refusal{
+	authkit.RespondError(recorder, http.StatusUnprocessableEntity, authkit.ErrorResponse{
 		Message: "name must be at most 256 characters",
 		Code:    "name_too_long",
 		Meta:    map[string]any{"max": 256},
 	})
 
-	body := decodeRefusal(t, recorder)
+	body := decodeError(t, recorder)
 	if body.Meta["max"] != float64(256) {
 		t.Errorf("meta = %v, want the limit as data rather than only in the prose", body.Meta)
 	}
 }
 
-func TestRespondRefusalLeavesAnEmptyCodeOffTheWire(t *testing.T) {
+func TestRespondErrorLeavesAnEmptyCodeOffTheWire(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
 
-	authkit.RespondRefusal(recorder, http.StatusNotFound, authkit.Refusal{Message: "not found"})
+	authkit.RespondError(recorder, http.StatusNotFound, authkit.ErrorResponse{Message: "not found"})
 
 	if got := recorder.Body.String(); got != `{"error":"not found"}` {
 		t.Errorf("body = %s, want no empty members on the wire", got)
 	}
 }
 
-func TestRefusalForAuthErrorNamesACode(t *testing.T) {
+func TestErrorResponseForAuthErrorNamesACode(t *testing.T) {
 	t.Parallel()
 
-	status, refusal, ok := authkit.RefusalForAuthError(gouncer.ErrEmailTaken)
+	status, response, ok := authkit.ErrorResponseForAuthError(gouncer.ErrEmailTaken)
 
 	if !ok {
-		t.Fatalf("RefusalForAuthError() ok = false, want the error recognized")
+		t.Fatalf("ErrorResponseForAuthError() ok = false, want the error recognized")
 	}
 	if status != http.StatusConflict {
 		t.Errorf("status = %d, want %d", status, http.StatusConflict)
 	}
-	if refusal.Code != "email_taken" {
-		t.Errorf("code = %q, want the taken email named", refusal.Code)
+	if response.Code != "email_taken" {
+		t.Errorf("code = %q, want the taken email named", response.Code)
 	}
-	if refusal.Message != "email already in use" {
-		t.Errorf("message = %q, want the prose kept beside the code", refusal.Message)
+	if response.Message != "email already in use" {
+		t.Errorf("message = %q, want the prose kept beside the code", response.Message)
 	}
 }
 
-func TestRefusalForAuthErrorReportsAnUnknownError(t *testing.T) {
+func TestErrorResponseForAuthErrorReportsAnUnknownError(t *testing.T) {
 	t.Parallel()
 
-	if _, _, ok := authkit.RefusalForAuthError(errNotAnAuthError); ok {
-		t.Errorf("RefusalForAuthError() ok = true, want an unrecognized error reported")
+	if _, _, ok := authkit.ErrorResponseForAuthError(errNotAnAuthError); ok {
+		t.Errorf("ErrorResponseForAuthError() ok = true, want an unrecognized error reported")
 	}
 }
 
@@ -149,7 +142,7 @@ func TestLoginRefusesAnOversizedBodyWithItsCode(t *testing.T) {
 	if recorder.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusRequestEntityTooLarge)
 	}
-	held := decodeRefusal(t, recorder)
+	held := decodeError(t, recorder)
 	if held.Code != "body_too_large" {
 		t.Errorf("code = %q, want the cap named rather than a malformed body", held.Code)
 	}

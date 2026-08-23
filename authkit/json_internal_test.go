@@ -9,19 +9,19 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
-// reportedLimit returns the number a refusal carries under the meta key.
+// reportedLimit returns the number an error body carries under the meta key.
 func reportedLimit(code, key string) (int, bool) {
-	for _, held := range authRefusals {
-		if held.refusal.Code != code {
+	for _, held := range authErrors {
+		if held.response.Code != code {
 			continue
 		}
-		reported, ok := held.refusal.Meta[key].(int)
+		reported, ok := held.response.Meta[key].(int)
 		return reported, ok
 	}
 	return 0, false
 }
 
-func TestRefusalLimitsMatchGouncer(t *testing.T) {
+func TestErrorLimitsMatchGouncer(t *testing.T) {
 	t.Parallel()
 
 	limits := []struct {
@@ -70,7 +70,7 @@ func TestRefusalLimitsMatchGouncer(t *testing.T) {
 			t.Parallel()
 			reported, found := reportedLimit(limit.code, limit.key)
 			if !found {
-				t.Fatalf("no refusal reports %q under %q", limit.code, limit.key)
+				t.Fatalf("no error body reports %q under %q", limit.code, limit.key)
 			}
 			if err := limit.allowed(reported); err != nil {
 				t.Errorf("gouncer refused a value at the reported bound %d: %v", reported, err)
