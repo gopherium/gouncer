@@ -79,7 +79,7 @@ func TestRequirePrivilegeRefusesARoleOutsideTheCover(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
 	}
-	if code := decodeBody[authkit.Refusal](t, recorder).Code; code != "role_insufficient" {
+	if code := decodeBody[authkit.ErrorResponse](t, recorder).Code; code != "role_insufficient" {
 		t.Errorf("code = %q, want %q", code, "role_insufficient")
 	}
 }

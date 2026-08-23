@@ -24,8 +24,11 @@ const testPassword = "correct horse battery"
 
 const testCookieName = "__Host-session"
 
+// errorBody is the error shape a client reads.
 type errorBody struct {
-	Error string `json:"error"`
+	Error string         `json:"error"`
+	Code  string         `json:"code"`
+	Meta  map[string]any `json:"meta"`
 }
 
 // addAda stores the default test user.

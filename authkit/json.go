@@ -11,17 +11,11 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
-type errorResponse struct {
-	Error string         `json:"error"`
-	Code  string         `json:"code,omitempty"`
-	Meta  map[string]any `json:"meta,omitempty"`
-}
-
-// Refusal is the reason a request was turned away, named for a client that translates it.
-type Refusal struct {
-	Message string
-	Code    string
-	Meta    map[string]any
+// ErrorResponse is the JSON error body naming its condition as a stable code beside the message.
+type ErrorResponse struct {
+	Message string         `json:"error"`
+	Code    string         `json:"code,omitempty"`
+	Meta    map[string]any `json:"meta,omitempty"`
 }
 
 // Respond writes v as a JSON response with the given status code, falling back to a 500 error payload
@@ -39,73 +33,68 @@ func Respond(w http.ResponseWriter, status int, v any) {
 	_, _ = w.Write(data)
 }
 
-// RespondError writes a JSON error response with the given status code and message.
-func RespondError(w http.ResponseWriter, status int, message string) {
-	Respond(w, status, errorResponse{Error: message})
-}
-
-// RespondRefusal writes a JSON error response naming the reason as a code beside its message.
-func RespondRefusal(w http.ResponseWriter, status int, refusal Refusal) {
-	Respond(w, status, errorResponse{Error: refusal.Message, Code: refusal.Code, Meta: refusal.Meta})
+// RespondError writes the JSON error body with the given status code.
+func RespondError(w http.ResponseWriter, status int, response ErrorResponse) {
+	Respond(w, status, response)
 }
 
 // respondAuthError writes the mapped auth error, masking unrecognized errors as internal ones.
 func respondAuthError(w http.ResponseWriter, err error) {
-	if status, refusal, ok := RefusalForAuthError(err); ok {
-		RespondRefusal(w, status, refusal)
+	if status, response, ok := ErrorResponseForAuthError(err); ok {
+		RespondError(w, status, response)
 		return
 	}
-	RespondRefusal(w, http.StatusInternalServerError, Refusal{Message: "internal error", Code: "internal"})
+	RespondError(w, http.StatusInternalServerError, ErrorResponse{Message: "internal error", Code: "internal"})
 }
 
-// The lengths gouncer enforces, reported as data and pinned by TestRefusalLimitsMatchGouncer.
+// The lengths gouncer enforces, reported as data and pinned by TestErrorLimitsMatchGouncer.
 const (
 	maxNameLength     = 256
 	minPasswordLength = 12
 	maxPasswordLength = 1024
 )
 
-// authRefusals maps each gouncer error a client may meet to its status and refusal.
-var authRefusals = []struct {
-	err     error
-	status  int
-	refusal Refusal
+// authErrors maps each gouncer error a client may meet to its status and error body.
+var authErrors = []struct {
+	err      error
+	status   int
+	response ErrorResponse
 }{
 	{gouncer.ErrInvalidEmail, http.StatusUnprocessableEntity,
-		Refusal{Message: "invalid email address", Code: "email_invalid"}},
+		ErrorResponse{Message: "invalid email address", Code: "email_invalid"}},
 	{gouncer.ErrEmptyName, http.StatusUnprocessableEntity,
-		Refusal{Message: "name is required", Code: "name_required"}},
+		ErrorResponse{Message: "name is required", Code: "name_required"}},
 	{gouncer.ErrNameTooLong, http.StatusUnprocessableEntity,
-		Refusal{Message: "name must be at most 256 characters", Code: "name_too_long",
+		ErrorResponse{Message: "name must be at most 256 characters", Code: "name_too_long",
 			Meta: map[string]any{"max": maxNameLength}}},
 	{gouncer.ErrWeakPassword, http.StatusUnprocessableEntity,
-		Refusal{Message: "password must be at least 12 characters", Code: "password_too_short",
+		ErrorResponse{Message: "password must be at least 12 characters", Code: "password_too_short",
 			Meta: map[string]any{"min": minPasswordLength}}},
 	{gouncer.ErrPasswordTooLong, http.StatusUnprocessableEntity,
-		Refusal{Message: "password must be at most 1024 characters", Code: "password_too_long",
+		ErrorResponse{Message: "password must be at most 1024 characters", Code: "password_too_long",
 			Meta: map[string]any{"max": maxPasswordLength}}},
 	{gouncer.ErrUserNotFound, http.StatusNotFound,
-		Refusal{Message: "user not found", Code: "user_not_found"}},
+		ErrorResponse{Message: "user not found", Code: "user_not_found"}},
 	{gouncer.ErrEmailTaken, http.StatusConflict,
-		Refusal{Message: "email already in use", Code: "email_taken"}},
+		ErrorResponse{Message: "email already in use", Code: "email_taken"}},
 }
 
-// RefusalForAuthError returns the HTTP status code and named refusal for a
+// ErrorResponseForAuthError returns the HTTP status code and error body for a
 // gouncer error, reporting false for errors it does not recognize.
-func RefusalForAuthError(err error) (int, Refusal, bool) {
-	for _, held := range authRefusals {
+func ErrorResponseForAuthError(err error) (int, ErrorResponse, bool) {
+	for _, held := range authErrors {
 		if errors.Is(err, held.err) {
-			return held.status, held.refusal, true
+			return held.status, held.response, true
 		}
 	}
-	return 0, Refusal{}, false
+	return 0, ErrorResponse{}, false
 }
 
 // StatusForAuthError returns the HTTP status code and client-facing message
 // for a gouncer error, reporting false for errors it does not recognize.
 func StatusForAuthError(err error) (int, string, bool) {
-	status, refusal, ok := RefusalForAuthError(err)
-	return status, refusal.Message, ok
+	status, response, ok := ErrorResponseForAuthError(err)
+	return status, response.Message, ok
 }
 
 // MaxRequestBodyBytes caps how much of a request body Decode will read,
@@ -134,14 +123,14 @@ func Decode[T any](w http.ResponseWriter, r *http.Request) (T, error) {
 	return v, nil
 }
 
-// respondDecodeError writes the refusal a failed request decode carries.
+// respondDecodeError writes the error body a failed request decode carries.
 func respondDecodeError(w http.ResponseWriter, err error, message string) {
 	if errors.Is(err, ErrBodyTooLarge) {
-		RespondRefusal(w, http.StatusRequestEntityTooLarge, Refusal{
+		RespondError(w, http.StatusRequestEntityTooLarge, ErrorResponse{
 			Message: "request body too large", Code: "body_too_large",
 			Meta: map[string]any{"max": MaxRequestBodyBytes},
 		})
 		return
 	}
-	RespondRefusal(w, http.StatusBadRequest, Refusal{Message: message, Code: "body_malformed"})
+	RespondError(w, http.StatusBadRequest, ErrorResponse{Message: message, Code: "body_malformed"})
 }

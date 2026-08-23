@@ -53,7 +53,7 @@ func (a *AdminHandlers) refuseUnprivileged(w http.ResponseWriter, r *http.Reques
 	if len(a.privileged) == 0 || a.privileged.Holds(IdentityFromContext(r.Context()).Role) {
 		return false
 	}
-	RespondRefusal(w, http.StatusForbidden, Refusal{Message: "role insufficient", Code: "role_insufficient"})
+	RespondError(w, http.StatusForbidden, ErrorResponse{Message: "role insufficient", Code: "role_insufficient"})
 	return true
 }
 
@@ -176,7 +176,7 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		RespondRefusal(w, http.StatusBadRequest, Refusal{
+		RespondError(w, http.StatusBadRequest, ErrorResponse{
 			Message: "malformed user id", Code: "user_id_malformed",
 		})
 		return
@@ -187,7 +187,7 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Disabled == nil {
-		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "disabled is required", Code: "body_field_required", Meta: map[string]any{"field": "disabled"},
 		})
 		return
@@ -195,7 +195,7 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 	actor := IdentityFromContext(r.Context())
 	err = a.SetAccountDisabled(r.Context(), actor.ID, id, *req.Disabled)
 	if errors.Is(err, ErrSelfDisable) {
-		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "cannot disable your own account", Code: "self_disable_refused",
 		})
 		return
@@ -215,7 +215,7 @@ func (a *AdminHandlers) refuseLastPrivileged(w http.ResponseWriter, err error) b
 	if !errors.Is(err, gouncer.ErrLastPrivileged) {
 		return false
 	}
-	RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+	RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 		Message: "the last privileged account must remain", Code: "last_privileged_refused",
 	})
 	return true
@@ -231,7 +231,7 @@ func (a *AdminHandlers) SetRole(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		RespondRefusal(w, http.StatusBadRequest, Refusal{
+		RespondError(w, http.StatusBadRequest, ErrorResponse{
 			Message: "malformed user id", Code: "user_id_malformed",
 		})
 		return
@@ -242,7 +242,7 @@ func (a *AdminHandlers) SetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Role == nil {
-		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "role is required", Code: "body_field_required", Meta: map[string]any{"field": "role"},
 		})
 		return
@@ -250,7 +250,7 @@ func (a *AdminHandlers) SetRole(w http.ResponseWriter, r *http.Request) {
 	actor := IdentityFromContext(r.Context())
 	err = a.SetAccountRole(r.Context(), actor.ID, id, *req.Role)
 	if errors.Is(err, ErrSelfRole) {
-		RespondRefusal(w, http.StatusUnprocessableEntity, Refusal{
+		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "cannot change your own role", Code: "self_role_refused",
 		})
 		return
