@@ -148,15 +148,15 @@ async function restSetUserRole(id: string, role: string): Promise<void> {
 	if (response.status === 401) {
 		throw new UnauthorizedError('session expired')
 	}
-	const refusal = await refusalOf(response)
-	if (refusal.code === 'role_insufficient') {
-		throw new RoleRefusedError(refusal.message)
+	const failed = await errorOf(response)
+	if (failed.code === 'role_insufficient') {
+		throw new RoleRefusedError(failed.message)
 	}
-	if (refusal.code === 'self_role_refused') {
-		throw new SelfRoleError(refusal.message)
+	if (failed.code === 'self_role_refused') {
+		throw new SelfRoleError(failed.message)
 	}
-	if (refusal.code === 'last_privileged_refused') {
-		throw new LastPrivilegedError(refusal.message)
+	if (failed.code === 'last_privileged_refused') {
+		throw new LastPrivilegedError(failed.message)
 	}
 	throw new Error(`updating role failed with status ${response.status}`)
 }
@@ -164,9 +164,9 @@ async function restSetUserRole(id: string, role: string): Promise<void> {
 /**
  * Returns the code and message a refused response carries.
  * @param response - The refused HTTP response.
- * @returns The refusal code, if any, and its message.
+ * @returns The error code, if any, and its message.
  */
-async function refusalOf(response: Response): Promise<{ code?: string, message: string }> {
+async function errorOf(response: Response): Promise<{ code?: string, message: string }> {
 	try {
 		const held = errorSchema.parse(await response.json())
 		return { code: held.code, message: held.error }

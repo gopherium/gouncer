@@ -141,7 +141,7 @@ describe('setUserRole', () => {
 	})
 })
 
-describe('setUserRole when the response is not a refusal it knows', () => {
+describe('setUserRole when the response is not an error it knows', () => {
 	it('reports an expired session', async () => {
 		server.use(
 			http.put('/api/users/:id/role', () =>
@@ -152,7 +152,7 @@ describe('setUserRole when the response is not a refusal it knows', () => {
 		await expect(setUserRole(maria.id, 'admin')).rejects.toBeInstanceOf(UnauthorizedError)
 	})
 
-	it('reports a status carrying no refusal code', async () => {
+	it('reports a status carrying no error code', async () => {
 		server.use(
 			http.put('/api/users/:id/role', () =>
 				HttpResponse.json({ error: 'internal error' }, { status: 500 }),
@@ -162,7 +162,7 @@ describe('setUserRole when the response is not a refusal it knows', () => {
 		await expect(setUserRole(maria.id, 'admin')).rejects.toThrow(/500/)
 	})
 
-	it('reports a refusal whose body cannot be read', async () => {
+	it('reports an error whose body cannot be read', async () => {
 		server.use(
 			http.put('/api/users/:id/role', () =>
 				new HttpResponse('not json at all', { status: 422 }),
