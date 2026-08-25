@@ -7,6 +7,15 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- `EnsureAdmin` stamps its role onto an existing account that holds
+  none, so a seed run repairs an installation that adopted roles after
+  the account was created. An account already holding any role is left
+  exactly as it is.
+
 ## [0.10.0] - 2026-08-23
 
 ### Changed
