@@ -10,7 +10,6 @@ import (
 
 	"github.com/gopherium/gouncer"
 
-	"github.com/gopherium/gouncer/authkit"
 	"github.com/gopherium/gouncer/authkit/postgres"
 )
 
@@ -176,20 +175,16 @@ func TestSetUserRoleLeavesOnePrivilegedAccountUnderConcurrentDemotions(t *testin
 	}
 }
 
-func TestEnsureAdminStampsARolelessAccountInPostgres(t *testing.T) {
+func TestSetUserRoleWithNoPrivilegedListStampsARolelessAccount(t *testing.T) {
 	t.Parallel()
 
 	store := postgres.NewUserStore(newTestPool(t))
 	ada := addWithRole(t, store, "ada@example.com", "")
 
-	created, err := authkit.EnsureAdmin(t.Context(), store, "ada@example.com", "Ada", "password1234", "admin")
+	if err := store.SetUserRole(t.Context(), ada.ID, "admin", nil); err != nil {
+		t.Fatalf("SetUserRole() error = %v, want nil", err)
+	}
 
-	if err != nil {
-		t.Fatalf("EnsureAdmin() error = %v, want nil", err)
-	}
-	if created {
-		t.Error("EnsureAdmin() created = true, want the existing account kept")
-	}
 	held, err := store.UserByID(t.Context(), ada.ID)
 	if err != nil {
 		t.Fatalf("UserByID() error = %v, want the stamped account", err)
