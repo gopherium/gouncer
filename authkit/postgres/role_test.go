@@ -10,6 +10,7 @@ import (
 
 	"github.com/gopherium/gouncer"
 
+	"github.com/gopherium/gouncer/authkit"
 	"github.com/gopherium/gouncer/authkit/postgres"
 )
 
@@ -172,6 +173,69 @@ func TestSetUserRoleLeavesOnePrivilegedAccountUnderConcurrentDemotions(t *testin
 	}
 	if left != 1 {
 		t.Errorf("admins left = %d, want exactly 1 to survive %d concurrent demotions", left, contenders)
+	}
+}
+
+func TestEnsureAdminStampsARolelessAccountInPostgres(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	ada := addWithRole(t, store, "ada@example.com", "")
+
+	created, err := authkit.EnsureAdmin(t.Context(), store, "ada@example.com", "Ada", "password1234", "admin")
+
+	if err != nil {
+		t.Fatalf("EnsureAdmin() error = %v, want nil", err)
+	}
+	if created {
+		t.Error("EnsureAdmin() created = true, want the existing account kept")
+	}
+	held, err := store.UserByID(t.Context(), ada.ID)
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want the stamped account", err)
+	}
+	if held.Role != "admin" {
+		t.Errorf("Role = %q, want the empty role stamped with admin", held.Role)
+	}
+}
+
+func TestEnsureAdminLeavesAHeldRoleStandingInPostgres(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	grace := addWithRole(t, store, "grace@example.com", "editor")
+
+	_, err := authkit.EnsureAdmin(t.Context(), store, "grace@example.com", "Grace", "password1234", "admin")
+
+	if err != nil {
+		t.Fatalf("EnsureAdmin() error = %v, want nil", err)
+	}
+	held, err := store.UserByID(t.Context(), grace.ID)
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want the existing account", err)
+	}
+	if held.Role != "editor" {
+		t.Errorf("Role = %q, want the held role left standing", held.Role)
+	}
+}
+
+func TestEnsureAdminStampsTheLoneAccountWithoutRefusingItsOwnCover(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	only := addWithRole(t, store, "only@example.com", "")
+
+	_, err := authkit.EnsureAdmin(t.Context(), store, "only@example.com", "Only", "password1234", "admin")
+
+	if err != nil {
+		t.Fatalf("EnsureAdmin() error = %v, want the lone account stamped", err)
+	}
+	held, err := store.UserByID(t.Context(), only.ID)
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want the stamped account", err)
+	}
+	if held.Role != "admin" {
+		t.Errorf("Role = %q, want the only account carried across", held.Role)
 	}
 }
 
