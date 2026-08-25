@@ -7,7 +7,7 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
-## [Unreleased]
+## [0.11.0] - 2026-08-25
 
 ### Changed
 
