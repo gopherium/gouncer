@@ -8,6 +8,13 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [0.8.0] - 2026-08-25
+
+### Changed
+
+- The module requires `authkit` 0.11.0, the first release whose
+  `EnsureAdmin` stamps its role onto an account holding none.
+
 ## [0.7.0] - 2026-08-22
 
 ### Changed
