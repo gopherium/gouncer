@@ -175,6 +175,25 @@ func TestSetUserRoleLeavesOnePrivilegedAccountUnderConcurrentDemotions(t *testin
 	}
 }
 
+func TestSetUserRoleWithNoPrivilegedListStampsARolelessAccount(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	ada := addWithRole(t, store, "ada@example.com", "")
+
+	if err := store.SetUserRole(t.Context(), ada.ID, "admin", nil); err != nil {
+		t.Fatalf("SetUserRole() error = %v, want nil", err)
+	}
+
+	held, err := store.UserByID(t.Context(), ada.ID)
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want the stamped account", err)
+	}
+	if held.Role != "admin" {
+		t.Errorf("Role = %q, want the empty role stamped with admin", held.Role)
+	}
+}
+
 func TestGrantRoleToRolelessAccountsFillsOnlyTheEmptyOnes(t *testing.T) {
 	t.Parallel()
 
