@@ -10,7 +10,7 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
-## [Unreleased]
+## [0.7.0] - 2026-08-26
 
 ### Changed
 
