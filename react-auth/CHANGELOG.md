@@ -10,6 +10,13 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Changed
+
+- The optional `@testing-library/jest-dom` peer admits 7 alongside 6,
+  and the package's own suite runs against 7.
+
 ## [0.6.0] - 2026-08-22
 
 ### Changed
