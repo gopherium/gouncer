@@ -7,6 +7,51 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Invites`, the invite and reset flows over an `InviteStore`: `Invite`
+  creates an unconfirmed account with its activation token,
+  `ResendInvite` replaces a pending token, `RedeemInvite` sets the
+  password, confirms the address and answers the account,
+  `RequestReset` issues a reset token for confirmed enabled accounts
+  only, and `RedeemReset` replaces the password and ends every session
+  the account holds.
+- `InviteStore` asks for each redemption whole. `ActivateByToken` spends
+  the invite token, stores the password and confirms the address, and
+  `ResetByToken` spends the reset token, stores the password and ends
+  every session, each landing complete or not at all. A refused
+  redemption spends no token, so the same link stays good and a
+  transient store failure costs the holder nothing.
+- `InviteStore` asks for each issuance whole too. `CreateToken` stores a
+  token only for an enabled account, and `ReplaceToken` puts one in
+  place of every token the account holds for the same purpose as one
+  change. A refused resend therefore leaves the standing invite good
+  rather than stranding the account without a link.
+- Disabling an account revokes every invite and reset token it holds,
+  so a link posted before the disable stays dead through any later
+  re-enable. Issuance and both redemptions answer
+  `gouncer.ErrUserNotFound` for a disabled account, so a disable cannot
+  be straddled by a token being minted or spent, and `ResendInvite`
+  refuses one the way `RequestReset` always has.
+- `ActivateByToken` answers `gouncer.ErrUserNotFound` for an account
+  already confirmed, so a token minted while another redemption
+  activates the same account cannot replace the password it settled on.
+- Token secrets reach the caller alone. The store is handed the hash
+  by itself, so no `InviteStore` is in a position to persist one.
+- `InviteStore`, the storage capabilities the flows need beyond
+  `gouncer.Store`, and `ErrAlreadyActivated`.
+- `DefaultInviteTTL` (seven days) and `DefaultResetTTL` (one hour).
+- `TokenReaper`, swept by the reaper alongside sessions when the store
+  offers it, taking expired tokens and the unconfirmed accounts an
+  expired invite leaves behind.
+- The testkit store carries tokens and implements every new capability.
+
+### Changed
+
+- The module builds against gouncer v0.4.0.
+
 ## [0.11.0] - 2026-08-25
 
 ### Changed

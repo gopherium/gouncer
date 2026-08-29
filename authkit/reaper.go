@@ -20,6 +20,12 @@ type SessionReaper interface {
 	DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error)
 }
 
+// TokenReaper deletes expired tokens and the unconfirmed accounts an
+// expired invite leaves behind. A store offering it is swept alongside sessions.
+type TokenReaper interface {
+	DeleteExpiredTokens(ctx context.Context, now time.Time) (int64, error)
+}
+
 // ReaperConfig parameterizes a Reaper.
 type ReaperConfig struct {
 	// Interval is how often expired sessions are swept. Zero applies one hour.
@@ -100,7 +106,8 @@ func reapExpiredSessions(
 	}
 }
 
-// reapOnce deletes the currently expired sessions within timeout, logging the outcome.
+// reapOnce deletes the currently expired sessions and tokens within
+// timeout, logging the outcomes.
 func reapOnce(ctx context.Context, reaper SessionReaper, timeout time.Duration, log *slog.Logger) {
 	sweepCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -113,5 +120,19 @@ func reapOnce(ctx context.Context, reaper SessionReaper, timeout time.Duration, 
 	}
 	if count > 0 {
 		log.Info("reaped expired sessions", "count", count)
+	}
+	tokens, ok := reaper.(TokenReaper)
+	if !ok {
+		return
+	}
+	count, err = tokens.DeleteExpiredTokens(sweepCtx, time.Now().UTC())
+	if err != nil {
+		if ctx.Err() == nil {
+			log.Error("reap expired tokens", "error", err)
+		}
+		return
+	}
+	if count > 0 {
+		log.Info("reaped expired tokens", "count", count)
 	}
 }

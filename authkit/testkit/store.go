@@ -22,6 +22,7 @@ import (
 type Store struct {
 	Users    map[uuid.UUID]gouncer.User
 	Sessions map[string]gouncer.Session
+	Tokens   map[string]gouncer.Token
 
 	LookupErr        error
 	SessionErr       error
@@ -31,6 +32,9 @@ type Store struct {
 	CreateUserErr    error
 	SetDisabledErr   error
 	SetRoleErr       error
+	TokenErr         error
+	ActivateErr      error
+	ResetErr         error
 
 	// DisabledUnderCover counts the disables that went through the guarded write.
 	DisabledUnderCover int
@@ -43,6 +47,7 @@ func NewStore() *Store {
 	return &Store{
 		Users:    map[uuid.UUID]gouncer.User{},
 		Sessions: map[string]gouncer.Session{},
+		Tokens:   map[string]gouncer.Token{},
 	}
 }
 
@@ -164,6 +169,9 @@ func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) 
 		maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
 			return sess.UserID == id
 		})
+		maps.DeleteFunc(s.Tokens, func(_ string, tok gouncer.Token) bool {
+			return tok.UserID == id
+		})
 	}
 	return nil
 }
@@ -181,6 +189,128 @@ func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privil
 	u.Role = role
 	s.Users[id] = u
 	return nil
+}
+
+// CreateToken stores t, or returns gouncer.ErrTokenExists while a live
+// token stands for the same user and purpose.
+func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
+	if s.TokenErr != nil {
+		return s.TokenErr
+	}
+	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
+		return gouncer.ErrUserNotFound
+	}
+	for _, existing := range s.Tokens {
+		if existing.UserID == t.UserID && existing.Purpose == t.Purpose && existing.ExpiresAt.After(time.Now().UTC()) {
+			return gouncer.ErrTokenExists
+		}
+	}
+	s.Tokens[string(t.TokenHash)] = t
+	return nil
+}
+
+// ReplaceToken stores t in place of every token the account holds for
+// the same purpose, or returns gouncer.ErrUserNotFound for an unknown
+// or disabled account, replacing nothing when it refuses.
+func (s *Store) ReplaceToken(_ context.Context, t gouncer.Token) error {
+	if s.TokenErr != nil {
+		return s.TokenErr
+	}
+	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
+		return gouncer.ErrUserNotFound
+	}
+	maps.DeleteFunc(s.Tokens, func(_ string, held gouncer.Token) bool {
+		return held.UserID == t.UserID && held.Purpose == t.Purpose
+	})
+	s.Tokens[string(t.TokenHash)] = t
+	return nil
+}
+
+// ActivateByToken spends the invite token and confirms the account it
+// names, or returns gouncer.ErrTokenNotFound for a spent or expired
+// token and gouncer.ErrUserNotFound for an unknown, disabled or already
+// confirmed account, spending nothing when it refuses.
+func (s *Store) ActivateByToken(
+	_ context.Context,
+	tokenHash []byte,
+	now time.Time,
+	passwordHash string,
+) (uuid.UUID, error) {
+	if s.TokenErr != nil {
+		return uuid.Nil, s.TokenErr
+	}
+	if s.ActivateErr != nil {
+		return uuid.Nil, s.ActivateErr
+	}
+	t, ok := s.Tokens[string(tokenHash)]
+	if !ok || t.Purpose != gouncer.PurposeInvite || !t.ExpiresAt.After(now) {
+		return uuid.Nil, gouncer.ErrTokenNotFound
+	}
+	u, ok := s.Users[t.UserID]
+	if !ok || u.Disabled || u.Confirmed {
+		return uuid.Nil, gouncer.ErrUserNotFound
+	}
+	u.PasswordHash = passwordHash
+	u.Confirmed = true
+	s.Users[t.UserID] = u
+	delete(s.Tokens, string(tokenHash))
+	return t.UserID, nil
+}
+
+// ResetByToken spends the reset token, stores the password hash and ends
+// every session the account it names holds, or returns
+// gouncer.ErrTokenNotFound for a spent or expired token and
+// gouncer.ErrUserNotFound for an unknown or disabled account, spending
+// nothing when it refuses.
+func (s *Store) ResetByToken(
+	_ context.Context,
+	tokenHash []byte,
+	now time.Time,
+	passwordHash string,
+) (uuid.UUID, error) {
+	if s.TokenErr != nil {
+		return uuid.Nil, s.TokenErr
+	}
+	if s.ResetErr != nil {
+		return uuid.Nil, s.ResetErr
+	}
+	t, ok := s.Tokens[string(tokenHash)]
+	if !ok || t.Purpose != gouncer.PurposeReset || !t.ExpiresAt.After(now) {
+		return uuid.Nil, gouncer.ErrTokenNotFound
+	}
+	u, ok := s.Users[t.UserID]
+	if !ok || u.Disabled {
+		return uuid.Nil, gouncer.ErrUserNotFound
+	}
+	u.PasswordHash = passwordHash
+	s.Users[t.UserID] = u
+	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
+		return sess.UserID == t.UserID
+	})
+	delete(s.Tokens, string(tokenHash))
+	return t.UserID, nil
+}
+
+// DeleteExpiredTokens removes expired tokens and the unconfirmed
+// accounts an expired invite leaves behind, reporting how many tokens went.
+func (s *Store) DeleteExpiredTokens(_ context.Context, now time.Time) (int64, error) {
+	if s.TokenErr != nil {
+		return 0, s.TokenErr
+	}
+	var count int64
+	for hash, t := range s.Tokens {
+		if t.ExpiresAt.After(now) {
+			continue
+		}
+		if t.Purpose == gouncer.PurposeInvite {
+			if u, ok := s.Users[t.UserID]; ok && !u.Confirmed {
+				delete(s.Users, t.UserID)
+			}
+		}
+		delete(s.Tokens, hash)
+		count++
+	}
+	return count, nil
 }
 
 // SetUserDisabledUnderCover disables an account under the guard, counting the call.
