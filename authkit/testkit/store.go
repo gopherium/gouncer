@@ -169,6 +169,9 @@ func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) 
 		maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
 			return sess.UserID == id
 		})
+		maps.DeleteFunc(s.Tokens, func(_ string, tok gouncer.Token) bool {
+			return tok.UserID == id
+		})
 	}
 	return nil
 }
@@ -234,13 +237,14 @@ func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gou
 }
 
 // ActivateAccount stores the password hash and confirms the account, or
-// returns gouncer.ErrUserNotFound for an unknown or disabled one.
+// returns gouncer.ErrUserNotFound for an unknown, disabled or already
+// confirmed one.
 func (s *Store) ActivateAccount(_ context.Context, id uuid.UUID, passwordHash string) error {
 	if s.ActivateErr != nil {
 		return s.ActivateErr
 	}
 	u, ok := s.Users[id]
-	if !ok || u.Disabled {
+	if !ok || u.Disabled || u.Confirmed {
 		return gouncer.ErrUserNotFound
 	}
 	u.PasswordHash = passwordHash

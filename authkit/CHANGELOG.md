@@ -24,11 +24,14 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   not at all. A store failure therefore leaves the account exactly as
   it was, still reachable with the password it had and still able to
   ask for another reset.
-- Disabling an account refuses the tokens it already holds. Both
-  account writes answer `gouncer.ErrUserNotFound` for a disabled
-  account, and `ResendInvite` refuses one the way `RequestReset`
-  always has, so a link posted before the disable cannot set a
-  password on it or confirm the address behind it.
+- Disabling an account revokes every invite and reset token it holds,
+  so a link posted before the disable stays dead through any later
+  re-enable. Both account writes also answer `gouncer.ErrUserNotFound`
+  for a disabled account, and `ResendInvite` refuses one the way
+  `RequestReset` always has.
+- `ActivateAccount` answers `gouncer.ErrUserNotFound` for an account
+  already confirmed, so a token minted while another redemption
+  activates the same account cannot replace the password it settled on.
 - Token secrets reach the caller alone. The store is handed the hash
   by itself, so no `InviteStore` is in a position to persist one.
 - `InviteStore`, the storage capabilities the flows need beyond

@@ -379,12 +379,97 @@ func TestTheStoreNeverReceivesATokenSecret(t *testing.T) {
 	}
 }
 
-func TestRedeemInviteRefusesADisabledAccount(t *testing.T) {
+func TestRedeemInviteRefusesAnActivatedAccount(t *testing.T) {
 	t.Parallel()
 
 	service, store, handlers := invites(authkit.InvitesConfig{})
 	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
 	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Fatalf("RedeemInvite() error = %v, want nil", err)
+	}
+	stale, err := gouncer.NewToken(tok.UserID, gouncer.PurposeInvite, time.Hour)
+	if err != nil {
+		t.Fatalf("NewToken() error = %v, want nil", err)
+	}
+	if err := store.CreateToken(t.Context(), stale); err != nil {
+		t.Fatalf("CreateToken() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemInvite(t.Context(), stale.Token, "attacker chosen password")
+	if !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("RedeemInvite() error = %v, want gouncer.ErrUserNotFound for an activated account", err)
+	}
+
+	if _, err := handlers.Authenticate(t.Context(), "maria@example.com", "attacker chosen password"); err == nil {
+		t.Error("a second activation overwrote the password of an activated account")
+	}
+	if _, err := handlers.Authenticate(t.Context(), "maria@example.com", "correct horse battery"); err != nil {
+		t.Errorf("Authenticate() with the owner's password error = %v, want it untouched", err)
+	}
+}
+
+func TestDisablingAnAccountRevokesItsInvite(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), tok.UserID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), tok.UserID, false); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemInvite(t.Context(), tok.Token, "attacker chosen password")
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("RedeemInvite() error = %v, want the disable to have revoked the token", err)
+	}
+
+	if _, err := handlers.Authenticate(t.Context(), "maria@example.com", "attacker chosen password"); err == nil {
+		t.Error("a token issued before the disable set a password after the re-enable")
+	}
+}
+
+func TestDisablingAnAccountRevokesItsReset(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), u.ID, false); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemReset(t.Context(), tok.Token, "attacker chosen password")
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("RedeemReset() error = %v, want the disable to have revoked the token", err)
+	}
+
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "attacker chosen password"); err == nil {
+		t.Error("a token issued before the disable replaced the password after the re-enable")
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "correct horse battery"); err != nil {
+		t.Errorf("Authenticate() with the original password error = %v, want it untouched", err)
+	}
+}
+
+func TestRedeemInviteRefusesADisabledAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
 		t.Fatalf("Invite() error = %v, want nil", err)
 	}
 	invited, err := store.UserByEmail(t.Context(), "maria@example.com")
@@ -393,6 +478,13 @@ func TestRedeemInviteRefusesADisabledAccount(t *testing.T) {
 	}
 	if err := store.SetUserDisabled(t.Context(), invited.ID, true); err != nil {
 		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	tok, err := gouncer.NewToken(invited.ID, gouncer.PurposeInvite, time.Hour)
+	if err != nil {
+		t.Fatalf("NewToken() error = %v, want nil", err)
+	}
+	if err := store.CreateToken(t.Context(), tok); err != nil {
+		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 
 	_, err = service.RedeemInvite(t.Context(), tok.Token, "attacker chosen password")
@@ -423,12 +515,18 @@ func TestRedeemResetRefusesADisabledAccount(t *testing.T) {
 
 	service, store, handlers := invites(authkit.InvitesConfig{})
 	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
-	tok, err := service.RequestReset(t.Context(), "ada@example.com")
-	if err != nil {
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); err != nil {
 		t.Fatalf("RequestReset() error = %v, want nil", err)
 	}
 	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
 		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	tok, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+	if err != nil {
+		t.Fatalf("NewToken() error = %v, want nil", err)
+	}
+	if err := store.CreateToken(t.Context(), tok); err != nil {
+		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 
 	_, err = service.RedeemReset(t.Context(), tok.Token, "attacker chosen password")
