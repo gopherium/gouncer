@@ -115,6 +115,13 @@ WHERE expires_at <= $1;
 DELETE FROM auth.tokens
 WHERE expires_at <= $1;
 
+-- name: LockUnconfirmedAccounts :many
+SELECT id
+FROM auth.users
+WHERE NOT confirmed AND id = ANY($1::uuid[])
+ORDER BY id
+FOR UPDATE;
+
 -- name: DeleteUnconfirmedAccounts :exec
 DELETE FROM auth.users
 WHERE NOT confirmed

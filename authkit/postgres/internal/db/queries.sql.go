@@ -444,6 +444,34 @@ func (q *Queries) LockUnactivatedUser(ctx context.Context, id uuid.UUID) (uuid.U
 	return id_2, err
 }
 
+const lockUnconfirmedAccounts = `-- name: LockUnconfirmedAccounts :many
+SELECT id
+FROM auth.users
+WHERE NOT confirmed AND id = ANY($1::uuid[])
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockUnconfirmedAccounts(ctx context.Context, dollar_1 []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockUnconfirmedAccounts, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setUserDisabled = `-- name: SetUserDisabled :execrows
 UPDATE auth.users
 SET disabled = $2

@@ -110,15 +110,8 @@ func (s *UserStore) DeleteExpiredTokens(ctx context.Context, now time.Time) (int
 				stranded = append(stranded, row.UserID)
 			}
 		}
-		if len(stranded) > 0 {
-			err = queries.DeleteUnconfirmedAccounts(ctx, db.DeleteUnconfirmedAccountsParams{
-				Column1:   stranded,
-				Purpose:   string(gouncer.PurposeInvite),
-				ExpiresAt: now,
-			})
-			if err != nil {
-				return err
-			}
+		if err := sweepStranded(ctx, queries, stranded, now); err != nil {
+			return err
 		}
 		_, err = queries.DeleteExpiredTokens(ctx, now)
 		return err
@@ -195,6 +188,23 @@ func (s *UserStore) inTx(ctx context.Context, action string, body func(*db.Queri
 		return fmt.Errorf("postgres: %s: %w", action, err)
 	}
 	return nil
+}
+
+// sweepStranded takes the accounts an expired invite left behind, holding
+// each one first so a replacement committing beside the sweep is seen.
+func sweepStranded(ctx context.Context, queries *db.Queries, stranded []uuid.UUID, now time.Time) error {
+	if len(stranded) == 0 {
+		return nil
+	}
+	held, err := queries.LockUnconfirmedAccounts(ctx, stranded)
+	if err != nil || len(held) == 0 {
+		return err
+	}
+	return queries.DeleteUnconfirmedAccounts(ctx, db.DeleteUnconfirmedAccountsParams{
+		Column1:   held,
+		Purpose:   string(gouncer.PurposeInvite),
+		ExpiresAt: now,
+	})
 }
 
 // holdReplaceable locks the account a replacement token may stand for,

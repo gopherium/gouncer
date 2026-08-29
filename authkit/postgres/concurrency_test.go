@@ -242,3 +242,58 @@ func TestRedeemingAndDisablingDoNotDeadlock(t *testing.T) {
 		t.Errorf("disable answered %v, want nil", disableErr)
 	}
 }
+
+func TestTheSweepSparesAnInviteRenewedBesideIt(t *testing.T) {
+	t.Parallel()
+
+	pool := newTestPool(t)
+	store := postgres.NewUserStore(pool)
+	u := invitedAccount(t, store)
+	expired := plantedToken(t, pool, u.ID, gouncer.PurposeInvite, time.Nanosecond)
+
+	holder, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("Begin() error = %v", err)
+	}
+	if _, err := holder.Exec(
+		t.Context(),
+		"SELECT id FROM auth.users WHERE id = $1 AND NOT disabled AND NOT confirmed FOR UPDATE", u.ID,
+	); err != nil {
+		t.Fatalf("holding the account: %v", err)
+	}
+
+	swept := make(chan error, 1)
+	go func() {
+		_, err := store.DeleteExpiredTokens(t.Context(), time.Now().UTC())
+		swept <- err
+	}()
+	time.Sleep(400 * time.Millisecond)
+
+	if _, err := holder.Exec(t.Context(), "DELETE FROM auth.tokens WHERE token_hash = $1", expired.TokenHash); err != nil {
+		t.Fatalf("removing the expired token: %v", err)
+	}
+	renewed, err := gouncer.NewToken(u.ID, gouncer.PurposeInvite, time.Hour)
+	if err != nil {
+		t.Fatalf("NewToken() error = %v", err)
+	}
+	if _, err := holder.Exec(
+		t.Context(),
+		"INSERT INTO auth.tokens (token_hash, user_id, purpose, created_at, expires_at) VALUES ($1,$2,$3,$4,$5)",
+		renewed.TokenHash, renewed.UserID, string(renewed.Purpose), renewed.CreatedAt, renewed.ExpiresAt,
+	); err != nil {
+		t.Fatalf("renewing the invite: %v", err)
+	}
+	if err := holder.Commit(t.Context()); err != nil {
+		t.Fatalf("Commit() error = %v", err)
+	}
+	if err := <-swept; err != nil {
+		t.Fatalf("DeleteExpiredTokens() error = %v", err)
+	}
+
+	if _, err := store.UserByID(t.Context(), u.ID); err != nil {
+		t.Fatalf("UserByID() error = %v, want the renewed account spared", err)
+	}
+	if _, err := store.ActivateByToken(t.Context(), renewed.TokenHash, time.Now().UTC(), "hash"); err != nil {
+		t.Errorf("ActivateByToken() error = %v, want the renewed invite to have survived the sweep", err)
+	}
+}

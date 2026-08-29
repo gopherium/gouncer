@@ -34,8 +34,9 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
   cannot be issued against an account being disabled, two issuances
   cannot both mint a live token for one purpose, and a redemption cannot
   deadlock against a disable.
-- The sweep spares an unconfirmed account that holds a live invite, so a
-  resend landing beside it keeps both the account and its fresh link.
+- The sweep holds each account an expired invite stranded before it
+  looks again, so a resend landing beside the sweep keeps both the
+  account and its fresh link.
 - A replacement invite requires an unactivated account, so a resend
   racing an activation refuses rather than answering a dead link.
 
