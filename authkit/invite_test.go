@@ -595,10 +595,10 @@ func TestAFailedResetLeavesTheAccountExactlyAsItWas(t *testing.T) {
 	}
 }
 
-func TestAFailedResetLeavesTheAccountRecoverable(t *testing.T) {
+func TestAFailedResetKeepsTheStandingLink(t *testing.T) {
 	t.Parallel()
 
-	service, store, handlers := invites(authkit.InvitesConfig{})
+	service, store, _ := invites(authkit.InvitesConfig{})
 	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
 	tok, err := service.RequestReset(t.Context(), "ada@example.com")
 	if err != nil {
@@ -608,20 +608,13 @@ func TestAFailedResetLeavesTheAccountRecoverable(t *testing.T) {
 	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err == nil {
 		t.Fatal("RedeemReset() error = nil, want the store failure surfaced")
 	}
-
 	store.ResetErr = nil
-	fresh, err := service.RequestReset(t.Context(), "ada@example.com")
-	if err != nil {
-		t.Fatalf("RequestReset() after the failure error = %v, want a second link issued", err)
+
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); !errors.Is(err, gouncer.ErrTokenExists) {
+		t.Errorf("RequestReset() error = %v, want the standing link held", err)
 	}
-	if fresh.Token == tok.Token {
-		t.Error("the second reset reissued the first secret, want a fresh one")
-	}
-	if _, err := service.RedeemReset(t.Context(), fresh.Token, "entirely new password"); err != nil {
-		t.Fatalf("RedeemReset() with the second link error = %v, want the account recovered", err)
-	}
-	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password"); err != nil {
-		t.Errorf("Authenticate() with the new password error = %v, want the recovery to have landed", err)
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+		t.Errorf("RedeemReset() with the standing link error = %v, want it still good", err)
 	}
 }
 
@@ -642,6 +635,48 @@ func TestAFailedInviteLeavesTheAddressResendable(t *testing.T) {
 	}
 	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
 		t.Errorf("RedeemInvite() error = %v, want the resent invite to activate", err)
+	}
+}
+
+func TestAFailedActivationSpendsNoInvite(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	store.ActivateErr = errors.New("users table gone")
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err == nil {
+		t.Fatal("RedeemInvite() error = nil, want the store failure surfaced")
+	}
+
+	store.ActivateErr = nil
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite() with the same secret error = %v, want the invite unspent", err)
+	}
+}
+
+func TestAFailedResetSpendsNoLink(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	store.ResetErr = errors.New("users table gone")
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err == nil {
+		t.Fatal("RedeemReset() error = nil, want the store failure surfaced")
+	}
+
+	store.ResetErr = nil
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+		t.Errorf("RedeemReset() with the same secret error = %v, want the link unspent", err)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password"); err != nil {
+		t.Errorf("Authenticate() error = %v, want the retried reset to have landed", err)
 	}
 }
 

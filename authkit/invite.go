@@ -31,22 +31,22 @@ type InviteStore interface {
 	// live token stands for the same user and purpose.
 	CreateToken(ctx context.Context, t gouncer.Token) error
 
-	// ConsumeToken removes and returns the live token behind the hash
-	// and purpose, or gouncer.ErrTokenNotFound.
-	ConsumeToken(ctx context.Context, tokenHash []byte, purpose gouncer.TokenPurpose, now time.Time) (gouncer.Token, error)
-
 	// DeleteTokensForUser removes every token the user holds for the purpose.
 	DeleteTokensForUser(ctx context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error
 
-	// ActivateAccount stores the password hash and confirms the account,
-	// as one change that either lands whole or not at all, answering
-	// gouncer.ErrUserNotFound for a disabled account.
-	ActivateAccount(ctx context.Context, id uuid.UUID, passwordHash string) error
+	// ActivateByToken spends the invite token, storing the password hash
+	// and confirming the account it names, as one change that either
+	// lands whole or not at all. It answers the account's id,
+	// gouncer.ErrTokenNotFound for a spent or expired token, and
+	// gouncer.ErrUserNotFound for a disabled or confirmed account.
+	ActivateByToken(ctx context.Context, tokenHash []byte, now time.Time, passwordHash string) (uuid.UUID, error)
 
-	// ResetPassword stores the password hash and ends every session the
-	// user holds, as one change that either lands whole or not at all,
-	// answering gouncer.ErrUserNotFound for a disabled account.
-	ResetPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+	// ResetByToken spends the reset token, storing the password hash and
+	// ending every session the account it names holds, as one change
+	// that either lands whole or not at all. It answers the account's
+	// id, gouncer.ErrTokenNotFound for a spent or expired token, and
+	// gouncer.ErrUserNotFound for a disabled account.
+	ResetByToken(ctx context.Context, tokenHash []byte, now time.Time, passwordHash string) (uuid.UUID, error)
 }
 
 // InvitesConfig parameterizes the invite and reset flows.
@@ -114,21 +114,15 @@ func (i *Invites) ResendInvite(ctx context.Context, email string) (gouncer.Token
 	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL)
 }
 
-// RedeemInvite consumes an invite token, storing the password,
-// confirming the address, and answering the activated account's id.
+// RedeemInvite spends an invite token, storing the password, confirming
+// the address, and answering the activated account's id as one store
+// change.
 func (i *Invites) RedeemInvite(ctx context.Context, token, password string) (uuid.UUID, error) {
 	hash, err := hashOf(password)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	t, err := i.store.ConsumeToken(ctx, gouncer.HashToken(token), gouncer.PurposeInvite, time.Now().UTC())
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if err := i.store.ActivateAccount(ctx, t.UserID, hash); err != nil {
-		return uuid.Nil, err
-	}
-	return t.UserID, nil
+	return i.store.ActivateByToken(ctx, gouncer.HashToken(token), time.Now().UTC(), hash)
 }
 
 // RequestReset issues a reset token for a confirmed enabled account,
@@ -144,7 +138,7 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL)
 }
 
-// RedeemReset consumes a reset token, replacing the password and ending
+// RedeemReset spends a reset token, replacing the password and ending
 // every session the account holds as one store change, answering the
 // account's id.
 func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid.UUID, error) {
@@ -152,14 +146,7 @@ func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid
 	if err != nil {
 		return uuid.Nil, err
 	}
-	t, err := i.store.ConsumeToken(ctx, gouncer.HashToken(token), gouncer.PurposeReset, time.Now().UTC())
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if err := i.store.ResetPassword(ctx, t.UserID, hash); err != nil {
-		return uuid.Nil, err
-	}
-	return t.UserID, nil
+	return i.store.ResetByToken(ctx, gouncer.HashToken(token), time.Now().UTC(), hash)
 }
 
 // issue creates and stores a token for the user, answering it with its

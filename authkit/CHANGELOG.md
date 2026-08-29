@@ -18,18 +18,18 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   `RequestReset` issues a reset token for confirmed enabled accounts
   only, and `RedeemReset` replaces the password and ends every session
   the account holds.
-- `InviteStore` asks for the two account writes whole. `ActivateAccount`
-  stores the password and confirms the address, and `ResetPassword`
-  stores the password and ends every session, each landing complete or
-  not at all. A store failure therefore leaves the account exactly as
-  it was, still reachable with the password it had and still able to
-  ask for another reset.
+- `InviteStore` asks for each redemption whole. `ActivateByToken` spends
+  the invite token, stores the password and confirms the address, and
+  `ResetByToken` spends the reset token, stores the password and ends
+  every session, each landing complete or not at all. A refused
+  redemption spends no token, so the same link stays good and a
+  transient store failure costs the holder nothing.
 - Disabling an account revokes every invite and reset token it holds,
   so a link posted before the disable stays dead through any later
-  re-enable. Both account writes also answer `gouncer.ErrUserNotFound`
-  for a disabled account, and `ResendInvite` refuses one the way
+  re-enable. Both redemptions also answer `gouncer.ErrUserNotFound` for
+  a disabled account, and `ResendInvite` refuses one the way
   `RequestReset` always has.
-- `ActivateAccount` answers `gouncer.ErrUserNotFound` for an account
+- `ActivateByToken` answers `gouncer.ErrUserNotFound` for an account
   already confirmed, so a token minted while another redemption
   activates the same account cannot replace the password it settled on.
 - Token secrets reach the caller alone. The store is handed the hash

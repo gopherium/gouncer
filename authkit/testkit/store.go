@@ -206,25 +206,6 @@ func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
 	return nil
 }
 
-// ConsumeToken removes and returns the live token behind the hash and
-// purpose, or gouncer.ErrTokenNotFound.
-func (s *Store) ConsumeToken(
-	_ context.Context,
-	tokenHash []byte,
-	purpose gouncer.TokenPurpose,
-	now time.Time,
-) (gouncer.Token, error) {
-	if s.TokenErr != nil {
-		return gouncer.Token{}, s.TokenErr
-	}
-	t, ok := s.Tokens[string(tokenHash)]
-	if !ok || t.Purpose != purpose || !t.ExpiresAt.After(now) {
-		return gouncer.Token{}, gouncer.ErrTokenNotFound
-	}
-	delete(s.Tokens, string(tokenHash))
-	return t, nil
-}
-
 // DeleteTokensForUser removes every token the user holds for the purpose.
 func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error {
 	if s.TokenErr != nil {
@@ -236,40 +217,69 @@ func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gou
 	return nil
 }
 
-// ActivateAccount stores the password hash and confirms the account, or
-// returns gouncer.ErrUserNotFound for an unknown, disabled or already
-// confirmed one.
-func (s *Store) ActivateAccount(_ context.Context, id uuid.UUID, passwordHash string) error {
-	if s.ActivateErr != nil {
-		return s.ActivateErr
+// ActivateByToken spends the invite token and confirms the account it
+// names, or returns gouncer.ErrTokenNotFound for a spent or expired
+// token and gouncer.ErrUserNotFound for an unknown, disabled or already
+// confirmed account, spending nothing when it refuses.
+func (s *Store) ActivateByToken(
+	_ context.Context,
+	tokenHash []byte,
+	now time.Time,
+	passwordHash string,
+) (uuid.UUID, error) {
+	if s.TokenErr != nil {
+		return uuid.Nil, s.TokenErr
 	}
-	u, ok := s.Users[id]
+	if s.ActivateErr != nil {
+		return uuid.Nil, s.ActivateErr
+	}
+	t, ok := s.Tokens[string(tokenHash)]
+	if !ok || t.Purpose != gouncer.PurposeInvite || !t.ExpiresAt.After(now) {
+		return uuid.Nil, gouncer.ErrTokenNotFound
+	}
+	u, ok := s.Users[t.UserID]
 	if !ok || u.Disabled || u.Confirmed {
-		return gouncer.ErrUserNotFound
+		return uuid.Nil, gouncer.ErrUserNotFound
 	}
 	u.PasswordHash = passwordHash
 	u.Confirmed = true
-	s.Users[id] = u
-	return nil
+	s.Users[t.UserID] = u
+	delete(s.Tokens, string(tokenHash))
+	return t.UserID, nil
 }
 
-// ResetPassword stores the password hash and ends every session the
-// user holds, or returns gouncer.ErrUserNotFound for an unknown or
-// disabled one, leaving both untouched.
-func (s *Store) ResetPassword(_ context.Context, id uuid.UUID, passwordHash string) error {
-	if s.ResetErr != nil {
-		return s.ResetErr
+// ResetByToken spends the reset token, stores the password hash and ends
+// every session the account it names holds, or returns
+// gouncer.ErrTokenNotFound for a spent or expired token and
+// gouncer.ErrUserNotFound for an unknown or disabled account, spending
+// nothing when it refuses.
+func (s *Store) ResetByToken(
+	_ context.Context,
+	tokenHash []byte,
+	now time.Time,
+	passwordHash string,
+) (uuid.UUID, error) {
+	if s.TokenErr != nil {
+		return uuid.Nil, s.TokenErr
 	}
-	u, ok := s.Users[id]
+	if s.ResetErr != nil {
+		return uuid.Nil, s.ResetErr
+	}
+	t, ok := s.Tokens[string(tokenHash)]
+	if !ok || t.Purpose != gouncer.PurposeReset || !t.ExpiresAt.After(now) {
+		return uuid.Nil, gouncer.ErrTokenNotFound
+	}
+	u, ok := s.Users[t.UserID]
 	if !ok || u.Disabled {
-		return gouncer.ErrUserNotFound
+		return uuid.Nil, gouncer.ErrUserNotFound
 	}
 	u.PasswordHash = passwordHash
-	s.Users[id] = u
+	s.Users[t.UserID] = u
 	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
-		return sess.UserID == id
+		return sess.UserID == t.UserID
 	})
-	return nil
+	delete(s.Tokens, string(tokenHash))
+	return t.UserID, nil
 }
 
 // DeleteExpiredTokens removes expired tokens and the unconfirmed
