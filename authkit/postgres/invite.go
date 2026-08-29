@@ -40,10 +40,11 @@ func (s *UserStore) CreateToken(ctx context.Context, t gouncer.Token) error {
 
 // ReplaceToken stores t for an enabled account in place of every token
 // it holds for the same purpose, or returns [gouncer.ErrUserNotFound]
-// for a disabled one, replacing nothing when it refuses.
+// for a disabled one and for an activated one under
+// [gouncer.PurposeInvite], replacing nothing when it refuses.
 func (s *UserStore) ReplaceToken(ctx context.Context, t gouncer.Token) error {
 	return s.inTx(ctx, "replace token", func(queries *db.Queries) error {
-		if err := holdEnabled(ctx, queries, t.UserID); err != nil {
+		if err := holdReplaceable(ctx, queries, t.UserID, t.Purpose); err != nil {
 			return err
 		}
 		err := queries.DeleteUserTokensForPurpose(ctx, db.DeleteUserTokensForPurposeParams{
@@ -110,7 +111,12 @@ func (s *UserStore) DeleteExpiredTokens(ctx context.Context, now time.Time) (int
 			}
 		}
 		if len(stranded) > 0 {
-			if err := queries.DeleteUnconfirmedAccounts(ctx, stranded); err != nil {
+			err = queries.DeleteUnconfirmedAccounts(ctx, db.DeleteUnconfirmedAccountsParams{
+				Column1:   stranded,
+				Purpose:   string(gouncer.PurposeInvite),
+				ExpiresAt: now,
+			})
+			if err != nil {
 				return err
 			}
 		}
@@ -189,6 +195,24 @@ func (s *UserStore) inTx(ctx context.Context, action string, body func(*db.Queri
 		return fmt.Errorf("postgres: %s: %w", action, err)
 	}
 	return nil
+}
+
+// holdReplaceable locks the account a replacement token may stand for,
+// requiring an unactivated one under [gouncer.PurposeInvite].
+func holdReplaceable(
+	ctx context.Context,
+	queries *db.Queries,
+	id uuid.UUID,
+	purpose gouncer.TokenPurpose,
+) error {
+	if purpose != gouncer.PurposeInvite {
+		return holdEnabled(ctx, queries, id)
+	}
+	_, err := queries.LockUnactivatedUser(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return gouncer.ErrUserNotFound
+	}
+	return err
 }
 
 // holdEnabled locks the enabled account against a concurrent disable, or

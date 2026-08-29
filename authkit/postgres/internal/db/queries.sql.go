@@ -160,11 +160,23 @@ func (q *Queries) DeleteToken(ctx context.Context, tokenHash []byte) (int64, err
 
 const deleteUnconfirmedAccounts = `-- name: DeleteUnconfirmedAccounts :exec
 DELETE FROM auth.users
-WHERE NOT confirmed AND id = ANY($1::uuid[])
+WHERE NOT confirmed
+  AND id = ANY($1::uuid[])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth.tokens t
+    WHERE t.user_id = auth.users.id AND t.purpose = $2 AND t.expires_at > $3
+  )
 `
 
-func (q *Queries) DeleteUnconfirmedAccounts(ctx context.Context, dollar_1 []uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteUnconfirmedAccounts, dollar_1)
+type DeleteUnconfirmedAccountsParams struct {
+	Column1   []uuid.UUID
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) DeleteUnconfirmedAccounts(ctx context.Context, arg DeleteUnconfirmedAccountsParams) error {
+	_, err := q.db.Exec(ctx, deleteUnconfirmedAccounts, arg.Column1, arg.Purpose, arg.ExpiresAt)
 	return err
 }
 
@@ -413,6 +425,20 @@ FOR UPDATE
 
 func (q *Queries) LockEnabledUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockEnabledUser, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lockUnactivatedUser = `-- name: LockUnactivatedUser :one
+SELECT id
+FROM auth.users
+WHERE id = $1 AND NOT disabled AND NOT confirmed
+FOR UPDATE
+`
+
+func (q *Queries) LockUnactivatedUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockUnactivatedUser, id)
 	var id_2 uuid.UUID
 	err := row.Scan(&id_2)
 	return id_2, err

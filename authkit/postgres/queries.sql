@@ -62,6 +62,12 @@ FROM auth.users
 WHERE id = $1 AND NOT disabled
 FOR UPDATE;
 
+-- name: LockUnactivatedUser :one
+SELECT id
+FROM auth.users
+WHERE id = $1 AND NOT disabled AND NOT confirmed
+FOR UPDATE;
+
 -- name: CreateToken :exec
 INSERT INTO auth.tokens (token_hash, user_id, purpose, created_at, expires_at)
 VALUES ($1, $2, $3, $4, $5);
@@ -111,4 +117,10 @@ WHERE expires_at <= $1;
 
 -- name: DeleteUnconfirmedAccounts :exec
 DELETE FROM auth.users
-WHERE NOT confirmed AND id = ANY($1::uuid[]);
+WHERE NOT confirmed
+  AND id = ANY($1::uuid[])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth.tokens t
+    WHERE t.user_id = auth.users.id AND t.purpose = $2 AND t.expires_at > $3
+  );

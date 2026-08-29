@@ -21,8 +21,8 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
   they were.
 - Migration `00004` adds `auth.users.confirmed` and the `auth.tokens`
   table with `tokens_user_id_purpose_idx` and `tokens_expires_at_idx`.
-  Existing rows take `confirmed` as true, and the column then carries no
-  default, so every insert names it.
+  The column defaults to true, so rows an earlier release wrote and rows
+  it goes on writing during a rolling upgrade both count as activated.
 
 ### Fixed
 
@@ -34,6 +34,10 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
   cannot be issued against an account being disabled, two issuances
   cannot both mint a live token for one purpose, and a redemption cannot
   deadlock against a disable.
+- The sweep spares an unconfirmed account that holds a live invite, so a
+  resend landing beside it keeps both the account and its fresh link.
+- A replacement invite requires an unactivated account, so a resend
+  racing an activation refuses rather than answering a dead link.
 
 ### Changed
 

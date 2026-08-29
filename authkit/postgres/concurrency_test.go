@@ -43,20 +43,21 @@ func raced(body func(int) error) []error {
 	return errs
 }
 
-// settled counts the nil errors and reports the first that is not nil.
-func settled(errs []error) (int, error) {
+// settled counts the nil errors and reports every loser that answered
+// anything other than want.
+func settled(t *testing.T, errs []error, want error) int {
+	t.Helper()
 	won := 0
-	var refused error
-	for _, err := range errs {
+	for i, err := range errs {
 		if err == nil {
 			won++
 			continue
 		}
-		if refused == nil {
-			refused = err
+		if !errors.Is(err, want) {
+			t.Errorf("racer %d answered %v, want %v", i, err, want)
 		}
 	}
-	return won, refused
+	return won
 }
 
 func TestConcurrentRedemptionsSpendTheInviteOnce(t *testing.T) {
@@ -71,12 +72,8 @@ func TestConcurrentRedemptionsSpendTheInviteOnce(t *testing.T) {
 		return err
 	})
 
-	won, refused := settled(errs)
-	if won != 1 {
+	if won := settled(t, errs, gouncer.ErrTokenNotFound); won != 1 {
 		t.Errorf("redemptions that landed = %d, want exactly 1", won)
-	}
-	if !errors.Is(refused, gouncer.ErrTokenNotFound) {
-		t.Errorf("a losing redemption answered %v, want gouncer.ErrTokenNotFound", refused)
 	}
 	held, err := store.UserByID(t.Context(), u.ID)
 	if err != nil {
@@ -118,12 +115,8 @@ func TestConcurrentRedemptionsSpendTheResetOnce(t *testing.T) {
 	}
 	wg.Wait()
 
-	won, refused := settled(errs)
-	if won != 1 {
+	if won := settled(t, errs, gouncer.ErrTokenNotFound); won != 1 {
 		t.Errorf("resets that landed = %d, want exactly 1 even though every one read the token live", won)
-	}
-	if !errors.Is(refused, gouncer.ErrTokenNotFound) {
-		t.Errorf("a losing reset answered %v, want gouncer.ErrTokenNotFound", refused)
 	}
 }
 
@@ -179,19 +172,27 @@ func TestIssuanceCannotStraddleADisable(t *testing.T) {
 
 	var wg sync.WaitGroup
 	start := make(chan struct{})
+	var issueErr, disableErr error
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		<-start
-		_ = store.CreateToken(t.Context(), tok)
+		issueErr = store.CreateToken(t.Context(), tok)
 	}()
 	go func() {
 		defer wg.Done()
 		<-start
-		_ = store.SetUserDisabledUnderCover(t.Context(), u.ID, true, gouncer.Roles{"admin"})
+		disableErr = store.SetUserDisabledUnderCover(t.Context(), u.ID, true, gouncer.Roles{"admin"})
 	}()
 	close(start)
 	wg.Wait()
+
+	if disableErr != nil {
+		t.Fatalf("SetUserDisabledUnderCover() error = %v, want nil", disableErr)
+	}
+	if issueErr != nil && !errors.Is(issueErr, gouncer.ErrUserNotFound) {
+		t.Fatalf("CreateToken() error = %v, want nil or gouncer.ErrUserNotFound", issueErr)
+	}
 
 	if err := store.SetUserDisabledUnderCover(t.Context(), u.ID, false, gouncer.Roles{"admin"}); err != nil {
 		t.Fatalf("re-enable error = %v, want nil", err)

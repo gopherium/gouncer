@@ -3,8 +3,6 @@
 -- +goose Up
 ALTER TABLE auth.users ADD COLUMN confirmed boolean NOT NULL DEFAULT true;
 
-ALTER TABLE auth.users ALTER COLUMN confirmed DROP DEFAULT;
-
 CREATE TABLE auth.tokens (
     token_hash bytea PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,

@@ -59,9 +59,10 @@ func plantedToken(
 	pool *pgxpool.Pool,
 	id uuid.UUID,
 	purpose gouncer.TokenPurpose,
+	ttl time.Duration,
 ) gouncer.Token {
 	t.Helper()
-	tok, err := gouncer.NewToken(id, purpose, time.Hour)
+	tok, err := gouncer.NewToken(id, purpose, ttl)
 	if err != nil {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
@@ -151,6 +152,25 @@ func TestReplaceTokenRefusesADisabledAccount(t *testing.T) {
 
 	if err := store.ReplaceToken(t.Context(), fresh); !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("ReplaceToken() error = %v, want gouncer.ErrUserNotFound", err)
+	}
+}
+
+func TestReplaceTokenRefusesAConfirmedAccount(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := invitedAccount(t, store)
+	first := issuedToken(t, store, u.ID, gouncer.PurposeInvite)
+	if _, err := store.ActivateByToken(t.Context(), first.TokenHash, time.Now().UTC(), "settled-hash"); err != nil {
+		t.Fatalf("ActivateByToken() error = %v, want nil", err)
+	}
+	fresh, err := gouncer.NewToken(u.ID, gouncer.PurposeInvite, time.Hour)
+	if err != nil {
+		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+	}
+
+	if err := store.ReplaceToken(t.Context(), fresh); !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("ReplaceToken() error = %v, want gouncer.ErrUserNotFound for an activated account", err)
 	}
 }
 
@@ -282,12 +302,33 @@ func TestResetByTokenRefusesADisabledAccount(t *testing.T) {
 	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
 		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
 	}
-	tok := plantedToken(t, pool, u.ID, gouncer.PurposeReset)
+	tok := plantedToken(t, pool, u.ID, gouncer.PurposeReset, time.Hour)
 
 	_, err := store.ResetByToken(t.Context(), tok.TokenHash, time.Now().UTC(), "attacker-hash")
 
 	if !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("ResetByToken() error = %v, want gouncer.ErrUserNotFound", err)
+	}
+}
+
+func TestDeleteExpiredTokensSparesAnAccountHoldingALiveInvite(t *testing.T) {
+	t.Parallel()
+
+	pool := newTestPool(t)
+	store := postgres.NewUserStore(pool)
+	u := invitedAccount(t, store)
+	plantedToken(t, pool, u.ID, gouncer.PurposeInvite, time.Nanosecond)
+	live := plantedToken(t, pool, u.ID, gouncer.PurposeInvite, time.Hour)
+
+	if _, err := store.DeleteExpiredTokens(t.Context(), time.Now().UTC()); err != nil {
+		t.Fatalf("DeleteExpiredTokens() error = %v, want nil", err)
+	}
+
+	if _, err := store.UserByID(t.Context(), u.ID); err != nil {
+		t.Fatalf("UserByID() error = %v, want the account holding a live invite spared", err)
+	}
+	if _, err := store.ActivateByToken(t.Context(), live.TokenHash, time.Now().UTC(), "argon2id-hash"); err != nil {
+		t.Errorf("ActivateByToken() error = %v, want the live invite to have survived the sweep", err)
 	}
 }
 

@@ -160,7 +160,7 @@ func TestMigrationsCascadeTokensWithTheirAccount(t *testing.T) {
 	}
 }
 
-func TestMigrationsRequireAnExplicitConfirmation(t *testing.T) {
+func TestMigrationsConfirmTheAccountsAnOlderReleaseInserts(t *testing.T) {
 	t.Parallel()
 
 	db := newTestDB(t)
@@ -174,8 +174,15 @@ func TestMigrationsRequireAnExplicitConfirmation(t *testing.T) {
 		ada.ID, ada.Email, ada.Name, ada.PasswordHash, ada.Disabled, ada.CreatedAt,
 	)
 
-	if err == nil {
-		t.Error("inserting without confirmed error = nil, want the column to carry no default")
+	if err != nil {
+		t.Fatalf("inserting the way a release before this one does: %v", err)
+	}
+	var confirmed bool
+	if err := db.QueryRow("SELECT confirmed FROM auth.users WHERE id = $1", ada.ID).Scan(&confirmed); err != nil {
+		t.Fatalf("reading the confirmation back: %v", err)
+	}
+	if !confirmed {
+		t.Error("confirmed = false, want an account an older release inserts to count as activated")
 	}
 }
 
