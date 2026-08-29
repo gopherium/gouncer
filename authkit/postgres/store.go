@@ -53,6 +53,7 @@ func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
 		Name:         u.Name,
 		PasswordHash: u.PasswordHash,
 		Disabled:     u.Disabled,
+		Confirmed:    u.Confirmed,
 		Role:         u.Role,
 		CreatedAt:    u.CreatedAt,
 	})
@@ -136,6 +137,7 @@ func (s *UserStore) ListUsers(ctx context.Context) ([]gouncer.User, error) {
 			Email:     row.Email,
 			Name:      row.Name,
 			Disabled:  row.Disabled,
+			Confirmed: row.Confirmed,
 			Role:      row.Role,
 			CreatedAt: row.CreatedAt,
 		}
@@ -164,6 +166,9 @@ func (s *UserStore) SetUserDisabled(ctx context.Context, id uuid.UUID, disabled 
 	if disabled {
 		if err := queries.DeleteUserSessions(ctx, id); err != nil {
 			return fmt.Errorf("postgres: revoke user sessions: %w", err)
+		}
+		if err := queries.DeleteUserTokens(ctx, id); err != nil {
+			return fmt.Errorf("postgres: revoke user tokens: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -198,6 +203,7 @@ func userFromRow(row db.AuthUser) gouncer.User {
 		Name:         row.Name,
 		PasswordHash: row.PasswordHash,
 		Disabled:     row.Disabled,
+		Confirmed:    row.Confirmed,
 		Role:         row.Role,
 		CreatedAt:    row.CreatedAt,
 	}

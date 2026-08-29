@@ -119,7 +119,7 @@ func (s *UserStore) holdsPrivilege(
 	return held > 0, nil
 }
 
-// disable writes an account's disabled state and sweeps its sessions when it closes.
+// disable writes an account's disabled state and sweeps its sessions and tokens when it closes.
 func (s *UserStore) disable(ctx context.Context, queries *db.Queries, id uuid.UUID, disabled bool) error {
 	count, err := queries.SetUserDisabled(ctx, db.SetUserDisabledParams{ID: id, Disabled: disabled})
 	if err != nil {
@@ -131,6 +131,9 @@ func (s *UserStore) disable(ctx context.Context, queries *db.Queries, id uuid.UU
 	if disabled {
 		if err := queries.DeleteUserSessions(ctx, id); err != nil {
 			return fmt.Errorf("postgres: revoke user sessions: %w", err)
+		}
+		if err := queries.DeleteUserTokens(ctx, id); err != nil {
+			return fmt.Errorf("postgres: revoke user tokens: %w", err)
 		}
 	}
 	return nil

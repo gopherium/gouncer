@@ -12,6 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
+const activateUser = `-- name: ActivateUser :execrows
+UPDATE auth.users
+SET password_hash = $2, confirmed = true
+WHERE id = $1 AND NOT disabled AND NOT confirmed
+`
+
+type ActivateUserParams struct {
+	ID           uuid.UUID
+	PasswordHash string
+}
+
+func (q *Queries) ActivateUser(ctx context.Context, arg ActivateUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, activateUser, arg.ID, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO auth.sessions (token_hash, user_id, created_at, expires_at)
 VALUES ($1, $2, $3, $4)
@@ -34,10 +53,34 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	return err
 }
 
+const createToken = `-- name: CreateToken :exec
+INSERT INTO auth.tokens (token_hash, user_id, purpose, created_at, expires_at)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateTokenParams struct {
+	TokenHash []byte
+	UserID    uuid.UUID
+	Purpose   string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) error {
+	_, err := q.db.Exec(ctx, createToken,
+		arg.TokenHash,
+		arg.UserID,
+		arg.Purpose,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const createUser = `-- name: CreateUser :exec
 
-INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, role)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at, role, confirmed)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type CreateUserParams struct {
@@ -48,6 +91,7 @@ type CreateUserParams struct {
 	Disabled     bool
 	CreatedAt    time.Time
 	Role         string
+	Confirmed    bool
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -60,6 +104,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.Disabled,
 		arg.CreatedAt,
 		arg.Role,
+		arg.Confirmed,
 	)
 	return err
 }
@@ -77,6 +122,19 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt time.Time
 	return result.RowsAffected(), nil
 }
 
+const deleteExpiredTokens = `-- name: DeleteExpiredTokens :execrows
+DELETE FROM auth.tokens
+WHERE expires_at <= $1
+`
+
+func (q *Queries) DeleteExpiredTokens(ctx context.Context, expiresAt time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredTokens, expiresAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteSession = `-- name: DeleteSession :exec
 DELETE FROM auth.sessions
 WHERE token_hash = $1
@@ -84,6 +142,41 @@ WHERE token_hash = $1
 
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
+	return err
+}
+
+const deleteToken = `-- name: DeleteToken :execrows
+DELETE FROM auth.tokens
+WHERE token_hash = $1
+`
+
+func (q *Queries) DeleteToken(ctx context.Context, tokenHash []byte) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteToken, tokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteUnconfirmedAccounts = `-- name: DeleteUnconfirmedAccounts :exec
+DELETE FROM auth.users
+WHERE NOT confirmed
+  AND id = ANY($1::uuid[])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth.tokens t
+    WHERE t.user_id = auth.users.id AND t.purpose = $2 AND t.expires_at > $3
+  )
+`
+
+type DeleteUnconfirmedAccountsParams struct {
+	Column1   []uuid.UUID
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) DeleteUnconfirmedAccounts(ctx context.Context, arg DeleteUnconfirmedAccountsParams) error {
+	_, err := q.db.Exec(ctx, deleteUnconfirmedAccounts, arg.Column1, arg.Purpose, arg.ExpiresAt)
 	return err
 }
 
@@ -97,8 +190,83 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) erro
 	return err
 }
 
+const deleteUserTokens = `-- name: DeleteUserTokens :exec
+DELETE FROM auth.tokens
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserTokens, userID)
+	return err
+}
+
+const deleteUserTokensForPurpose = `-- name: DeleteUserTokensForPurpose :exec
+DELETE FROM auth.tokens
+WHERE user_id = $1 AND purpose = $2
+`
+
+type DeleteUserTokensForPurposeParams struct {
+	UserID  uuid.UUID
+	Purpose string
+}
+
+func (q *Queries) DeleteUserTokensForPurpose(ctx context.Context, arg DeleteUserTokensForPurposeParams) error {
+	_, err := q.db.Exec(ctx, deleteUserTokensForPurpose, arg.UserID, arg.Purpose)
+	return err
+}
+
+const expiredTokens = `-- name: ExpiredTokens :many
+SELECT user_id, purpose
+FROM auth.tokens
+WHERE expires_at <= $1
+`
+
+type ExpiredTokensRow struct {
+	UserID  uuid.UUID
+	Purpose string
+}
+
+func (q *Queries) ExpiredTokens(ctx context.Context, expiresAt time.Time) ([]ExpiredTokensRow, error) {
+	rows, err := q.db.Query(ctx, expiredTokens, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExpiredTokensRow
+	for rows.Next() {
+		var i ExpiredTokensRow
+		if err := rows.Scan(&i.UserID, &i.Purpose); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findLiveToken = `-- name: FindLiveToken :one
+SELECT user_id
+FROM auth.tokens
+WHERE token_hash = $1 AND purpose = $2 AND expires_at > $3
+`
+
+type FindLiveTokenParams struct {
+	TokenHash []byte
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) FindLiveToken(ctx context.Context, arg FindLiveTokenParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findLiveToken, arg.TokenHash, arg.Purpose, arg.ExpiresAt)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, password_hash, disabled, created_at, role
+SELECT id, email, name, password_hash, disabled, created_at, role, confirmed
 FROM auth.users
 WHERE email = $1
 `
@@ -114,12 +282,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (AuthUser, e
 		&i.Disabled,
 		&i.CreatedAt,
 		&i.Role,
+		&i.Confirmed,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, name, password_hash, disabled, created_at, role
+SELECT id, email, name, password_hash, disabled, created_at, role, confirmed
 FROM auth.users
 WHERE id = $1
 `
@@ -135,12 +304,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (AuthUser, erro
 		&i.Disabled,
 		&i.CreatedAt,
 		&i.Role,
+		&i.Confirmed,
 	)
 	return i, err
 }
 
 const getUserBySession = `-- name: GetUserBySession :one
-SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.role
+SELECT u.id, u.email, u.name, u.password_hash, u.disabled, u.created_at, u.role, u.confirmed
 FROM auth.sessions s
 JOIN auth.users u ON u.id = s.user_id
 WHERE s.token_hash = $1 AND s.expires_at > $2 AND NOT u.disabled
@@ -162,6 +332,7 @@ func (q *Queries) GetUserBySession(ctx context.Context, arg GetUserBySessionPara
 		&i.Disabled,
 		&i.CreatedAt,
 		&i.Role,
+		&i.Confirmed,
 	)
 	return i, err
 }
@@ -181,7 +352,7 @@ func (q *Queries) GrantRoleToRoleless(ctx context.Context, role string) (int64, 
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, name, disabled, created_at, role
+SELECT id, email, name, disabled, confirmed, created_at, role
 FROM auth.users
 ORDER BY name, id
 `
@@ -191,6 +362,7 @@ type ListUsersRow struct {
 	Email     string
 	Name      string
 	Disabled  bool
+	Confirmed bool
 	CreatedAt time.Time
 	Role      string
 }
@@ -209,12 +381,90 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.Email,
 			&i.Name,
 			&i.Disabled,
+			&i.Confirmed,
 			&i.CreatedAt,
 			&i.Role,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const liveTokenExists = `-- name: LiveTokenExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM auth.tokens
+    WHERE user_id = $1 AND purpose = $2 AND expires_at > $3
+)
+`
+
+type LiveTokenExistsParams struct {
+	UserID    uuid.UUID
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) LiveTokenExists(ctx context.Context, arg LiveTokenExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, liveTokenExists, arg.UserID, arg.Purpose, arg.ExpiresAt)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const lockEnabledUser = `-- name: LockEnabledUser :one
+SELECT id
+FROM auth.users
+WHERE id = $1 AND NOT disabled
+FOR UPDATE
+`
+
+func (q *Queries) LockEnabledUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockEnabledUser, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lockUnactivatedUser = `-- name: LockUnactivatedUser :one
+SELECT id
+FROM auth.users
+WHERE id = $1 AND NOT disabled AND NOT confirmed
+FOR UPDATE
+`
+
+func (q *Queries) LockUnactivatedUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockUnactivatedUser, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lockUnconfirmedAccounts = `-- name: LockUnconfirmedAccounts :many
+SELECT id
+FROM auth.users
+WHERE NOT confirmed AND id = ANY($1::uuid[])
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockUnconfirmedAccounts(ctx context.Context, dollar_1 []uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockUnconfirmedAccounts, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -235,6 +485,25 @@ type SetUserDisabledParams struct {
 
 func (q *Queries) SetUserDisabled(ctx context.Context, arg SetUserDisabledParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setUserDisabled, arg.ID, arg.Disabled)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUserPassword = `-- name: SetUserPassword :execrows
+UPDATE auth.users
+SET password_hash = $2
+WHERE id = $1 AND NOT disabled
+`
+
+type SetUserPasswordParams struct {
+	ID           uuid.UUID
+	PasswordHash string
+}
+
+func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserPassword, arg.ID, arg.PasswordHash)
 	if err != nil {
 		return 0, err
 	}
