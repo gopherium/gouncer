@@ -19,6 +19,8 @@ var (
 	_ gouncer.Store         = (*postgres.UserStore)(nil)
 	_ authkit.AdminStore    = (*postgres.UserStore)(nil)
 	_ authkit.SessionReaper = (*postgres.UserStore)(nil)
+	_ authkit.InviteStore   = (*postgres.UserStore)(nil)
+	_ authkit.TokenReaper   = (*postgres.UserStore)(nil)
 )
 
 // newTestPool returns a pgx pool on a fresh migrated test database.
