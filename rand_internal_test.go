@@ -25,4 +25,7 @@ func TestRandomnessFailuresAreReported(t *testing.T) {
 	if _, err := NewSession(uuid.Must(uuid.NewV7())); err == nil {
 		t.Error("NewSession() error = nil, want a randomness failure")
 	}
+	if _, err := NewToken(uuid.Must(uuid.NewV7()), PurposeInvite, DefaultSessionDuration); err == nil {
+		t.Error("NewToken() error = nil, want a randomness failure")
+	}
 }

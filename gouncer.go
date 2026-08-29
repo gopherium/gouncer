@@ -39,21 +39,59 @@ const (
 // variable so failure paths stay testable.
 var randRead = rand.Read
 
-// User is an account holder with password credentials. Build one with [NewUser].
+// User is an account holder with password credentials. Build one with
+// [NewUser], or with [NewInvitedUser] for an account activated later.
 type User struct {
 	ID           uuid.UUID
 	Email        string
 	Name         string
 	PasswordHash string
 	Disabled     bool
+	Confirmed    bool
 	Role         string
 	CreatedAt    time.Time
 }
 
-// NewUser returns a validated [User] with a normalized email, a trimmed
-// name, and the password stored as an argon2id hash. Invalid input
-// returns one of the package's Err* sentinels.
+// NewUser returns a validated confirmed [User] with a normalized email,
+// a trimmed name, and the password stored as an argon2id hash. Invalid
+// input returns one of the package's Err* sentinels.
 func NewUser(email, name, password string) (User, error) {
+	u, err := newIdentity(email, name)
+	if err != nil {
+		return User{}, err
+	}
+	if err := u.SetPassword(password); err != nil {
+		return User{}, err
+	}
+	u.Confirmed = true
+	return u, nil
+}
+
+// NewInvitedUser returns a validated unconfirmed [User] holding no
+// usable password until activation sets one.
+func NewInvitedUser(email, name string) (User, error) {
+	return newIdentity(email, name)
+}
+
+// SetPassword stores password as an argon2id hash, validating its
+// bounds like [NewUser] and leaving the user unchanged when refused.
+func (u *User) SetPassword(password string) error {
+	if passwordLength := len([]rune(password)); passwordLength < minPasswordLength {
+		return ErrWeakPassword
+	} else if passwordLength > maxPasswordLength {
+		return ErrPasswordTooLong
+	}
+	hash, err := hashPassword(password)
+	if err != nil {
+		return err
+	}
+	u.PasswordHash = hash
+	return nil
+}
+
+// newIdentity returns an unconfirmed [User] with a validated normalized
+// email and trimmed name, and no password.
+func newIdentity(email, name string) (User, error) {
 	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
 	if !isValidEmail(normalizedEmail) {
 		return User{}, ErrInvalidEmail
@@ -65,25 +103,15 @@ func NewUser(email, name, password string) (User, error) {
 	if len([]rune(trimmedName)) > maxNameLength {
 		return User{}, ErrNameTooLong
 	}
-	if passwordLength := len([]rune(password)); passwordLength < minPasswordLength {
-		return User{}, ErrWeakPassword
-	} else if passwordLength > maxPasswordLength {
-		return User{}, ErrPasswordTooLong
-	}
-	hash, err := hashPassword(password)
-	if err != nil {
-		return User{}, err
-	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return User{}, fmt.Errorf("gouncer: generate id: %w", err)
 	}
 	return User{
-		ID:           id,
-		Email:        normalizedEmail,
-		Name:         trimmedName,
-		PasswordHash: hash,
-		CreatedAt:    time.Now().UTC(),
+		ID:        id,
+		Email:     normalizedEmail,
+		Name:      trimmedName,
+		CreatedAt: time.Now().UTC(),
 	}, nil
 }
 
