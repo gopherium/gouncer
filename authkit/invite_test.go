@@ -354,6 +354,101 @@ func TestRedeemResetLeavesTheTokenWhenThePasswordIsRefused(t *testing.T) {
 	}
 }
 
+func TestTheStoreNeverReceivesATokenSecret(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+
+	if len(store.Tokens) != 2 {
+		t.Fatalf("stored tokens = %d, want 2", len(store.Tokens))
+	}
+	for _, tok := range store.Tokens {
+		if tok.Token != "" {
+			t.Errorf("a %s token reached the store carrying its secret, want the hash alone", tok.Purpose)
+		}
+		if len(tok.TokenHash) == 0 {
+			t.Errorf("a %s token reached the store with no hash", tok.Purpose)
+		}
+	}
+}
+
+func TestAFailedResetNeverLeavesALiveSessionBesideANewPassword(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	stolen, err := handlers.StartSession(t.Context(), u.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v, want nil", err)
+	}
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	store.EndSessionsErr = errors.New("session table gone")
+
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err == nil {
+		t.Fatal("RedeemReset() error = nil, want the store failure surfaced")
+	}
+
+	_, sessionErr := handlers.SessionIdentity(t.Context(), stolen.Value)
+	_, newPasswordErr := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password")
+	if sessionErr == nil && newPasswordErr == nil {
+		t.Error("a failed reset left the old session live beside the new password, want the two never to coexist")
+	}
+}
+
+func TestAFailedInviteLeavesTheAddressResendable(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.TokenErr = errors.New("token table gone")
+
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err == nil {
+		t.Fatal("Invite() error = nil, want the token failure surfaced")
+	}
+
+	store.TokenErr = nil
+	tok, err := service.ResendInvite(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("ResendInvite() error = %v, want the orphaned invite recoverable", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite() error = %v, want the resent invite to activate", err)
+	}
+}
+
+func TestAFailedActivationLeavesTheInviteResendable(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	store.ActivateErr = errors.New("users table gone")
+
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err == nil {
+		t.Fatal("RedeemInvite() error = nil, want the store failure surfaced")
+	}
+
+	store.ActivateErr = nil
+	fresh, err := service.ResendInvite(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("ResendInvite() error = %v, want the consumed invite recoverable", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), fresh.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite() error = %v, want the resent invite to activate", err)
+	}
+}
+
 func TestAnExpiredInviteFreesItsAddress(t *testing.T) {
 	t.Parallel()
 
@@ -375,26 +470,22 @@ func TestStoreFailuresSurface(t *testing.T) {
 	t.Parallel()
 
 	boom := errors.New("store down")
-	tests := map[string]func(*testkit.Store, *authkit.Invites) error{
-		"resend cannot clear tokens": func(s *testkit.Store, i *authkit.Invites) error {
+	tests := map[string]func(*testkit.Store, *authkit.Invites, string) error{
+		"resend cannot clear tokens": func(s *testkit.Store, i *authkit.Invites, _ string) error {
 			s.TokenErr = boom
 			_, err := i.ResendInvite(t.Context(), "maria@example.com")
 			return err
 		},
-		"redeem cannot activate": func(s *testkit.Store, i *authkit.Invites) error {
+		"redeem cannot activate": func(s *testkit.Store, i *authkit.Invites, pending string) error {
 			s.ActivateErr = boom
-			tok, ok := firstToken(s)
-			if !ok {
-				return errors.New("no pending token")
-			}
-			_, err := i.RedeemInvite(t.Context(), tok, "correct horse battery")
+			_, err := i.RedeemInvite(t.Context(), pending, "correct horse battery")
 			return err
 		},
-		"reset cannot store the password": func(s *testkit.Store, i *authkit.Invites) error {
+		"reset cannot store the password": func(s *testkit.Store, i *authkit.Invites, _ string) error {
 			s.SetPasswordErr = boom
 			return redeemFreshReset(t, s, i)
 		},
-		"reset cannot end sessions": func(s *testkit.Store, i *authkit.Invites) error {
+		"reset cannot end sessions": func(s *testkit.Store, i *authkit.Invites, _ string) error {
 			s.EndSessionsErr = boom
 			return redeemFreshReset(t, s, i)
 		},
@@ -404,23 +495,16 @@ func TestStoreFailuresSurface(t *testing.T) {
 			t.Parallel()
 
 			service, store, _ := invites(authkit.InvitesConfig{})
-			if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
+			pending, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+			if err != nil {
 				t.Fatalf("Invite() error = %v, want nil", err)
 			}
 
-			if err := run(store, service); !errors.Is(err, boom) {
+			if err := run(store, service, pending.Token); !errors.Is(err, boom) {
 				t.Errorf("error = %v, want the store failure surfaced", err)
 			}
 		})
 	}
-}
-
-// firstToken answers any stored token's plaintext stand-in by rebuilding it from the store.
-func firstToken(s *testkit.Store) (string, bool) {
-	for _, tok := range s.Tokens {
-		return tok.Token, tok.Token != ""
-	}
-	return "", false
 }
 
 // redeemFreshReset activates an account, requests a reset and redeems it, answering the redemption error.

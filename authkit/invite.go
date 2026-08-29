@@ -139,8 +139,10 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL)
 }
 
-// RedeemReset consumes a reset token, replacing the password and ending
-// every session the account holds, answering the account's id.
+// RedeemReset consumes a reset token, ending every session the account
+// holds before replacing the password, answering the account's id. The
+// sessions go first so a failure never leaves one live beside a
+// password its holder no longer knows.
 func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid.UUID, error) {
 	hash, err := hashOf(password)
 	if err != nil {
@@ -150,16 +152,18 @@ func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if err := i.store.SetUserPassword(ctx, t.UserID, hash); err != nil {
+	if err := i.store.DeleteSessionsForUser(ctx, t.UserID); err != nil {
 		return uuid.Nil, err
 	}
-	if err := i.store.DeleteSessionsForUser(ctx, t.UserID); err != nil {
+	if err := i.store.SetUserPassword(ctx, t.UserID, hash); err != nil {
 		return uuid.Nil, err
 	}
 	return t.UserID, nil
 }
 
-// issue creates and stores a token for the user, answering it with its secret.
+// issue creates and stores a token for the user, answering it with its
+// secret. The store is handed the hash alone, so no implementation of
+// InviteStore is ever in a position to persist the secret itself.
 func (i *Invites) issue(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -170,7 +174,9 @@ func (i *Invites) issue(
 	if err != nil {
 		return gouncer.Token{}, err
 	}
-	if err := i.store.CreateToken(ctx, t); err != nil {
+	stored := t
+	stored.Token = ""
+	if err := i.store.CreateToken(ctx, stored); err != nil {
 		return gouncer.Token{}, err
 	}
 	return t, nil
