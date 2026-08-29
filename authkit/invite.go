@@ -38,14 +38,15 @@ type InviteStore interface {
 	// DeleteTokensForUser removes every token the user holds for the purpose.
 	DeleteTokensForUser(ctx context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error
 
-	// ActivateAccount stores the password hash and confirms the account.
+	// ActivateAccount stores the password hash and confirms the account,
+	// as one change that either lands whole or not at all, answering
+	// gouncer.ErrUserNotFound for a disabled account.
 	ActivateAccount(ctx context.Context, id uuid.UUID, passwordHash string) error
 
-	// SetUserPassword stores the password hash.
-	SetUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
-
-	// DeleteSessionsForUser removes every session the user holds.
-	DeleteSessionsForUser(ctx context.Context, id uuid.UUID) error
+	// ResetPassword stores the password hash and ends every session the
+	// user holds, as one change that either lands whole or not at all,
+	// answering gouncer.ErrUserNotFound for a disabled account.
+	ResetPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 }
 
 // InvitesConfig parameterizes the invite and reset flows.
@@ -93,12 +94,16 @@ func (i *Invites) Invite(ctx context.Context, email, name, role string) (gouncer
 	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL)
 }
 
-// ResendInvite replaces the pending token of an unactivated account,
-// answering the fresh one.
+// ResendInvite replaces the pending token of an unactivated enabled
+// account, answering the fresh one and gouncer.ErrUserNotFound for
+// every other address.
 func (i *Invites) ResendInvite(ctx context.Context, email string) (gouncer.Token, error) {
 	u, err := i.store.UserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
 	if err != nil {
 		return gouncer.Token{}, err
+	}
+	if u.Disabled {
+		return gouncer.Token{}, gouncer.ErrUserNotFound
 	}
 	if u.Confirmed || u.PasswordHash != "" {
 		return gouncer.Token{}, ErrAlreadyActivated
@@ -139,10 +144,9 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL)
 }
 
-// RedeemReset consumes a reset token, ending every session the account
-// holds before replacing the password, answering the account's id. The
-// sessions go first so a failure never leaves one live beside a
-// password its holder no longer knows.
+// RedeemReset consumes a reset token, replacing the password and ending
+// every session the account holds as one store change, answering the
+// account's id.
 func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid.UUID, error) {
 	hash, err := hashOf(password)
 	if err != nil {
@@ -152,10 +156,7 @@ func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if err := i.store.DeleteSessionsForUser(ctx, t.UserID); err != nil {
-		return uuid.Nil, err
-	}
-	if err := i.store.SetUserPassword(ctx, t.UserID, hash); err != nil {
+	if err := i.store.ResetPassword(ctx, t.UserID, hash); err != nil {
 		return uuid.Nil, err
 	}
 	return t.UserID, nil

@@ -16,9 +16,19 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   `ResendInvite` replaces a pending token, `RedeemInvite` sets the
   password, confirms the address and answers the account,
   `RequestReset` issues a reset token for confirmed enabled accounts
-  only, and `RedeemReset` ends every session the account holds before
-  replacing the password, so a store failure never leaves a live
-  session beside a password its holder no longer knows.
+  only, and `RedeemReset` replaces the password and ends every session
+  the account holds.
+- `InviteStore` asks for the two account writes whole. `ActivateAccount`
+  stores the password and confirms the address, and `ResetPassword`
+  stores the password and ends every session, each landing complete or
+  not at all. A store failure therefore leaves the account exactly as
+  it was, still reachable with the password it had and still able to
+  ask for another reset.
+- Disabling an account refuses the tokens it already holds. Both
+  account writes answer `gouncer.ErrUserNotFound` for a disabled
+  account, and `ResendInvite` refuses one the way `RequestReset`
+  always has, so a link posted before the disable cannot set a
+  password on it or confirm the address behind it.
 - Token secrets reach the caller alone. The store is handed the hash
   by itself, so no `InviteStore` is in a position to persist one.
 - `InviteStore`, the storage capabilities the flows need beyond

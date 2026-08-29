@@ -34,8 +34,7 @@ type Store struct {
 	SetRoleErr       error
 	TokenErr         error
 	ActivateErr      error
-	SetPasswordErr   error
-	EndSessionsErr   error
+	ResetErr         error
 
 	// DisabledUnderCover counts the disables that went through the guarded write.
 	DisabledUnderCover int
@@ -235,13 +234,13 @@ func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gou
 }
 
 // ActivateAccount stores the password hash and confirms the account, or
-// returns gouncer.ErrUserNotFound.
+// returns gouncer.ErrUserNotFound for an unknown or disabled one.
 func (s *Store) ActivateAccount(_ context.Context, id uuid.UUID, passwordHash string) error {
 	if s.ActivateErr != nil {
 		return s.ActivateErr
 	}
 	u, ok := s.Users[id]
-	if !ok {
+	if !ok || u.Disabled {
 		return gouncer.ErrUserNotFound
 	}
 	u.PasswordHash = passwordHash
@@ -250,25 +249,19 @@ func (s *Store) ActivateAccount(_ context.Context, id uuid.UUID, passwordHash st
 	return nil
 }
 
-// SetUserPassword stores the password hash, or returns gouncer.ErrUserNotFound.
-func (s *Store) SetUserPassword(_ context.Context, id uuid.UUID, passwordHash string) error {
-	if s.SetPasswordErr != nil {
-		return s.SetPasswordErr
+// ResetPassword stores the password hash and ends every session the
+// user holds, or returns gouncer.ErrUserNotFound for an unknown or
+// disabled one, leaving both untouched.
+func (s *Store) ResetPassword(_ context.Context, id uuid.UUID, passwordHash string) error {
+	if s.ResetErr != nil {
+		return s.ResetErr
 	}
 	u, ok := s.Users[id]
-	if !ok {
+	if !ok || u.Disabled {
 		return gouncer.ErrUserNotFound
 	}
 	u.PasswordHash = passwordHash
 	s.Users[id] = u
-	return nil
-}
-
-// DeleteSessionsForUser removes every session the user holds.
-func (s *Store) DeleteSessionsForUser(_ context.Context, id uuid.UUID) error {
-	if s.EndSessionsErr != nil {
-		return s.EndSessionsErr
-	}
 	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
 		return sess.UserID == id
 	})

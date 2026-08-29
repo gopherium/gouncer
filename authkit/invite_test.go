@@ -379,12 +379,100 @@ func TestTheStoreNeverReceivesATokenSecret(t *testing.T) {
 	}
 }
 
-func TestAFailedResetNeverLeavesALiveSessionBesideANewPassword(t *testing.T) {
+func TestRedeemInviteRefusesADisabledAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	invited, err := store.UserByEmail(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), invited.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemInvite(t.Context(), tok.Token, "attacker chosen password")
+	if !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("RedeemInvite() error = %v, want gouncer.ErrUserNotFound", err)
+	}
+
+	held, err := store.UserByID(t.Context(), invited.ID)
+	if err != nil {
+		t.Fatalf("UserByID() error = %v, want nil", err)
+	}
+	if held.Confirmed {
+		t.Error("the refused redemption confirmed a disabled account, want the address left recoverable")
+	}
+	if held.PasswordHash != "" {
+		t.Error("the refused redemption stored a password on a disabled account")
+	}
+	if err := store.SetUserDisabled(t.Context(), invited.ID, false); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "maria@example.com", "attacker chosen password"); err == nil {
+		t.Error("re-enabling admitted the password the refused redemption offered")
+	}
+}
+
+func TestRedeemResetRefusesADisabledAccount(t *testing.T) {
 	t.Parallel()
 
 	service, store, handlers := invites(authkit.InvitesConfig{})
 	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
-	stolen, err := handlers.StartSession(t.Context(), u.ID)
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemReset(t.Context(), tok.Token, "attacker chosen password")
+	if !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("RedeemReset() error = %v, want gouncer.ErrUserNotFound", err)
+	}
+
+	if err := store.SetUserDisabled(t.Context(), u.ID, false); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "attacker chosen password"); err == nil {
+		t.Error("re-enabling admitted the password the refused reset offered")
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "correct horse battery"); err != nil {
+		t.Errorf("Authenticate() with the original password error = %v, want it untouched", err)
+	}
+}
+
+func TestResendInviteRefusesADisabledAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	invited, err := store.UserByEmail(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), invited.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	if _, err := service.ResendInvite(t.Context(), "maria@example.com"); !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("ResendInvite() error = %v, want gouncer.ErrUserNotFound", err)
+	}
+}
+
+func TestAFailedResetLeavesTheAccountExactlyAsItWas(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	held, err := handlers.StartSession(t.Context(), u.ID)
 	if err != nil {
 		t.Fatalf("StartSession() error = %v, want nil", err)
 	}
@@ -392,16 +480,50 @@ func TestAFailedResetNeverLeavesALiveSessionBesideANewPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RequestReset() error = %v, want nil", err)
 	}
-	store.EndSessionsErr = errors.New("session table gone")
+	store.ResetErr = errors.New("users table gone")
 
 	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err == nil {
 		t.Fatal("RedeemReset() error = nil, want the store failure surfaced")
 	}
 
-	_, sessionErr := handlers.SessionIdentity(t.Context(), stolen.Value)
-	_, newPasswordErr := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password")
-	if sessionErr == nil && newPasswordErr == nil {
-		t.Error("a failed reset left the old session live beside the new password, want the two never to coexist")
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "correct horse battery"); err != nil {
+		t.Errorf("Authenticate() with the old password error = %v, want the failed reset to have changed nothing", err)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password"); err == nil {
+		t.Error("Authenticate() with the new password error = nil, want a failed reset to store no password")
+	}
+	if _, err := handlers.SessionIdentity(t.Context(), held.Value); err != nil {
+		t.Errorf("SessionIdentity() error = %v, want a failed reset to end no session", err)
+	}
+}
+
+func TestAFailedResetLeavesTheAccountRecoverable(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	store.ResetErr = errors.New("users table gone")
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err == nil {
+		t.Fatal("RedeemReset() error = nil, want the store failure surfaced")
+	}
+
+	store.ResetErr = nil
+	fresh, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() after the failure error = %v, want a second link issued", err)
+	}
+	if fresh.Token == tok.Token {
+		t.Error("the second reset reissued the first secret, want a fresh one")
+	}
+	if _, err := service.RedeemReset(t.Context(), fresh.Token, "entirely new password"); err != nil {
+		t.Fatalf("RedeemReset() with the second link error = %v, want the account recovered", err)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password"); err != nil {
+		t.Errorf("Authenticate() with the new password error = %v, want the recovery to have landed", err)
 	}
 }
 
@@ -481,12 +603,8 @@ func TestStoreFailuresSurface(t *testing.T) {
 			_, err := i.RedeemInvite(t.Context(), pending, "correct horse battery")
 			return err
 		},
-		"reset cannot store the password": func(s *testkit.Store, i *authkit.Invites, _ string) error {
-			s.SetPasswordErr = boom
-			return redeemFreshReset(t, s, i)
-		},
-		"reset cannot end sessions": func(s *testkit.Store, i *authkit.Invites, _ string) error {
-			s.EndSessionsErr = boom
+		"reset cannot write the account": func(s *testkit.Store, i *authkit.Invites, _ string) error {
+			s.ResetErr = boom
 			return redeemFreshReset(t, s, i)
 		},
 	}
