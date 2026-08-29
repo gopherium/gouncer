@@ -167,6 +167,9 @@ func (s *UserStore) SetUserDisabled(ctx context.Context, id uuid.UUID, disabled 
 		if err := queries.DeleteUserSessions(ctx, id); err != nil {
 			return fmt.Errorf("postgres: revoke user sessions: %w", err)
 		}
+		if err := queries.DeleteUserTokens(ctx, id); err != nil {
+			return fmt.Errorf("postgres: revoke user tokens: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("postgres: set user disabled: %w", err)

@@ -8,6 +8,37 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `UserStore` implements `authkit.InviteStore` and `authkit.TokenReaper`.
+  `CreateToken` and `ReplaceToken` issue a token against an enabled
+  account, `ActivateByToken` and `ResetByToken` spend one and write the
+  account it names, and `DeleteExpiredTokens` sweeps expired tokens with
+  the unconfirmed accounts an expired invite strands. Each is one
+  transaction, so a failure leaves the account and the token exactly as
+  they were.
+- Migration `00004` adds `auth.users.confirmed` and the `auth.tokens`
+  table with `tokens_user_id_purpose_idx` and `tokens_expires_at_idx`.
+  Existing rows take `confirmed` as true, and the column then carries no
+  default, so every insert names it.
+
+### Fixed
+
+- Disabling an account revokes the invite and reset tokens it holds, on
+  the guarded path an administration uses as well as the plain one. A
+  link posted before the disable no longer activates the account or
+  replaces its password after a later re-enable.
+- Every token operation holds the account row while it runs, so a token
+  cannot be issued against an account being disabled, two issuances
+  cannot both mint a live token for one purpose, and a redemption cannot
+  deadlock against a disable.
+
+### Changed
+
+- The module requires `gouncer` 0.4.0 and `authkit` 0.12.0.
+
 ## [0.8.0] - 2026-08-25
 
 ### Changed

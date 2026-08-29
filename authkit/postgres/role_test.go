@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gopherium/gouncer"
 
@@ -322,5 +323,45 @@ func TestGrantRoleToRolelessRefusesTheEmptyRole(t *testing.T) {
 	}
 	if held.Role != "" {
 		t.Errorf("role = %q, want the refused grant to leave it holding none", held.Role)
+	}
+}
+
+func TestDisablingAnAccountRevokesItsTokens(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := invitedAccount(t, store)
+	tok := issuedToken(t, store, u.ID, gouncer.PurposeInvite)
+	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabled(t.Context(), u.ID, false); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+
+	_, err := store.ActivateByToken(t.Context(), tok.TokenHash, time.Now().UTC(), "attacker-hash")
+
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("ActivateByToken() error = %v, want the disable to have revoked the token", err)
+	}
+}
+
+func TestTheGuardedDisableRevokesItsTokens(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := invitedAccount(t, store)
+	tok := issuedToken(t, store, u.ID, gouncer.PurposeInvite)
+	if err := store.SetUserDisabledUnderCover(t.Context(), u.ID, true, gouncer.Roles{"admin"}); err != nil {
+		t.Fatalf("SetUserDisabledUnderCover() error = %v, want nil", err)
+	}
+	if err := store.SetUserDisabledUnderCover(t.Context(), u.ID, false, gouncer.Roles{"admin"}); err != nil {
+		t.Fatalf("SetUserDisabledUnderCover() error = %v, want nil", err)
+	}
+
+	_, err := store.ActivateByToken(t.Context(), tok.TokenHash, time.Now().UTC(), "attacker-hash")
+
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("ActivateByToken() error = %v, want the guarded disable to have revoked the token", err)
 	}
 }
