@@ -483,9 +483,7 @@ func TestRedeemInviteRefusesADisabledAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), tok); err != nil {
-		t.Fatalf("CreateToken() error = %v, want nil", err)
-	}
+	store.Tokens[string(tok.TokenHash)] = tok
 
 	_, err = service.RedeemInvite(t.Context(), tok.Token, "attacker chosen password")
 	if !errors.Is(err, gouncer.ErrUserNotFound) {
@@ -525,9 +523,7 @@ func TestRedeemResetRefusesADisabledAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), tok); err != nil {
-		t.Fatalf("CreateToken() error = %v, want nil", err)
-	}
+	store.Tokens[string(tok.TokenHash)] = tok
 
 	_, err = service.RedeemReset(t.Context(), tok.Token, "attacker chosen password")
 	if !errors.Is(err, gouncer.ErrUserNotFound) {
@@ -635,6 +631,46 @@ func TestAFailedInviteLeavesTheAddressResendable(t *testing.T) {
 	}
 	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
 		t.Errorf("RedeemInvite() error = %v, want the resent invite to activate", err)
+	}
+}
+
+func TestIssuingATokenRefusesADisabledAccount(t *testing.T) {
+	t.Parallel()
+
+	_, store, _ := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	if err := store.SetUserDisabled(t.Context(), u.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	tok, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+	if err != nil {
+		t.Fatalf("NewToken() error = %v, want nil", err)
+	}
+
+	if err := store.CreateToken(t.Context(), tok); !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("CreateToken() error = %v, want gouncer.ErrUserNotFound for a disabled account", err)
+	}
+	if err := store.ReplaceToken(t.Context(), tok); !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("ReplaceToken() error = %v, want gouncer.ErrUserNotFound for a disabled account", err)
+	}
+}
+
+func TestAFailedResendKeepsTheStandingInvite(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	store.TokenErr = errors.New("token table gone")
+	if _, err := service.ResendInvite(t.Context(), "maria@example.com"); err == nil {
+		t.Fatal("ResendInvite() error = nil, want the store failure surfaced")
+	}
+	store.TokenErr = nil
+
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite() error = %v, want the failed resend to have kept the standing invite", err)
 	}
 }
 

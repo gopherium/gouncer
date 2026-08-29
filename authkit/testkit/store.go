@@ -197,6 +197,9 @@ func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
+	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
+		return gouncer.ErrUserNotFound
+	}
 	for _, existing := range s.Tokens {
 		if existing.UserID == t.UserID && existing.Purpose == t.Purpose && existing.ExpiresAt.After(time.Now().UTC()) {
 			return gouncer.ErrTokenExists
@@ -206,14 +209,20 @@ func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
 	return nil
 }
 
-// DeleteTokensForUser removes every token the user holds for the purpose.
-func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error {
+// ReplaceToken stores t in place of every token the account holds for
+// the same purpose, or returns gouncer.ErrUserNotFound for an unknown
+// or disabled account, replacing nothing when it refuses.
+func (s *Store) ReplaceToken(_ context.Context, t gouncer.Token) error {
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
-	maps.DeleteFunc(s.Tokens, func(_ string, t gouncer.Token) bool {
-		return t.UserID == id && t.Purpose == purpose
+	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
+		return gouncer.ErrUserNotFound
+	}
+	maps.DeleteFunc(s.Tokens, func(_ string, held gouncer.Token) bool {
+		return held.UserID == t.UserID && held.Purpose == t.Purpose
 	})
+	s.Tokens[string(t.TokenHash)] = t
 	return nil
 }
 

@@ -27,12 +27,16 @@ var ErrAlreadyActivated = errors.New("authkit: account already activated")
 type InviteStore interface {
 	gouncer.Store
 
-	// CreateToken stores t, or returns gouncer.ErrTokenExists while a
-	// live token stands for the same user and purpose.
+	// CreateToken stores t for an enabled account, or returns
+	// gouncer.ErrTokenExists while a live token stands for the same user
+	// and purpose and gouncer.ErrUserNotFound for a disabled one.
 	CreateToken(ctx context.Context, t gouncer.Token) error
 
-	// DeleteTokensForUser removes every token the user holds for the purpose.
-	DeleteTokensForUser(ctx context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error
+	// ReplaceToken stores t for an enabled account in place of every
+	// token it holds for the same purpose, as one change that either
+	// lands whole or not at all, answering gouncer.ErrUserNotFound for a
+	// disabled account.
+	ReplaceToken(ctx context.Context, t gouncer.Token) error
 
 	// ActivateByToken spends the invite token, storing the password hash
 	// and confirming the account it names, as one change that either
@@ -91,7 +95,7 @@ func (i *Invites) Invite(ctx context.Context, email, name, role string) (gouncer
 	if err := i.store.CreateUser(ctx, u); err != nil {
 		return gouncer.Token{}, err
 	}
-	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL)
+	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.store.CreateToken)
 }
 
 // ResendInvite replaces the pending token of an unactivated enabled
@@ -108,10 +112,7 @@ func (i *Invites) ResendInvite(ctx context.Context, email string) (gouncer.Token
 	if u.Confirmed || u.PasswordHash != "" {
 		return gouncer.Token{}, ErrAlreadyActivated
 	}
-	if err := i.store.DeleteTokensForUser(ctx, u.ID, gouncer.PurposeInvite); err != nil {
-		return gouncer.Token{}, err
-	}
-	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL)
+	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.store.ReplaceToken)
 }
 
 // RedeemInvite spends an invite token, storing the password, confirming
@@ -135,7 +136,7 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	if u.Disabled || !u.Confirmed {
 		return gouncer.Token{}, gouncer.ErrUserNotFound
 	}
-	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL)
+	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL, i.store.CreateToken)
 }
 
 // RedeemReset spends a reset token, replacing the password and ending
@@ -149,14 +150,16 @@ func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid
 	return i.store.ResetByToken(ctx, gouncer.HashToken(token), time.Now().UTC(), hash)
 }
 
-// issue creates and stores a token for the user, answering it with its
-// secret. The store is handed the hash alone, so no implementation of
-// InviteStore is ever in a position to persist the secret itself.
+// issue mints a token for the user and stores it with write, answering
+// it with its secret. The store is handed the hash alone, so no
+// implementation of InviteStore is ever in a position to persist the
+// secret itself.
 func (i *Invites) issue(
 	ctx context.Context,
 	userID uuid.UUID,
 	purpose gouncer.TokenPurpose,
 	ttl time.Duration,
+	write func(context.Context, gouncer.Token) error,
 ) (gouncer.Token, error) {
 	t, err := gouncer.NewToken(userID, purpose, ttl)
 	if err != nil {
@@ -164,7 +167,7 @@ func (i *Invites) issue(
 	}
 	stored := t
 	stored.Token = ""
-	if err := i.store.CreateToken(ctx, stored); err != nil {
+	if err := write(ctx, stored); err != nil {
 		return gouncer.Token{}, err
 	}
 	return t, nil

@@ -24,11 +24,17 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   every session, each landing complete or not at all. A refused
   redemption spends no token, so the same link stays good and a
   transient store failure costs the holder nothing.
+- `InviteStore` asks for each issuance whole too. `CreateToken` stores a
+  token only for an enabled account, and `ReplaceToken` puts one in
+  place of every token the account holds for the same purpose as one
+  change. A refused resend therefore leaves the standing invite good
+  rather than stranding the account without a link.
 - Disabling an account revokes every invite and reset token it holds,
   so a link posted before the disable stays dead through any later
-  re-enable. Both redemptions also answer `gouncer.ErrUserNotFound` for
-  a disabled account, and `ResendInvite` refuses one the way
-  `RequestReset` always has.
+  re-enable. Issuance and both redemptions answer
+  `gouncer.ErrUserNotFound` for a disabled account, so a disable cannot
+  be straddled by a token being minted or spent, and `ResendInvite`
+  refuses one the way `RequestReset` always has.
 - `ActivateByToken` answers `gouncer.ErrUserNotFound` for an account
   already confirmed, so a token minted while another redemption
   activates the same account cannot replace the password it settled on.
