@@ -17,6 +17,14 @@ type AuthSession struct {
 	ExpiresAt time.Time
 }
 
+type AuthToken struct {
+	TokenHash []byte
+	UserID    uuid.UUID
+	Purpose   string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
 type AuthUser struct {
 	ID           uuid.UUID
 	Email        string
@@ -25,4 +33,5 @@ type AuthUser struct {
 	Disabled     bool
 	CreatedAt    time.Time
 	Role         string
+	Confirmed    bool
 }

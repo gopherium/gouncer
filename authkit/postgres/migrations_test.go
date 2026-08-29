@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/peterldowns/pgtestdb"
 
@@ -45,8 +46,9 @@ func TestMigrateCreatesAuthSchema(t *testing.T) {
 		t.Fatalf("gouncer.NewUser() error = %v, want nil", err)
 	}
 	if _, err := db.Exec(
-		"INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-		ada.ID, ada.Email, ada.Name, ada.PasswordHash, ada.Disabled, ada.CreatedAt,
+		"INSERT INTO auth.users (id, email, name, password_hash, disabled, confirmed, created_at)"+
+			" VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		ada.ID, ada.Email, ada.Name, ada.PasswordHash, ada.Disabled, ada.Confirmed, ada.CreatedAt,
 	); err != nil {
 		t.Fatalf("inserting into migrated schema: %v", err)
 	}
@@ -93,6 +95,87 @@ func TestMigrationsIndexSessionsExpiresAt(t *testing.T) {
 	}
 	if !strings.Contains(indexdef, "(expires_at)") {
 		t.Errorf("indexdef = %q, want an index on (expires_at)", indexdef)
+	}
+}
+
+func TestMigrationsIndexTokens(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB(t)
+
+	for name, want := range map[string]string{
+		"tokens_user_id_purpose_idx": "(user_id, purpose)",
+		"tokens_expires_at_idx":      "(expires_at)",
+	} {
+		var indexdef string
+		err := db.QueryRow(
+			"SELECT indexdef FROM pg_indexes WHERE schemaname = 'auth' AND indexname = $1", name,
+		).Scan(&indexdef)
+		if err != nil {
+			t.Errorf("looking up %s: %v, want the index to exist", name, err)
+			continue
+		}
+		if !strings.Contains(indexdef, want) {
+			t.Errorf("%s indexdef = %q, want an index on %s", name, indexdef, want)
+		}
+	}
+}
+
+func TestMigrationsCascadeTokensWithTheirAccount(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB(t)
+	ada, err := gouncer.NewUser("ada@example.com", "Ada Lovelace", "correct horse battery")
+	if err != nil {
+		t.Fatalf("gouncer.NewUser() error = %v, want nil", err)
+	}
+	if _, err := db.Exec(
+		"INSERT INTO auth.users (id, email, name, password_hash, disabled, confirmed, created_at)"+
+			" VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		ada.ID, ada.Email, ada.Name, ada.PasswordHash, ada.Disabled, ada.Confirmed, ada.CreatedAt,
+	); err != nil {
+		t.Fatalf("inserting the account: %v", err)
+	}
+	tok, err := gouncer.NewToken(ada.ID, gouncer.PurposeInvite, time.Hour)
+	if err != nil {
+		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+	}
+	if _, err := db.Exec(
+		"INSERT INTO auth.tokens (token_hash, user_id, purpose, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
+		tok.TokenHash, tok.UserID, tok.Purpose, tok.CreatedAt, tok.ExpiresAt,
+	); err != nil {
+		t.Fatalf("inserting the token: %v", err)
+	}
+
+	if _, err := db.Exec("DELETE FROM auth.users WHERE id = $1", ada.ID); err != nil {
+		t.Fatalf("deleting the account: %v", err)
+	}
+
+	var held int
+	if err := db.QueryRow("SELECT count(*) FROM auth.tokens WHERE user_id = $1", ada.ID).Scan(&held); err != nil {
+		t.Fatalf("counting the tokens left: %v", err)
+	}
+	if held != 0 {
+		t.Errorf("tokens left after the account went = %d, want 0", held)
+	}
+}
+
+func TestMigrationsRequireAnExplicitConfirmation(t *testing.T) {
+	t.Parallel()
+
+	db := newTestDB(t)
+	ada, err := gouncer.NewUser("ada@example.com", "Ada Lovelace", "correct horse battery")
+	if err != nil {
+		t.Fatalf("gouncer.NewUser() error = %v, want nil", err)
+	}
+
+	_, err = db.Exec(
+		"INSERT INTO auth.users (id, email, name, password_hash, disabled, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+		ada.ID, ada.Email, ada.Name, ada.PasswordHash, ada.Disabled, ada.CreatedAt,
+	)
+
+	if err == nil {
+		t.Error("inserting without confirmed error = nil, want the column to carry no default")
 	}
 }
 
