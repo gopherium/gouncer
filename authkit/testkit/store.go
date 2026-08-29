@@ -22,6 +22,7 @@ import (
 type Store struct {
 	Users    map[uuid.UUID]gouncer.User
 	Sessions map[string]gouncer.Session
+	Tokens   map[string]gouncer.Token
 
 	LookupErr        error
 	SessionErr       error
@@ -31,6 +32,10 @@ type Store struct {
 	CreateUserErr    error
 	SetDisabledErr   error
 	SetRoleErr       error
+	TokenErr         error
+	ActivateErr      error
+	SetPasswordErr   error
+	EndSessionsErr   error
 
 	// DisabledUnderCover counts the disables that went through the guarded write.
 	DisabledUnderCover int
@@ -43,6 +48,7 @@ func NewStore() *Store {
 	return &Store{
 		Users:    map[uuid.UUID]gouncer.User{},
 		Sessions: map[string]gouncer.Session{},
+		Tokens:   map[string]gouncer.Token{},
 	}
 }
 
@@ -181,6 +187,114 @@ func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privil
 	u.Role = role
 	s.Users[id] = u
 	return nil
+}
+
+// CreateToken stores t, or returns gouncer.ErrTokenExists while a live
+// token stands for the same user and purpose.
+func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
+	if s.TokenErr != nil {
+		return s.TokenErr
+	}
+	for _, existing := range s.Tokens {
+		if existing.UserID == t.UserID && existing.Purpose == t.Purpose && existing.ExpiresAt.After(time.Now().UTC()) {
+			return gouncer.ErrTokenExists
+		}
+	}
+	s.Tokens[string(t.TokenHash)] = t
+	return nil
+}
+
+// ConsumeToken removes and returns the live token behind the hash and
+// purpose, or gouncer.ErrTokenNotFound.
+func (s *Store) ConsumeToken(
+	_ context.Context,
+	tokenHash []byte,
+	purpose gouncer.TokenPurpose,
+	now time.Time,
+) (gouncer.Token, error) {
+	if s.TokenErr != nil {
+		return gouncer.Token{}, s.TokenErr
+	}
+	t, ok := s.Tokens[string(tokenHash)]
+	if !ok || t.Purpose != purpose || !t.ExpiresAt.After(now) {
+		return gouncer.Token{}, gouncer.ErrTokenNotFound
+	}
+	delete(s.Tokens, string(tokenHash))
+	return t, nil
+}
+
+// DeleteTokensForUser removes every token the user holds for the purpose.
+func (s *Store) DeleteTokensForUser(_ context.Context, id uuid.UUID, purpose gouncer.TokenPurpose) error {
+	if s.TokenErr != nil {
+		return s.TokenErr
+	}
+	maps.DeleteFunc(s.Tokens, func(_ string, t gouncer.Token) bool {
+		return t.UserID == id && t.Purpose == purpose
+	})
+	return nil
+}
+
+// ActivateAccount stores the password hash and confirms the account, or
+// returns gouncer.ErrUserNotFound.
+func (s *Store) ActivateAccount(_ context.Context, id uuid.UUID, passwordHash string) error {
+	if s.ActivateErr != nil {
+		return s.ActivateErr
+	}
+	u, ok := s.Users[id]
+	if !ok {
+		return gouncer.ErrUserNotFound
+	}
+	u.PasswordHash = passwordHash
+	u.Confirmed = true
+	s.Users[id] = u
+	return nil
+}
+
+// SetUserPassword stores the password hash, or returns gouncer.ErrUserNotFound.
+func (s *Store) SetUserPassword(_ context.Context, id uuid.UUID, passwordHash string) error {
+	if s.SetPasswordErr != nil {
+		return s.SetPasswordErr
+	}
+	u, ok := s.Users[id]
+	if !ok {
+		return gouncer.ErrUserNotFound
+	}
+	u.PasswordHash = passwordHash
+	s.Users[id] = u
+	return nil
+}
+
+// DeleteSessionsForUser removes every session the user holds.
+func (s *Store) DeleteSessionsForUser(_ context.Context, id uuid.UUID) error {
+	if s.EndSessionsErr != nil {
+		return s.EndSessionsErr
+	}
+	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
+		return sess.UserID == id
+	})
+	return nil
+}
+
+// DeleteExpiredTokens removes expired tokens and the unconfirmed
+// accounts an expired invite leaves behind, reporting how many tokens went.
+func (s *Store) DeleteExpiredTokens(_ context.Context, now time.Time) (int64, error) {
+	if s.TokenErr != nil {
+		return 0, s.TokenErr
+	}
+	var count int64
+	for hash, t := range s.Tokens {
+		if t.ExpiresAt.After(now) {
+			continue
+		}
+		if t.Purpose == gouncer.PurposeInvite {
+			if u, ok := s.Users[t.UserID]; ok && !u.Confirmed {
+				delete(s.Users, t.UserID)
+			}
+		}
+		delete(s.Tokens, hash)
+		count++
+	}
+	return count, nil
 }
 
 // SetUserDisabledUnderCover disables an account under the guard, counting the call.

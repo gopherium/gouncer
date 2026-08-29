@@ -7,6 +7,29 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Invites`, the invite and reset flows over an `InviteStore`: `Invite`
+  creates an unconfirmed account with its activation token,
+  `ResendInvite` replaces a pending token, `RedeemInvite` sets the
+  password, confirms the address and answers the account,
+  `RequestReset` issues a reset token for confirmed enabled accounts
+  only, and `RedeemReset` replaces the password and ends every session
+  the account holds.
+- `InviteStore`, the storage capabilities the flows need beyond
+  `gouncer.Store`, and `ErrAlreadyActivated`.
+- `DefaultInviteTTL` (seven days) and `DefaultResetTTL` (one hour).
+- `TokenReaper`, swept by the reaper alongside sessions when the store
+  offers it, taking expired tokens and the unconfirmed accounts an
+  expired invite leaves behind.
+- The testkit store carries tokens and implements every new capability.
+
+### Changed
+
+- The module builds against gouncer v0.4.0.
+
 ## [0.11.0] - 2026-08-25
 
 ### Changed

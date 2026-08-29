@@ -201,3 +201,60 @@ func TestReaperStopWithoutStart(t *testing.T) {
 
 	r.Stop()
 }
+
+type tokenSweepingReaper struct {
+	fakeReaper
+	mu          sync.Mutex
+	tokenSweeps int
+}
+
+func (f *tokenSweepingReaper) DeleteExpiredTokens(_ context.Context, _ time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tokenSweeps++
+	return 1, nil
+}
+
+func (f *tokenSweepingReaper) sweepCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.tokenSweeps
+}
+
+func TestReapOnceSweepsTokensWhenTheStoreCan(t *testing.T) {
+	t.Parallel()
+
+	sweeping := &tokenSweepingReaper{}
+	reapOnce(context.Background(), sweeping, time.Second, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	if got := sweeping.sweepCount(); got != 1 {
+		t.Errorf("token sweeps = %d, want the capable store swept once", got)
+	}
+
+	plain := &fakeReaper{}
+	reapOnce(context.Background(), plain, time.Second, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	if got := plain.callCount(); got != 1 {
+		t.Errorf("session sweeps = %d, want the plain store still swept", got)
+	}
+}
+
+type failingTokenReaper struct {
+	fakeReaper
+	tokenErr error
+}
+
+func (f *failingTokenReaper) DeleteExpiredTokens(_ context.Context, _ time.Time) (int64, error) {
+	return 0, f.tokenErr
+}
+
+func TestReapOnceLogsATokenSweepFailure(t *testing.T) {
+	t.Parallel()
+
+	var logged bytes.Buffer
+	failing := &failingTokenReaper{tokenErr: errors.New("token table gone")}
+
+	reapOnce(context.Background(), failing, time.Second, slog.New(slog.NewTextHandler(&logged, nil)))
+
+	if !strings.Contains(logged.String(), "reap expired tokens") {
+		t.Errorf("log = %q, want the token sweep failure reported", logged.String())
+	}
+}

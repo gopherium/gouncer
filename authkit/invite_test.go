@@ -1,0 +1,461 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package authkit_test
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/gopherium/gouncer"
+	"github.com/gopherium/gouncer/authkit"
+	"github.com/gopherium/gouncer/authkit/testkit"
+)
+
+// invites returns an invite service over a fresh store beside login handlers sharing it.
+func invites(cfg authkit.InvitesConfig) (*authkit.Invites, *testkit.Store, *authkit.Handlers) {
+	store := testkit.NewStore()
+	cfg.Store = store
+	return authkit.NewInvites(cfg), store, authkit.New(authkit.Config{Store: store})
+}
+
+func TestInviteCreatesAnUnconfirmedAccountWithItsToken(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	if tok.Purpose != gouncer.PurposeInvite {
+		t.Errorf("purpose = %q, want %q", tok.Purpose, gouncer.PurposeInvite)
+	}
+	if lifetime := tok.ExpiresAt.Sub(tok.CreatedAt); lifetime != authkit.DefaultInviteTTL {
+		t.Errorf("lifetime = %v, want the default %v", lifetime, authkit.DefaultInviteTTL)
+	}
+	u, err := store.UserByEmail(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v, want the invited account stored", err)
+	}
+	if u.Confirmed {
+		t.Error("confirmed = true, want the invited account unconfirmed")
+	}
+	if u.PasswordHash != "" {
+		t.Error("password hash set, want none before activation")
+	}
+	if u.Role != "member" {
+		t.Errorf("role = %q, want %q", u.Role, "member")
+	}
+	if tok.UserID != u.ID {
+		t.Errorf("token user = %v, want the invited account %v", tok.UserID, u.ID)
+	}
+	_, err = handlers.Authenticate(t.Context(), "maria@example.com", "anything at all")
+	if !errors.Is(err, authkit.ErrInvalidCredentials) {
+		t.Errorf("Authenticate() error = %v, want ErrInvalidCredentials before activation", err)
+	}
+}
+
+func TestInviteRefusesATakenAddress(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "maria@example.com", "Maria Perez", "correct horse battery")
+
+	_, err := service.Invite(t.Context(), "maria@example.com", "Maria Again", "member")
+
+	if !errors.Is(err, gouncer.ErrEmailTaken) {
+		t.Errorf("Invite() error = %v, want ErrEmailTaken", err)
+	}
+}
+
+func TestInviteValidatesTheIdentity(t *testing.T) {
+	t.Parallel()
+
+	service, _, _ := invites(authkit.InvitesConfig{})
+
+	_, err := service.Invite(t.Context(), "not-an-address", "Maria Perez", "member")
+
+	if !errors.Is(err, gouncer.ErrInvalidEmail) {
+		t.Errorf("Invite() error = %v, want ErrInvalidEmail", err)
+	}
+}
+
+func TestResendReplacesThePendingToken(t *testing.T) {
+	t.Parallel()
+
+	service, _, _ := invites(authkit.InvitesConfig{})
+	first, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	second, err := service.ResendInvite(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("ResendInvite() error = %v, want nil", err)
+	}
+
+	if second.Token == first.Token {
+		t.Error("resend answered the same secret, want a replacement")
+	}
+	_, err = service.RedeemInvite(t.Context(), first.Token, "correct horse battery")
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("RedeemInvite(old) error = %v, want ErrTokenNotFound after the replacement", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), second.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite(new) error = %v, want nil", err)
+	}
+}
+
+func TestResendRefusesAnActivatedOrUnknownAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+
+	if _, err := service.ResendInvite(t.Context(), "ada@example.com"); !errors.Is(err, authkit.ErrAlreadyActivated) {
+		t.Errorf("ResendInvite(activated) error = %v, want ErrAlreadyActivated", err)
+	}
+	if _, err := service.ResendInvite(t.Context(), "nobody@example.com"); !errors.Is(err, gouncer.ErrUserNotFound) {
+		t.Errorf("ResendInvite(unknown) error = %v, want ErrUserNotFound", err)
+	}
+}
+
+func TestRedeemInviteActivatesTheAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	userID, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery")
+	if err != nil {
+		t.Fatalf("RedeemInvite() error = %v, want nil", err)
+	}
+
+	if userID != tok.UserID {
+		t.Errorf("user = %v, want the invited account %v", userID, tok.UserID)
+	}
+	u, err := store.UserByEmail(t.Context(), "maria@example.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v, want nil", err)
+	}
+	if !u.Confirmed {
+		t.Error("confirmed = false, want redemption to confirm the address")
+	}
+	if _, err := handlers.Authenticate(t.Context(), "maria@example.com", "correct horse battery"); err != nil {
+		t.Errorf("Authenticate() error = %v, want the activated account to log in", err)
+	}
+}
+
+func TestRedeemInviteIsSingleUse(t *testing.T) {
+	t.Parallel()
+
+	service, _, _ := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Fatalf("RedeemInvite() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemInvite(t.Context(), tok.Token, "another good password")
+
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("second RedeemInvite() error = %v, want ErrTokenNotFound", err)
+	}
+}
+
+func TestRedeemInviteRefusesAnExpiredToken(t *testing.T) {
+	t.Parallel()
+
+	service, _, _ := invites(authkit.InvitesConfig{InviteTTL: time.Nanosecond})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemInvite(t.Context(), tok.Token, "correct horse battery")
+
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("RedeemInvite(expired) error = %v, want ErrTokenNotFound", err)
+	}
+}
+
+func TestRedeemInviteLeavesTheTokenWhenThePasswordIsRefused(t *testing.T) {
+	t.Parallel()
+
+	service, _, _ := invites(authkit.InvitesConfig{})
+	tok, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "tiny"); !errors.Is(err, gouncer.ErrWeakPassword) {
+		t.Fatalf("RedeemInvite(weak) error = %v, want ErrWeakPassword", err)
+	}
+
+	if _, err := service.RedeemInvite(t.Context(), tok.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite(retry) error = %v, want the token still redeemable", err)
+	}
+}
+
+func TestRequestResetIssuesATokenForAConfirmedAccount(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+
+	if tok.Purpose != gouncer.PurposeReset {
+		t.Errorf("purpose = %q, want %q", tok.Purpose, gouncer.PurposeReset)
+	}
+	if tok.UserID != u.ID {
+		t.Errorf("token user = %v, want %v", tok.UserID, u.ID)
+	}
+	if lifetime := tok.ExpiresAt.Sub(tok.CreatedAt); lifetime != authkit.DefaultResetTTL {
+		t.Errorf("lifetime = %v, want the default %v", lifetime, authkit.DefaultResetTTL)
+	}
+}
+
+func TestRequestResetAnswersNotFoundOutsideConfirmedEnabledAccounts(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	disabled := store.AddUser(t, "off@example.com", "Turned Off", "correct horse battery")
+	if err := store.SetUserDisabled(t.Context(), disabled.ID, true); err != nil {
+		t.Fatalf("SetUserDisabled() error = %v, want nil", err)
+	}
+	if _, err := service.Invite(t.Context(), "pending@example.com", "Still Pending", "member"); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	for name, email := range map[string]string{
+		"unknown":     "nobody@example.com",
+		"disabled":    "off@example.com",
+		"unconfirmed": "pending@example.com",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := service.RequestReset(t.Context(), email); !errors.Is(err, gouncer.ErrUserNotFound) {
+				t.Errorf("RequestReset(%s) error = %v, want ErrUserNotFound", email, err)
+			}
+		})
+	}
+}
+
+func TestRequestResetHoldsWhileATokenStands(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); !errors.Is(err, gouncer.ErrTokenExists) {
+		t.Errorf("second RequestReset() error = %v, want ErrTokenExists while one stands", err)
+	}
+
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+		t.Fatalf("RedeemReset() error = %v, want nil", err)
+	}
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); err != nil {
+		t.Errorf("RequestReset() after redemption error = %v, want a fresh token allowed", err)
+	}
+}
+
+func TestRedeemResetReplacesThePasswordAndEndsEverySession(t *testing.T) {
+	t.Parallel()
+
+	service, store, handlers := invites(authkit.InvitesConfig{})
+	u := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	laptop, err := handlers.StartSession(t.Context(), u.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v, want nil", err)
+	}
+	phone, err := handlers.StartSession(t.Context(), u.ID)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v, want nil", err)
+	}
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+
+	userID, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password")
+	if err != nil {
+		t.Fatalf("RedeemReset() error = %v, want nil", err)
+	}
+
+	if userID != u.ID {
+		t.Errorf("user = %v, want %v", userID, u.ID)
+	}
+	if _, err := handlers.Authenticate(t.Context(), "ada@example.com", "entirely new password"); err != nil {
+		t.Errorf("Authenticate(new) error = %v, want the new password accepted", err)
+	}
+	_, err = handlers.Authenticate(t.Context(), "ada@example.com", "correct horse battery")
+	if !errors.Is(err, authkit.ErrInvalidCredentials) {
+		t.Errorf("Authenticate(old) error = %v, want the old password refused", err)
+	}
+	for name, cookie := range map[string]string{"laptop": laptop.Value, "phone": phone.Value} {
+		if _, err := handlers.SessionIdentity(t.Context(), cookie); !errors.Is(err, gouncer.ErrSessionNotFound) {
+			t.Errorf("SessionIdentity(%s) error = %v, want every session ended by the reset", name, err)
+		}
+	}
+}
+
+func TestRedeemResetIsSingleUse(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+		t.Fatalf("RedeemReset() error = %v, want nil", err)
+	}
+
+	_, err = service.RedeemReset(t.Context(), tok.Token, "yet another password")
+
+	if !errors.Is(err, gouncer.ErrTokenNotFound) {
+		t.Errorf("second RedeemReset() error = %v, want ErrTokenNotFound", err)
+	}
+}
+
+func TestRedeemResetLeavesTheTokenWhenThePasswordIsRefused(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := service.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		t.Fatalf("RequestReset() error = %v, want nil", err)
+	}
+
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "tiny"); !errors.Is(err, gouncer.ErrWeakPassword) {
+		t.Fatalf("RedeemReset(weak) error = %v, want ErrWeakPassword", err)
+	}
+
+	if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+		t.Errorf("RedeemReset(retry) error = %v, want the token still redeemable", err)
+	}
+}
+
+func TestAnExpiredInviteFreesItsAddress(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{InviteTTL: time.Nanosecond})
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	if _, err := store.DeleteExpiredTokens(t.Context(), time.Now().UTC()); err != nil {
+		t.Fatalf("DeleteExpiredTokens() error = %v, want nil", err)
+	}
+
+	if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Again", "member"); err != nil {
+		t.Errorf("Invite() after the sweep error = %v, want the address free again", err)
+	}
+}
+
+func TestStoreFailuresSurface(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("store down")
+	tests := map[string]func(*testkit.Store, *authkit.Invites) error{
+		"resend cannot clear tokens": func(s *testkit.Store, i *authkit.Invites) error {
+			s.TokenErr = boom
+			_, err := i.ResendInvite(t.Context(), "maria@example.com")
+			return err
+		},
+		"redeem cannot activate": func(s *testkit.Store, i *authkit.Invites) error {
+			s.ActivateErr = boom
+			tok, ok := firstToken(s)
+			if !ok {
+				return errors.New("no pending token")
+			}
+			_, err := i.RedeemInvite(t.Context(), tok, "correct horse battery")
+			return err
+		},
+		"reset cannot store the password": func(s *testkit.Store, i *authkit.Invites) error {
+			s.SetPasswordErr = boom
+			return redeemFreshReset(t, s, i)
+		},
+		"reset cannot end sessions": func(s *testkit.Store, i *authkit.Invites) error {
+			s.EndSessionsErr = boom
+			return redeemFreshReset(t, s, i)
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			service, store, _ := invites(authkit.InvitesConfig{})
+			if _, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member"); err != nil {
+				t.Fatalf("Invite() error = %v, want nil", err)
+			}
+
+			if err := run(store, service); !errors.Is(err, boom) {
+				t.Errorf("error = %v, want the store failure surfaced", err)
+			}
+		})
+	}
+}
+
+// firstToken answers any stored token's plaintext stand-in by rebuilding it from the store.
+func firstToken(s *testkit.Store) (string, bool) {
+	for _, tok := range s.Tokens {
+		return tok.Token, tok.Token != ""
+	}
+	return "", false
+}
+
+// redeemFreshReset activates an account, requests a reset and redeems it, answering the redemption error.
+func redeemFreshReset(t *testing.T, s *testkit.Store, i *authkit.Invites) error {
+	t.Helper()
+	s.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	tok, err := i.RequestReset(t.Context(), "ada@example.com")
+	if err != nil {
+		return err
+	}
+	_, err = i.RedeemReset(t.Context(), tok.Token, "entirely new password")
+	return err
+}
+
+func TestTheSweepSparesActivatedAccountsAndLiveInvites(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{})
+	kept := store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+	pending, err := service.Invite(t.Context(), "maria@example.com", "Maria Perez", "member")
+	if err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	if _, err := store.DeleteExpiredTokens(t.Context(), time.Now().UTC()); err != nil {
+		t.Fatalf("DeleteExpiredTokens() error = %v, want nil", err)
+	}
+
+	if _, err := store.UserByID(t.Context(), kept.ID); err != nil {
+		t.Errorf("UserByID(activated) error = %v, want the activated account untouched", err)
+	}
+	if _, err := store.UserByID(t.Context(), pending.UserID); err != nil {
+		t.Errorf("UserByID(pending) error = %v, want the live invite untouched", err)
+	}
+	if _, err := service.RedeemInvite(t.Context(), pending.Token, "correct horse battery"); err != nil {
+		t.Errorf("RedeemInvite() error = %v, want the live invite still redeemable", err)
+	}
+}
