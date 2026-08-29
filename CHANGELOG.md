@@ -5,6 +5,22 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/). While
 at v0.x, minor releases may contain breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- `Token`, a single-use hashed secret with a purpose, built by
+  `NewToken` under the purposes `PurposeInvite`, `PurposeReset` and
+  `PurposeConfirm`.
+- `NewInvitedUser`, building an unconfirmed account holding no usable
+  password until activation.
+- `User.SetPassword`, replacing the password under the same bounds
+  `NewUser` applies.
+- `User.Confirmed`, true from `NewUser` and false from
+  `NewInvitedUser`.
+- `ErrEmptyPurpose`, `ErrTokenLifetime`, `ErrTokenNotFound` and
+  `ErrTokenExists`.
+
 ## [0.3.0] - 2026-08-22
 
 ### Changed
