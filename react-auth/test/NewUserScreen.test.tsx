@@ -47,6 +47,26 @@ test('shows the invite form with no password field', async () => {
 	)
 })
 
+test('locks the submit while the invitation is in flight', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/users/invite', () => {
+			posts += 1
+			return new Promise<never>(() => {})
+		}),
+	)
+	renderNewUser()
+
+	await userEvent.type(await screen.findByLabelText('Email'), 'grace@example.com')
+	await userEvent.type(screen.getByLabelText('Name'), 'Grace Hopper')
+	const submit = screen.getByRole('button', { name: 'Send invitation' })
+	await userEvent.click(submit)
+
+	await waitFor(() => expect(submit).toHaveAttribute('aria-disabled', 'true'))
+	await userEvent.click(submit)
+	expect(posts).toBe(1)
+})
+
 test('sends the invitation and reports success upward', async () => {
 	let body: unknown
 	server.use(

@@ -52,6 +52,25 @@ test('hints browsers this is a fresh password', async () => {
 	)
 })
 
+test('locks the submit while the activation is in flight', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/auth/activate', () => {
+			posts += 1
+			return new Promise<never>(() => {})
+		}),
+	)
+	renderSetPassword()
+
+	await userEvent.type(await screen.findByLabelText('Password'), 'correct horse battery')
+	const submit = screen.getByRole('button', { name: 'Set password' })
+	await userEvent.click(submit)
+
+	await waitFor(() => expect(submit).toHaveAttribute('aria-disabled', 'true'))
+	await userEvent.click(submit)
+	expect(posts).toBe(1)
+})
+
 test('posts the token and password and hands the user upward', async () => {
 	let body: unknown
 	server.use(

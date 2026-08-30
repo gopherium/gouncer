@@ -60,6 +60,41 @@ test('replaces the form with the neutral sentence and moves focus to it', async 
 	expect(screen.queryByRole('button', { name: 'Send reset link' })).not.toBeInTheDocument()
 })
 
+test('locks the submit while the request is in flight', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/auth/password-reset', () => {
+			posts += 1
+			return new Promise<never>(() => {})
+		}),
+	)
+	renderRequestReset()
+
+	await userEvent.type(await screen.findByLabelText('Email'), 'maria@example.com')
+	const submit = screen.getByRole('button', { name: 'Send reset link' })
+	await userEvent.click(submit)
+
+	await waitFor(() => expect(submit).toHaveAttribute('aria-disabled', 'true'))
+	await userEvent.click(submit)
+	expect(posts).toBe(1)
+})
+
+test('posts the trimmed address the form carries', async () => {
+	let body: unknown
+	server.use(
+		http.post('/api/auth/password-reset', async ({ request }) => {
+			body = await request.json()
+			return new HttpResponse(null, { status: 204 })
+		}),
+	)
+	renderRequestReset()
+
+	await submitEmail('  maria@example.com  ')
+
+	await screen.findByRole('status')
+	expect(body).toEqual({ email: 'maria@example.com' })
+})
+
 test('answers the same sentence whatever the address', async () => {
 	server.use(resetRequestOk())
 	renderRequestReset()

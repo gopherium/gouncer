@@ -43,6 +43,25 @@ test('hints browsers this is a fresh password', async () => {
 	)
 })
 
+test('locks the submit while the reset is in flight', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/auth/password-reset/confirm', () => {
+			posts += 1
+			return new Promise<never>(() => {})
+		}),
+	)
+	renderResetPassword()
+
+	await userEvent.type(await screen.findByLabelText('Password'), 'another good password')
+	const submit = screen.getByRole('button', { name: 'Set password' })
+	await userEvent.click(submit)
+
+	await waitFor(() => expect(submit).toHaveAttribute('aria-disabled', 'true'))
+	await userEvent.click(submit)
+	expect(posts).toBe(1)
+})
+
 test('posts the token and password and replaces the form with the outcome', async () => {
 	let body: unknown
 	server.use(
