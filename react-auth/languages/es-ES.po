@@ -75,7 +75,7 @@ msgid "Send invitation"
 msgstr "Enviar invitación"
 
 msgid "Send reset link"
-msgstr "Enviar enlace"
+msgstr "Enviar enlace de restablecimiento"
 
 msgid "Set password"
 msgstr "Guardar contraseña"
