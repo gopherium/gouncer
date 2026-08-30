@@ -3,7 +3,8 @@
 import { QueryClient } from '@tanstack/react-query'
 import { expect, test } from 'vitest'
 
-import { adoptSession, sessionQueryKey, usersQueryKey } from '../src/index'
+import { usersQueryKey } from '../src/admin'
+import { adoptSession, sessionQueryKey } from '../src/index'
 import { defaultUser } from '../src/testing'
 
 test('adoptSession seeds the session', async () => {
