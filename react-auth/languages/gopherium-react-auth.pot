@@ -100,6 +100,9 @@ msgstr ""
 msgid "Too many attempts. Please wait a minute and try again."
 msgstr ""
 
+msgid "Try again"
+msgstr ""
+
 msgid "Update failed."
 msgstr ""
 
