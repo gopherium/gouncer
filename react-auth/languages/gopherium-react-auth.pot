@@ -13,7 +13,7 @@ msgstr ""
 msgid "Active"
 msgstr ""
 
-msgid "Create user"
+msgid "Back to login"
 msgstr ""
 
 msgid "Disable"
@@ -25,10 +25,22 @@ msgstr ""
 msgid "Disabled"
 msgstr ""
 
+msgid "Done"
+msgstr ""
+
 msgid "Enable"
 msgstr ""
 
 msgid "Enable %s"
+msgstr ""
+
+msgid "Forgot your password?"
+msgstr ""
+
+msgid "Go to login"
+msgstr ""
+
+msgid "If that address has an account, a reset link is on its way."
 msgstr ""
 
 msgid "Invalid email or password."
@@ -52,16 +64,37 @@ msgstr ""
 msgid "Logout failed, please try again."
 msgstr ""
 
+msgid "No mail server is configured. Deliver the activation link by hand."
+msgstr ""
+
 msgid "Password"
+msgstr ""
+
+msgid "Send invitation"
+msgstr ""
+
+msgid "Send reset link"
+msgstr ""
+
+msgid "Set password"
 msgstr ""
 
 msgid "Something went wrong."
 msgstr ""
 
-msgid "That email is already in use."
+msgid "The invitation could not be sent."
 msgstr ""
 
-msgid "The user could not be created."
+msgid "The password could not be set, please try again."
+msgstr ""
+
+msgid "The request failed, please try again."
+msgstr ""
+
+msgid "This link is no longer valid. Ask for a new one."
+msgstr ""
+
+msgid "This link is no longer valid. Ask the person who invited you for a new one."
 msgstr ""
 
 msgid "Too many attempts. Please wait a minute and try again."
@@ -71,6 +104,15 @@ msgid "Update failed."
 msgstr ""
 
 msgid "Users could not be loaded."
+msgstr ""
+
+msgid "Your password is set. Sign in with it."
+msgstr ""
+
+msgid "invalid invitation details"
+msgstr ""
+
+msgid "invalid password details"
 msgstr ""
 
 msgid "invalid user details"
@@ -97,6 +139,10 @@ msgstr ""
 
 msgctxt "column"
 msgid "Status"
+msgstr ""
+
+msgctxt "field label"
+msgid "Activation link"
 msgstr ""
 
 msgctxt "field label"
