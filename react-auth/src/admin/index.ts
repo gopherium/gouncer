@@ -251,10 +251,10 @@ export async function setUserRole(id: string, role: string): Promise<void> {
 
 /**
  * Sends an invitation, answering the same shape whatever the address's
- * state.
+ * state, and holding every transport to the invitation contract.
  * @param input - The email, name, and optional role of the invited account.
  * @returns The delivery report, carrying the link when nothing mailed it.
  */
 export async function invite(input: NewInvite): Promise<Invitation> {
-	return resolveTransport('invite', restInvite)(input)
+	return invitationSchema.parse(await resolveTransport('invite', restInvite)(input))
 }

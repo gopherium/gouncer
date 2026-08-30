@@ -31,6 +31,14 @@ test('a configured transport carries the session operations', async () => {
 	expect(injectedSession).toHaveBeenCalledOnce()
 })
 
+test('a configured invite transport is held to the invitation contract', async () => {
+	configureAuthTransport({
+		invite: () => Promise.resolve({ delivered: false, activation_link: '' }),
+	})
+
+	await expect(invite({ email: 'maria@example.com', name: 'Maria Perez' })).rejects.toThrow()
+})
+
 test('a configured transport carries the admin operations', async () => {
 	const injectedUsers = vi.fn().mockResolvedValue([])
 	const injectedCreate = vi.fn().mockResolvedValue({
