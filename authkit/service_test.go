@@ -126,7 +126,11 @@ func TestAccountsCarryTheirConfirmation(t *testing.T) {
 	if !confirmed["maria@example.com"] {
 		t.Error("the password-created account lists as unconfirmed, want confirmed")
 	}
-	if confirmed["grace@example.com"] {
+	grace, present := confirmed["grace@example.com"]
+	if !present {
+		t.Fatal("the invited account is missing from the listing, want it listed unconfirmed")
+	}
+	if grace {
 		t.Error("the invited account lists as confirmed, want unconfirmed until activation")
 	}
 }
