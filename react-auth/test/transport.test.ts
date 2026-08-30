@@ -2,8 +2,16 @@
 
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { createUser, fetchUsers } from '../src/admin'
-import { configureAuthTransport, fetchSession, login, resetAuthTransport } from '../src/index'
+import { createUser, fetchUsers, invite } from '../src/admin'
+import {
+	acceptInvite,
+	configureAuthTransport,
+	fetchSession,
+	login,
+	requestPasswordReset,
+	resetAuthTransport,
+	resetPassword,
+} from '../src/index'
 import { defaultUser, loginOk, server, sessionOk } from '../src/testing'
 
 afterEach(() => {
@@ -21,6 +29,14 @@ test('a configured transport carries the session operations', async () => {
 
 	expect(injectedLogin).toHaveBeenCalledWith('maria@example.com', 'password1234')
 	expect(injectedSession).toHaveBeenCalledOnce()
+})
+
+test('a configured invite transport is held to the invitation contract', async () => {
+	configureAuthTransport({
+		invite: () => Promise.resolve({ delivered: false, activation_link: '' }),
+	})
+
+	await expect(invite({ email: 'maria@example.com', name: 'Maria Perez' })).rejects.toThrow()
 })
 
 test('a configured transport carries the admin operations', async () => {
@@ -57,4 +73,29 @@ test('resetAuthTransport restores the REST default', async () => {
 
 	resetAuthTransport()
 	await expect(fetchSession()).resolves.toEqual(defaultUser)
+})
+
+test('a configured transport carries the invitation operations', async () => {
+	const injectedInvite = vi.fn().mockResolvedValue({ delivered: true })
+	const injectedAccept = vi.fn().mockResolvedValue(defaultUser)
+	const injectedRequest = vi.fn().mockResolvedValue(undefined)
+	const injectedReset = vi.fn().mockResolvedValue(undefined)
+	configureAuthTransport({
+		invite: injectedInvite,
+		acceptInvite: injectedAccept,
+		requestPasswordReset: injectedRequest,
+		resetPassword: injectedReset,
+	})
+
+	await expect(invite({ email: 'maria@example.com', name: 'Maria Perez' })).resolves.toEqual({
+		delivered: true,
+	})
+	await expect(acceptInvite('t-123', 'password1234')).resolves.toEqual(defaultUser)
+	await requestPasswordReset('maria@example.com')
+	await resetPassword('t-123', 'password1234')
+
+	expect(injectedInvite).toHaveBeenCalledWith({ email: 'maria@example.com', name: 'Maria Perez' })
+	expect(injectedAccept).toHaveBeenCalledWith('t-123', 'password1234')
+	expect(injectedRequest).toHaveBeenCalledWith('maria@example.com')
+	expect(injectedReset).toHaveBeenCalledWith('t-123', 'password1234')
 })

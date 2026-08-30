@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { User as Account, NewUser } from './admin/index.js'
+import type { Invitation, NewInvite, User as Account, NewUser } from './admin/index.js'
 import type { User } from './api.js'
 
 /**
@@ -18,6 +18,10 @@ export interface AuthTransport {
 	createUser(input: NewUser): Promise<Account>
 	setUserDisabled(id: string, disabled: boolean): Promise<void>
 	setUserRole(id: string, role: string): Promise<void>
+	invite(input: NewInvite): Promise<Invitation>
+	acceptInvite(token: string, password: string): Promise<User>
+	requestPasswordReset(email: string): Promise<void>
+	resetPassword(token: string, password: string): Promise<void>
 }
 
 let overrides: Partial<AuthTransport> = {}

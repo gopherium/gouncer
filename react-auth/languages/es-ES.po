@@ -14,8 +14,8 @@ msgstr "Acciones"
 msgid "Active"
 msgstr "Activo"
 
-msgid "Create user"
-msgstr "Crear usuario"
+msgid "Back to login"
+msgstr "Volver al inicio de sesión"
 
 msgid "Disable"
 msgstr "Desactivar"
@@ -26,11 +26,23 @@ msgstr "Desactivar a %s"
 msgid "Disabled"
 msgstr "Desactivado"
 
+msgid "Done"
+msgstr "Hecho"
+
 msgid "Enable"
 msgstr "Activar"
 
 msgid "Enable %s"
 msgstr "Activar a %s"
+
+msgid "Forgot your password?"
+msgstr "¿Has olvidado tu contraseña?"
+
+msgid "Go to login"
+msgstr "Ir al inicio de sesión"
+
+msgid "If that address has an account, a reset link is on its way."
+msgstr "Si esa dirección tiene una cuenta, le llegará un enlace para restablecerla."
 
 msgid "Invalid email or password."
 msgstr "Correo o contraseña no válidos."
@@ -53,26 +65,59 @@ msgstr "No se pudo iniciar sesión, inténtalo de nuevo."
 msgid "Logout failed, please try again."
 msgstr "No se pudo cerrar sesión, inténtalo de nuevo."
 
+msgid "No mail server is configured. Deliver the activation link by hand."
+msgstr "No hay servidor de correo configurado. Entrega el enlace de activación a mano."
+
 msgid "Password"
 msgstr "Contraseña"
+
+msgid "Send invitation"
+msgstr "Enviar invitación"
+
+msgid "Send reset link"
+msgstr "Enviar enlace de restablecimiento"
+
+msgid "Set password"
+msgstr "Guardar contraseña"
 
 msgid "Something went wrong."
 msgstr "Algo ha ido mal."
 
-msgid "That email is already in use."
-msgstr "Ese correo ya está en uso."
+msgid "The invitation could not be sent."
+msgstr "No se pudo enviar la invitación."
 
-msgid "The user could not be created."
-msgstr "No se pudo crear el usuario."
+msgid "The password could not be set, please try again."
+msgstr "No se pudo guardar la contraseña, inténtalo de nuevo."
+
+msgid "The request failed, please try again."
+msgstr "No se pudo completar la petición, inténtalo de nuevo."
+
+msgid "This link is no longer valid. Ask for a new one."
+msgstr "Este enlace ya no es válido. Pide uno nuevo."
+
+msgid "This link is no longer valid. Ask the person who invited you for a new one."
+msgstr "Este enlace ya no es válido. Pide uno nuevo a quien te invitó."
 
 msgid "Too many attempts. Please wait a minute and try again."
 msgstr "Demasiados intentos. Espera un minuto e inténtalo de nuevo."
+
+msgid "Try again"
+msgstr "Inténtalo de nuevo"
 
 msgid "Update failed."
 msgstr "No se pudo actualizar."
 
 msgid "Users could not be loaded."
 msgstr "No se pudieron cargar los usuarios."
+
+msgid "Your password is set. Sign in with it."
+msgstr "Tu contraseña está guardada. Inicia sesión con ella."
+
+msgid "invalid invitation details"
+msgstr "datos de invitación no válidos"
+
+msgid "invalid password details"
+msgstr "datos de contraseña no válidos"
 
 msgid "invalid user details"
 msgstr "datos de usuario no válidos"
@@ -99,6 +144,10 @@ msgstr "Nombre"
 msgctxt "column"
 msgid "Status"
 msgstr "Estado"
+
+msgctxt "field label"
+msgid "Activation link"
+msgstr "Enlace de activación"
 
 msgctxt "field label"
 msgid "Email"

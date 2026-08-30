@@ -57,6 +57,92 @@ export function userWithRole(role: string): User {
 }
 
 /**
+ * Answers an invitation as mailed.
+ * @returns The msw handler.
+ */
+export function inviteDelivered() {
+	return http.post('/api/users/invite', () => HttpResponse.json({ delivered: true }))
+}
+
+/**
+ * Answers an invitation with the by-hand activation link.
+ * @param link - The activation link the admin delivers by hand.
+ * @returns The msw handler.
+ */
+export function inviteUndelivered(link: string) {
+	return http.post('/api/users/invite', () =>
+		HttpResponse.json({ delivered: false, activation_link: link }),
+	)
+}
+
+/**
+ * Fails the invitation endpoint with a server error.
+ * @returns The msw handler.
+ */
+export function inviteFailure() {
+	return http.post('/api/users/invite', () =>
+		HttpResponse.json({ error: 'internal error' }, { status: 500 }),
+	)
+}
+
+/**
+ * Accepts an activation with the given user.
+ * @param user - The user the activation signs in.
+ * @returns The msw handler.
+ */
+export function activateOk(user: User = defaultUser) {
+	return http.post('/api/auth/activate', () => HttpResponse.json(user))
+}
+
+/**
+ * Refuses an activation for a dead link.
+ * @returns The msw handler.
+ */
+export function activateInvalidToken() {
+	return http.post('/api/auth/activate', () =>
+		HttpResponse.json({ error: 'token not found', code: 'token_invalid' }, { status: 422 }),
+	)
+}
+
+/**
+ * Accepts a password reset request with the neutral answer.
+ * @returns The msw handler.
+ */
+export function resetRequestOk() {
+	return http.post('/api/auth/password-reset', () => new HttpResponse(null, { status: 204 }))
+}
+
+/**
+ * Refuses a password reset request for too many attempts.
+ * @returns The msw handler.
+ */
+export function resetRequestRateLimited() {
+	return http.post('/api/auth/password-reset', () =>
+		HttpResponse.json({ error: 'slow down' }, { status: 429 }),
+	)
+}
+
+/**
+ * Accepts a password reset confirmation.
+ * @returns The msw handler.
+ */
+export function resetOk() {
+	return http.post('/api/auth/password-reset/confirm', () =>
+		new HttpResponse(null, { status: 204 }),
+	)
+}
+
+/**
+ * Refuses a password reset confirmation for a dead link.
+ * @returns The msw handler.
+ */
+export function resetInvalidToken() {
+	return http.post('/api/auth/password-reset/confirm', () =>
+		HttpResponse.json({ error: 'token not found', code: 'token_invalid' }, { status: 422 }),
+	)
+}
+
+/**
  * Accepts a role change.
  * @returns The msw handler.
  */

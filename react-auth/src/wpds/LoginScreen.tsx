@@ -33,9 +33,11 @@ function loginErrorMessage(error: unknown): string {
 export function LoginScreen({
 	brand,
 	onLogin,
+	onForgotPassword,
 }: {
 	brand: string
 	onLogin: (user: User) => void | Promise<void>
+	onForgotPassword?: () => void
 }) {
 	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
@@ -61,12 +63,14 @@ export function LoginScreen({
 							<InputControl
 								label={_x('Email', 'field label', DOMAIN)}
 								type="email"
+								autoComplete="username"
 								value={email}
 								onChange={(event) => setEmail(event.target.value)}
 							/>
 							<InputControl
 								label={__('Password', DOMAIN)}
 								type="password"
+								autoComplete="current-password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
 							/>
@@ -81,6 +85,11 @@ export function LoginScreen({
 							</Button>
 							{attempt.isError ? (
 								<Text role="alert">{loginErrorMessage(attempt.error)}</Text>
+							) : null}
+							{onForgotPassword ? (
+								<Button type="button" variant="outline" onClick={onForgotPassword}>
+									{__('Forgot your password?', DOMAIN)}
+								</Button>
 							) : null}
 						</Stack>
 					</form>
