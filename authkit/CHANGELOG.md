@@ -7,6 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Account` carries `Confirmed`, false for an invited account until
+  activation.
+
 ## [0.12.0] - 2026-08-29
 
 ### Added

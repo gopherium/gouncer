@@ -63,6 +63,7 @@ type Account struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	Disabled  bool      `json:"disabled"`
+	Confirmed bool      `json:"confirmed"`
 	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -74,6 +75,7 @@ func newAccount(u gouncer.User) Account {
 		Email:     u.Email,
 		Name:      u.Name,
 		Disabled:  u.Disabled,
+		Confirmed: u.Confirmed,
 		Role:      u.Role,
 		CreatedAt: u.CreatedAt.UTC(),
 	}

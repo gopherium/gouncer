@@ -96,6 +96,41 @@ func TestSessionLifecycleThroughTheSeams(t *testing.T) {
 	}
 }
 
+func TestAccountsCarryTheirConfirmation(t *testing.T) {
+	t.Parallel()
+
+	store := testkit.NewStore()
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", servicePassword)
+	admin := authkit.NewAdmin(authkit.AdminConfig{Store: store})
+	invites := authkit.NewInvites(authkit.InvitesConfig{Store: store})
+
+	created, err := admin.CreateAccount(t.Context(), "maria@example.com", "Maria Perez", "password1234", "")
+	if err != nil {
+		t.Fatalf("CreateAccount() error = %v, want nil", err)
+	}
+	if !created.Confirmed {
+		t.Error("a password-created account answers Confirmed false, want true")
+	}
+	if _, err := invites.Invite(t.Context(), "grace@example.com", "Grace Hopper", ""); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+
+	listed, err := admin.ListAccounts(t.Context())
+	if err != nil {
+		t.Fatalf("ListAccounts() error = %v, want nil", err)
+	}
+	confirmed := map[string]bool{}
+	for _, account := range listed {
+		confirmed[account.Email] = account.Confirmed
+	}
+	if !confirmed["maria@example.com"] {
+		t.Error("the password-created account lists as unconfirmed, want confirmed")
+	}
+	if confirmed["grace@example.com"] {
+		t.Error("the invited account lists as confirmed, want unconfirmed until activation")
+	}
+}
+
 func TestAccountSeams(t *testing.T) {
 	t.Parallel()
 
