@@ -7,7 +7,7 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
-## [Unreleased]
+## [0.13.0] - 2026-08-30
 
 ### Added
 
@@ -205,6 +205,7 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `testkit.Store`, an in-memory store double encoding the gouncer
   contract semantics.
 
+[0.13.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.13.0
 [0.12.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.12.0
 [0.11.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.11.0
 [0.10.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fv0.10.0
