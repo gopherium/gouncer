@@ -29,7 +29,9 @@ npm-style tag stays invisible to the Go toolchain, unlike a
   account left cached.
 - `SetPasswordScreen`, `RequestResetScreen` and `ResetPasswordScreen`,
   the three screens behind those operations. Each tells a throttled
-  person to wait rather than offering an immediate retry.
+  person to wait rather than offering an immediate retry, and a handoff
+  that fails after activation offers a retry that never posts the spent
+  token again.
 - `LoginScreen` takes an optional `onForgotPassword`, rendering the way
   to the reset request under the form when given.
 - The testkit cans the four new routes, and the login fields carry
