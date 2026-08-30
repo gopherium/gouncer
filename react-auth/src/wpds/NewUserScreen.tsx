@@ -51,6 +51,9 @@ export function NewUserScreen({
 	})
 	const create = useMutation({
 		mutationFn: () => invite({ email: email.trim(), name: name.trim() }),
+		onMutate: () => {
+			finish.reset()
+		},
 		onSuccess: async (invitation) => {
 			await queryClient.invalidateQueries({ queryKey: usersQueryKey })
 			if (invitation.delivered) {
@@ -117,7 +120,13 @@ export function NewUserScreen({
 					/>
 					<Button
 						type="submit"
-						disabled={email.trim() === '' || name.trim() === '' || create.isPending}
+						disabled={
+							email.trim() === '' ||
+							name.trim() === '' ||
+							create.isPending ||
+							finish.isPending
+						}
+						loading={create.isPending || finish.isPending}
 					>
 						{__('Send invitation', DOMAIN)}
 					</Button>

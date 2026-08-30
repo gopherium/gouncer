@@ -122,6 +122,53 @@ test('keeps the form when the undelivered answer carries no link', async () => {
 	expect(onCreated).not.toHaveBeenCalled()
 })
 
+test('keeps the form locked while a delivered invitation hands off', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/users/invite', () => {
+			posts += 1
+			return HttpResponse.json({ delivered: true })
+		}),
+	)
+	const { onCreated } = renderNewUser(() => new Promise<void>(() => {}))
+
+	await fillForm('grace@example.com', 'Grace Hopper')
+	await waitFor(() => expect(onCreated).toHaveBeenCalled())
+
+	const submit = screen.getByRole('button', { name: 'Send invitation' })
+	expect(submit).toHaveAttribute('aria-disabled', 'true')
+	await userEvent.click(submit)
+	expect(posts).toBe(1)
+})
+
+test('clears a failed handoff before the next invitation', async () => {
+	let sent = 0
+	server.use(
+		http.post('/api/users/invite', () => {
+			sent += 1
+			return sent === 1
+				? HttpResponse.json({ delivered: true })
+				: HttpResponse.json({
+						delivered: false,
+						activation_link: 'https://crm.example.com/activate?token=t-2',
+					})
+		}),
+	)
+	renderNewUser(() => Promise.reject(new Error('the consumer could not navigate')))
+
+	await fillForm('grace@example.com', 'Grace Hopper')
+	expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong.')
+
+	await userEvent.clear(screen.getByLabelText('Email'))
+	await userEvent.clear(screen.getByLabelText('Name'))
+	await fillForm('ada@example.com', 'Ada Lovelace')
+
+	expect(await screen.findByLabelText('Activation link')).toHaveValue(
+		'https://crm.example.com/activate?token=t-2',
+	)
+	expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
 test('keeps the link on screen when handing off fails', async () => {
 	server.use(inviteUndelivered('https://crm.example.com/activate?token=t-123'))
 	renderNewUser(() => Promise.reject(new Error('the consumer could not navigate')))
