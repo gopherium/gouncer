@@ -3,7 +3,7 @@
 import { __ } from '@wordpress/i18n'
 import { z } from 'zod'
 
-import { UnauthorizedError } from '../api.js'
+import { RateLimitedError, UnauthorizedError, ValidationError } from '../api.js'
 import { DOMAIN } from '../domain.js'
 import { resolveTransport } from '../transport.js'
 
@@ -27,16 +27,25 @@ export interface NewUser {
 	role?: string
 }
 
+export interface NewInvite {
+	email: string
+	name: string
+	role?: string
+}
+
+const invitationSchema = z.object({
+	delivered: z.boolean(),
+	activation_link: z.string().optional(),
+})
+
+export type Invitation = z.infer<typeof invitationSchema>
+
 /**
  * EmailTakenError is thrown when a new user's email is already in use.
  */
 export class EmailTakenError extends Error {}
 
-/**
- * ValidationError is thrown when the backend rejects the submitted user
- * details; its message is the backend's human-readable explanation.
- */
-export class ValidationError extends Error {}
+export { ValidationError } from '../api.js'
 
 /**
  * RoleRefusedError is thrown when the actor holds no role the server admits.
@@ -110,6 +119,35 @@ async function restCreateUser(input: NewUser): Promise<User> {
 		throw new Error(`creating user failed with status ${response.status}`)
 	}
 	return userSchema.parse(await response.json())
+}
+
+/**
+ * Sends an invitation over REST, answering the same shape whatever the
+ * address's state.
+ * @param input - The email, name, and optional role of the invited account.
+ * @returns The delivery report, carrying the link when nothing mailed it.
+ */
+async function restInvite(input: NewInvite): Promise<Invitation> {
+	const response = await fetch('/api/users/invite', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(input),
+	})
+	if (response.status === 401) {
+		throw new UnauthorizedError('session expired')
+	}
+	if (response.status === 422) {
+		throw new ValidationError(
+			await errorMessage(response, __('invalid invitation details', DOMAIN)),
+		)
+	}
+	if (response.status === 429) {
+		throw new RateLimitedError('too many attempts')
+	}
+	if (!response.ok) {
+		throw new Error(`inviting failed with status ${response.status}`)
+	}
+	return invitationSchema.parse(await response.json())
 }
 
 /**
@@ -209,4 +247,14 @@ export async function setUserDisabled(id: string, disabled: boolean): Promise<vo
  */
 export async function setUserRole(id: string, role: string): Promise<void> {
 	await resolveTransport('setUserRole', restSetUserRole)(id, role)
+}
+
+/**
+ * Sends an invitation, answering the same shape whatever the address's
+ * state.
+ * @param input - The email, name, and optional role of the invited account.
+ * @returns The delivery report, carrying the link when nothing mailed it.
+ */
+export async function invite(input: NewInvite): Promise<Invitation> {
+	return resolveTransport('invite', restInvite)(input)
 }
