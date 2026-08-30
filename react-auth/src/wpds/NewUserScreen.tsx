@@ -6,7 +6,6 @@ import { Button, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
 import { ValidationError, invite, usersQueryKey } from '../admin/index.js'
-import type { Invitation } from '../admin/index.js'
 import { DOMAIN } from '../domain.js'
 import { Outcome } from './Outcome.js'
 
@@ -37,7 +36,7 @@ export function NewUserScreen({
 	const queryClient = useQueryClient()
 	const [email, setEmail] = useState('')
 	const [name, setName] = useState('')
-	const [undelivered, setUndelivered] = useState<Invitation | null>(null)
+	const [activationLink, setActivationLink] = useState<string | null>(null)
 	const create = useMutation({
 		mutationFn: () => invite({ email: email.trim(), name: name.trim() }),
 		onSuccess: async (invitation) => {
@@ -46,11 +45,11 @@ export function NewUserScreen({
 				await onCreated?.()
 				return
 			}
-			setUndelivered(invitation)
+			setActivationLink(invitation.activation_link)
 		},
 	})
 
-	if (undelivered) {
+	if (activationLink !== null) {
 		return (
 			<Stack direction="column" gap="lg">
 				<Text variant="heading-lg" render={<h1 />}>
@@ -64,7 +63,7 @@ export function NewUserScreen({
 				<InputControl
 					label={_x('Activation link', 'field label', DOMAIN)}
 					readOnly
-					value={undelivered.activation_link ?? ''}
+					value={activationLink}
 				/>
 				<Button type="button" onClick={() => onCreated?.()}>
 					{__('Done', DOMAIN)}

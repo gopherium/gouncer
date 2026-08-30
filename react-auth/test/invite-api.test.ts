@@ -38,6 +38,28 @@ describe('invite', () => {
 		})
 	})
 
+	it('rejects an undelivered report carrying no link', async () => {
+		server.use(
+			http.post('/api/users/invite', () => HttpResponse.json({ delivered: false })),
+		)
+
+		await expect(
+			invite({ email: 'maria@example.com', name: 'Maria Perez' }),
+		).rejects.toThrow()
+	})
+
+	it('rejects an undelivered report whose link is empty', async () => {
+		server.use(
+			http.post('/api/users/invite', () =>
+				HttpResponse.json({ delivered: false, activation_link: '' }),
+			),
+		)
+
+		await expect(
+			invite({ email: 'maria@example.com', name: 'Maria Perez' }),
+		).rejects.toThrow()
+	})
+
 	it('resolves through the canned delivered handler', async () => {
 		server.use(inviteDelivered())
 

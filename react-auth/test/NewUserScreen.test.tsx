@@ -86,15 +86,20 @@ test('stays on screen with the activation link when nothing mailed it', async ()
 	await waitFor(() => expect(onCreated).toHaveBeenCalled())
 })
 
-test('shows an empty link field when the undelivered answer carries none', async () => {
+test('keeps the form when the undelivered answer carries no link', async () => {
 	server.use(
 		http.post('/api/users/invite', () => HttpResponse.json({ delivered: false })),
 	)
-	renderNewUser()
+	const { onCreated } = renderNewUser()
 
 	await fillForm('grace@example.com', 'Grace Hopper')
 
-	expect(await screen.findByLabelText('Activation link')).toHaveValue('')
+	expect(await screen.findByRole('alert')).toHaveTextContent(
+		'The invitation could not be sent.',
+	)
+	expect(screen.queryByLabelText('Activation link')).not.toBeInTheDocument()
+	expect(screen.getByLabelText('Email')).toHaveValue('grace@example.com')
+	expect(onCreated).not.toHaveBeenCalled()
 })
 
 test('answers the same way whatever the address', async () => {

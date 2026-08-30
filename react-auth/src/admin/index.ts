@@ -33,10 +33,10 @@ export interface NewInvite {
 	role?: string
 }
 
-const invitationSchema = z.object({
-	delivered: z.boolean(),
-	activation_link: z.string().optional(),
-})
+const invitationSchema = z.discriminatedUnion('delivered', [
+	z.object({ delivered: z.literal(true) }),
+	z.object({ delivered: z.literal(false), activation_link: z.string().min(1) }),
+])
 
 export type Invitation = z.infer<typeof invitationSchema>
 
