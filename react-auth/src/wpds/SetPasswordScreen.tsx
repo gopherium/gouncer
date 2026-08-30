@@ -15,21 +15,28 @@ import type { User } from '../api.js'
 import { DOMAIN } from '../domain.js'
 
 /**
- * Maps an activation failure to the message shown to the user.
- * @param error - The error thrown by the activation attempt.
- * @returns The message to display.
+ * Maps the screen's failures to the message shown to the user.
+ * @param attempted - The error the activation raised, if any.
+ * @param handedOff - The error handing the user onward raised, if any.
+ * @returns The message to display, or null when nothing failed.
  */
-function setPasswordErrorMessage(error: Error): string {
-	if (error instanceof InvalidTokenError) {
+function setPasswordErrorMessage(attempted: Error | null, handedOff: Error | null): string | null {
+	if (attempted instanceof InvalidTokenError) {
 		return __('This link is no longer valid. Ask the person who invited you for a new one.', DOMAIN)
 	}
-	if (error instanceof ValidationError) {
-		return error.message
+	if (attempted instanceof ValidationError) {
+		return attempted.message
 	}
-	if (error instanceof RateLimitedError) {
+	if (attempted instanceof RateLimitedError) {
 		return __('Too many attempts. Please wait a minute and try again.', DOMAIN)
 	}
-	return __('The password could not be set, please try again.', DOMAIN)
+	if (attempted) {
+		return __('The password could not be set, please try again.', DOMAIN)
+	}
+	if (handedOff) {
+		return __('Something went wrong.', DOMAIN)
+	}
+	return null
 }
 
 /**
@@ -50,10 +57,16 @@ export function SetPasswordScreen({
 	onAccepted: (user: User) => void | Promise<void>
 }) {
 	const [password, setPassword] = useState('')
+	const finish = useMutation({
+		mutationFn: async (user: User) => {
+			await onAccepted(user)
+		},
+	})
 	const attempt = useMutation({
 		mutationFn: () => acceptInvite(token, password),
-		onSuccess: (user) => onAccepted(user),
+		onSuccess: (user) => finish.mutate(user),
 	})
+	const failure = setPasswordErrorMessage(attempt.error, finish.error)
 
 	return (
 		<div className="gopherium-login">
@@ -78,14 +91,17 @@ export function SetPasswordScreen({
 							/>
 							<Button
 								type="submit"
-								disabled={password === '' || attempt.isPending}
-								loading={attempt.isPending}
+								disabled={
+									password === '' ||
+									attempt.isPending ||
+									attempt.isSuccess ||
+									finish.isPending
+								}
+								loading={attempt.isPending || finish.isPending}
 							>
 								{__('Set password', DOMAIN)}
 							</Button>
-							{attempt.isError ? (
-								<Text role="alert">{setPasswordErrorMessage(attempt.error)}</Text>
-							) : null}
+							{failure ? <Text role="alert">{failure}</Text> : null}
 						</Stack>
 					</form>
 				</Card.Content>

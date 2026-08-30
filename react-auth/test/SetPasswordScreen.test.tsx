@@ -99,6 +99,36 @@ test('tells the user when the link is dead', async () => {
 	expect(onAccepted).not.toHaveBeenCalled()
 })
 
+test('does not blame the activation when handing the user onward fails', async () => {
+	let posts = 0
+	server.use(
+		http.post('/api/auth/activate', () => {
+			posts += 1
+			return HttpResponse.json(defaultUser)
+		}),
+	)
+	const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+	render(
+		<QueryClientProvider client={client}>
+			<SetPasswordScreen
+				brand="Testbed"
+				token="t-123"
+				onAccepted={() => Promise.reject(new Error('the consumer could not navigate'))}
+			/>
+		</QueryClientProvider>,
+	)
+
+	await submitPassword('correct horse battery')
+
+	expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong.')
+	expect(screen.getByRole('button', { name: 'Set password' })).toHaveAttribute(
+		'aria-disabled',
+		'true',
+	)
+	await userEvent.click(screen.getByRole('button', { name: 'Set password' }))
+	expect(posts).toBe(1)
+})
+
 test('shows the server validation message for a weak password', async () => {
 	server.use(
 		http.post('/api/auth/activate', () =>
