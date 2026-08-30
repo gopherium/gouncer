@@ -99,7 +99,7 @@ test('tells the user when the link is dead', async () => {
 	expect(onAccepted).not.toHaveBeenCalled()
 })
 
-test('does not blame the activation when handing the user onward fails', async () => {
+function renderHandoff(onAccepted: (user: unknown) => void | Promise<void>) {
 	let posts = 0
 	server.use(
 		http.post('/api/auth/activate', () => {
@@ -110,23 +110,60 @@ test('does not blame the activation when handing the user onward fails', async (
 	const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
 	render(
 		<QueryClientProvider client={client}>
-			<SetPasswordScreen
-				brand="Testbed"
-				token="t-123"
-				onAccepted={() => Promise.reject(new Error('the consumer could not navigate'))}
-			/>
+			<SetPasswordScreen brand="Testbed" token="t-123" onAccepted={onAccepted} />
 		</QueryClientProvider>,
+	)
+	return () => posts
+}
+
+test('does not blame the activation when handing the user onward fails', async () => {
+	const posts = renderHandoff(() =>
+		Promise.reject(new Error('the consumer could not navigate')),
 	)
 
 	await submitPassword('correct horse battery')
 
 	expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong.')
-	expect(screen.getByRole('button', { name: 'Set password' })).toHaveAttribute(
+	expect(screen.queryByRole('button', { name: 'Set password' })).not.toBeInTheDocument()
+	expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+	expect(posts()).toBe(1)
+})
+
+test('keeps the retry on screen while the handoff runs', async () => {
+	let calls = 0
+	renderHandoff(() => {
+		calls += 1
+		return calls === 1
+			? Promise.reject(new Error('the consumer could not navigate'))
+			: new Promise<void>(() => {})
+	})
+
+	await submitPassword('correct horse battery')
+	await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+
+	expect(screen.getByRole('button', { name: 'Try again' })).toHaveAttribute(
 		'aria-disabled',
 		'true',
 	)
-	await userEvent.click(screen.getByRole('button', { name: 'Set password' }))
-	expect(posts).toBe(1)
+	expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong.')
+	expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+})
+
+test('retries the handoff without spending the token again', async () => {
+	const calls: unknown[] = []
+	const posts = renderHandoff((user) => {
+		calls.push(user)
+		return calls.length === 1
+			? Promise.reject(new Error('the consumer could not navigate'))
+			: Promise.resolve()
+	})
+
+	await submitPassword('correct horse battery')
+	await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+
+	await waitFor(() => expect(calls).toHaveLength(2))
+	expect(calls[1]).toEqual(defaultUser)
+	expect(posts()).toBe(1)
 })
 
 test('shows the server validation message for a weak password', async () => {

@@ -15,28 +15,21 @@ import type { User } from '../api.js'
 import { DOMAIN } from '../domain.js'
 
 /**
- * Maps the screen's failures to the message shown to the user.
- * @param attempted - The error the activation raised, if any.
- * @param handedOff - The error handing the user onward raised, if any.
- * @returns The message to display, or null when nothing failed.
+ * Maps an activation failure to the message shown to the user.
+ * @param error - The error thrown by the activation attempt.
+ * @returns The message to display.
  */
-function setPasswordErrorMessage(attempted: Error | null, handedOff: Error | null): string | null {
-	if (attempted instanceof InvalidTokenError) {
+function setPasswordErrorMessage(error: Error): string {
+	if (error instanceof InvalidTokenError) {
 		return __('This link is no longer valid. Ask the person who invited you for a new one.', DOMAIN)
 	}
-	if (attempted instanceof ValidationError) {
-		return attempted.message
+	if (error instanceof ValidationError) {
+		return error.message
 	}
-	if (attempted instanceof RateLimitedError) {
+	if (error instanceof RateLimitedError) {
 		return __('Too many attempts. Please wait a minute and try again.', DOMAIN)
 	}
-	if (attempted) {
-		return __('The password could not be set, please try again.', DOMAIN)
-	}
-	if (handedOff) {
-		return __('Something went wrong.', DOMAIN)
-	}
-	return null
+	return __('The password could not be set, please try again.', DOMAIN)
 }
 
 /**
@@ -57,17 +50,47 @@ export function SetPasswordScreen({
 	onAccepted: (user: User) => void | Promise<void>
 }) {
 	const [password, setPassword] = useState('')
+	const [activated, setActivated] = useState<User | null>(null)
+	const [handoffFailed, setHandoffFailed] = useState(false)
 	const finish = useMutation({
 		mutationFn: async (user: User) => {
 			await onAccepted(user)
 		},
+		onError: () => setHandoffFailed(true),
+		onSuccess: () => setHandoffFailed(false),
 	})
 	const attempt = useMutation({
 		mutationFn: () => acceptInvite(token, password),
-		onSuccess: (user) => finish.mutate(user),
+		onSuccess: (user) => {
+			setActivated(user)
+			finish.mutate(user)
+		},
 	})
-	const failure = setPasswordErrorMessage(attempt.error, finish.error)
 
+	if (activated !== null && handoffFailed) {
+		return (
+			<div className="gopherium-login">
+				<Card.Root className="gopherium-login__card">
+					<Card.Content>
+						<Stack direction="column" gap="lg">
+							<Text variant="heading-lg" render={<h1 />}>
+								{brand}
+							</Text>
+							<Text role="alert">{__('Something went wrong.', DOMAIN)}</Text>
+							<Button
+								type="button"
+								disabled={finish.isPending}
+								loading={finish.isPending}
+								onClick={() => finish.mutate(activated)}
+							>
+								{__('Try again', DOMAIN)}
+							</Button>
+						</Stack>
+					</Card.Content>
+				</Card.Root>
+			</div>
+		)
+	}
 	return (
 		<div className="gopherium-login">
 			<Card.Root className="gopherium-login__card">
@@ -101,7 +124,9 @@ export function SetPasswordScreen({
 							>
 								{__('Set password', DOMAIN)}
 							</Button>
-							{failure ? <Text role="alert">{failure}</Text> : null}
+							{attempt.isError ? (
+								<Text role="alert">{setPasswordErrorMessage(attempt.error)}</Text>
+							) : null}
 						</Stack>
 					</form>
 				</Card.Content>
