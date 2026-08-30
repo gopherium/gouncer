@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 
 import type { User } from './api.js'
 import { DOMAIN } from './domain.js'
-import { sessionQueryKey, useSession } from './session.js'
+import { adoptSession, useSession } from './session.js'
 
 /**
  * Guards its children behind a login session, rendering the given login
@@ -40,10 +40,7 @@ export function AuthGate({
 	if (session.data === null) {
 		return (
 			<>
-				{loginScreen(async (user) => {
-					await queryClient.cancelQueries({ queryKey: sessionQueryKey })
-					queryClient.setQueryData(sessionQueryKey, user)
-				})}
+				{loginScreen((user) => adoptSession(queryClient, user))}
 			</>
 		)
 	}
