@@ -3,7 +3,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { expect, test } from 'vitest'
 
-import { adoptSession, sessionQueryKey } from '../src/index'
+import { adoptSession, sessionQueryKey, usersQueryKey } from '../src/index'
 import { defaultUser } from '../src/testing'
 
 test('adoptSession seeds the session', async () => {
@@ -11,6 +11,17 @@ test('adoptSession seeds the session', async () => {
 
 	await adoptSession(client, defaultUser)
 
+	expect(client.getQueryData(sessionQueryKey)).toEqual(defaultUser)
+})
+
+test('adoptSession drops what the previous account left cached', async () => {
+	const client = new QueryClient()
+	client.setQueryData(usersQueryKey, [{ id: 'a1', email: 'earlier@example.com' }])
+	client.setQueryData(sessionQueryKey, null)
+
+	await adoptSession(client, defaultUser)
+
+	expect(client.getQueryData(usersQueryKey)).toBeUndefined()
 	expect(client.getQueryData(sessionQueryKey)).toEqual(defaultUser)
 })
 

@@ -43,11 +43,14 @@ export function useLogout() {
 
 /**
  * Installs a freshly authenticated user as the cached session, cancelling
- * any in-flight session fetch so it cannot clobber the seed.
+ * any in-flight fetch and dropping what the previous account left cached.
  * @param client - The query client holding the session.
  * @param user - The authenticated user to install.
  */
 export async function adoptSession(client: QueryClient, user: User): Promise<void> {
-	await client.cancelQueries({ queryKey: sessionQueryKey })
+	await client.cancelQueries()
 	client.setQueryData(sessionQueryKey, user)
+	client.removeQueries({
+		predicate: (query) => query.queryHash !== hashKey(sessionQueryKey),
+	})
 }
