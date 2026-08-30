@@ -5,7 +5,12 @@ import { __ } from '@wordpress/i18n'
 import { Button, Card, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
-import { InvalidTokenError, ValidationError, acceptInvite } from '../api.js'
+import {
+	InvalidTokenError,
+	RateLimitedError,
+	ValidationError,
+	acceptInvite,
+} from '../api.js'
 import type { User } from '../api.js'
 import { DOMAIN } from '../domain.js'
 
@@ -20,6 +25,9 @@ function setPasswordErrorMessage(error: Error): string {
 	}
 	if (error instanceof ValidationError) {
 		return error.message
+	}
+	if (error instanceof RateLimitedError) {
+		return __('Too many attempts. Please wait a minute and try again.', DOMAIN)
 	}
 	return __('The password could not be set, please try again.', DOMAIN)
 }

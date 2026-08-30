@@ -109,6 +109,21 @@ test('shows the server validation message for a weak password', async () => {
 	)
 })
 
+test('tells a throttled user to wait instead of retrying', async () => {
+	server.use(
+		http.post('/api/auth/password-reset/confirm', () =>
+			HttpResponse.json({ error: 'slow down' }, { status: 429 }),
+		),
+	)
+	renderResetPassword()
+
+	await submitPassword('correct horse battery')
+
+	expect(await screen.findByRole('alert')).toHaveTextContent(
+		'Too many attempts. Please wait a minute and try again.',
+	)
+})
+
 test('shows a generic message when the reset fails', async () => {
 	server.use(
 		http.post('/api/auth/password-reset/confirm', () =>
