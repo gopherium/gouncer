@@ -16,7 +16,8 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 
 - `invite`, sending an invitation and answering the same shape whatever
   the address's state, so a taken address is indistinguishable from a
-  fresh one.
+  fresh one. An undelivered report without an activation link is
+  refused.
 - `acceptInvite`, setting the first password and starting the session in
   one step.
 - `requestPasswordReset`, asking for a reset link and answering nothing
@@ -24,9 +25,11 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 - `resetPassword`, replacing the password behind a reset link.
 - `InvalidTokenError`, answered for a spent, expired or unknown link.
 - `adoptSession`, installing a freshly authenticated user as the cached
-  session and cancelling any in-flight session fetch first.
+  session, cancelling any in-flight fetch and dropping what the previous
+  account left cached.
 - `SetPasswordScreen`, `RequestResetScreen` and `ResetPasswordScreen`,
-  the three screens behind those operations.
+  the three screens behind those operations. Each tells a throttled
+  person to wait rather than offering an immediate retry.
 - `LoginScreen` takes an optional `onForgotPassword`, rendering the way
   to the reset request under the form when given.
 - The testkit cans the four new routes, and the login fields carry
