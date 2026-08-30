@@ -10,6 +10,42 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Added
+
+- `invite`, sending an invitation and answering the same shape whatever
+  the address's state, so a taken address is indistinguishable from a
+  fresh one.
+- `acceptInvite`, setting the first password and starting the session in
+  one step.
+- `requestPasswordReset`, asking for a reset link and answering nothing
+  about the address.
+- `resetPassword`, replacing the password behind a reset link.
+- `InvalidTokenError`, answered for a spent, expired or unknown link.
+- `adoptSession`, installing a freshly authenticated user as the cached
+  session and cancelling any in-flight session fetch first.
+- `SetPasswordScreen`, `RequestResetScreen` and `ResetPasswordScreen`,
+  the three screens behind those operations.
+- `LoginScreen` takes an optional `onForgotPassword`, rendering the way
+  to the reset request under the form when given.
+- The testkit cans the four new routes, and the login fields carry
+  `username` and `current-password` autocomplete hints.
+
+### Changed
+
+- **Breaking.** `AuthTransport` requires `invite`, `acceptInvite`,
+  `requestPasswordReset` and `resetPassword`. A consumer implementing the
+  whole interface adds them, one overriding part of it through
+  `configureAuthTransport` is untouched.
+- **Breaking.** `NewUserScreen` sends an invitation instead of creating
+  an account, so it has no password field and posts to
+  `POST /api/users/invite`. No released server serves that route yet, a
+  future `authkit` release does. `createUser` and its route are
+  unchanged for consumers calling them directly.
+- `ValidationError` is declared on the package entry point and
+  re-exported from `./admin`, so both import paths keep working.
+
 ## [0.7.0] - 2026-08-26
 
 ### Changed
