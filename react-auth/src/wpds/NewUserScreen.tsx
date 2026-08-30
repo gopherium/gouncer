@@ -10,16 +10,23 @@ import { DOMAIN } from '../domain.js'
 import { Outcome } from './Outcome.js'
 
 /**
- * Maps an invitation failure to the message shown under the form,
+ * Maps the screen's failures to the message shown beside the form,
  * surfacing the backend's explanation for rejected input.
- * @param error - The error thrown by the invite mutation.
- * @returns The human-readable failure message.
+ * @param invited - The error the invitation raised, if any.
+ * @param handedOff - The error handing the invitation onward raised, if any.
+ * @returns The message to display, or null when nothing failed.
  */
-function inviteErrorMessage(error: Error): string {
-	if (error instanceof ValidationError) {
-		return error.message
+function failureMessage(invited: Error | null, handedOff: Error | null): string | null {
+	if (invited instanceof ValidationError) {
+		return invited.message
 	}
-	return __('The invitation could not be sent.', DOMAIN)
+	if (invited) {
+		return __('The invitation could not be sent.', DOMAIN)
+	}
+	if (handedOff) {
+		return __('Something went wrong.', DOMAIN)
+	}
+	return null
 }
 
 /**
@@ -37,17 +44,23 @@ export function NewUserScreen({
 	const [email, setEmail] = useState('')
 	const [name, setName] = useState('')
 	const [activationLink, setActivationLink] = useState<string | null>(null)
+	const finish = useMutation({
+		mutationFn: async () => {
+			await onCreated?.()
+		},
+	})
 	const create = useMutation({
 		mutationFn: () => invite({ email: email.trim(), name: name.trim() }),
 		onSuccess: async (invitation) => {
 			await queryClient.invalidateQueries({ queryKey: usersQueryKey })
 			if (invitation.delivered) {
-				await onCreated?.()
+				finish.mutate()
 				return
 			}
 			setActivationLink(invitation.activation_link)
 		},
 	})
+	const failure = failureMessage(create.error, finish.error)
 
 	if (activationLink !== null) {
 		return (
@@ -65,9 +78,15 @@ export function NewUserScreen({
 					readOnly
 					value={activationLink}
 				/>
-				<Button type="button" onClick={() => onCreated?.()}>
+				<Button
+					type="button"
+					disabled={finish.isPending}
+					loading={finish.isPending}
+					onClick={() => finish.mutate()}
+				>
 					{__('Done', DOMAIN)}
 				</Button>
+				{failure ? <Text role="alert">{failure}</Text> : null}
 			</Stack>
 		)
 	}
@@ -102,9 +121,7 @@ export function NewUserScreen({
 					>
 						{__('Send invitation', DOMAIN)}
 					</Button>
-					{create.isError ? (
-						<Text role="alert">{inviteErrorMessage(create.error)}</Text>
-					) : null}
+					{failure ? <Text role="alert">{failure}</Text> : null}
 				</Stack>
 			</form>
 		</Stack>

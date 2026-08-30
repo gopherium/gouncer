@@ -15,12 +15,12 @@ import {
 } from '../src/testing'
 import { NewUserScreen } from '../src/wpds'
 
-function renderNewUser() {
+function renderNewUser(handler?: () => void | Promise<void>) {
 	const client = new QueryClient({
 		defaultOptions: { mutations: { retry: false } },
 	})
 	client.setQueryData(usersQueryKey, [])
-	const onCreated = vi.fn()
+	const onCreated = vi.fn(handler)
 	render(
 		<QueryClientProvider client={client}>
 			<NewUserScreen onCreated={onCreated} />
@@ -120,6 +120,32 @@ test('keeps the form when the undelivered answer carries no link', async () => {
 	expect(screen.queryByLabelText('Activation link')).not.toBeInTheDocument()
 	expect(screen.getByLabelText('Email')).toHaveValue('grace@example.com')
 	expect(onCreated).not.toHaveBeenCalled()
+})
+
+test('keeps the link on screen when handing off fails', async () => {
+	server.use(inviteUndelivered('https://crm.example.com/activate?token=t-123'))
+	renderNewUser(() => Promise.reject(new Error('the consumer could not navigate')))
+
+	await fillForm('grace@example.com', 'Grace Hopper')
+	await userEvent.click(await screen.findByRole('button', { name: 'Done' }))
+
+	expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong.')
+	expect(screen.getByLabelText('Activation link')).toHaveValue(
+		'https://crm.example.com/activate?token=t-123',
+	)
+})
+
+test('locks Done while the handoff is in flight', async () => {
+	server.use(inviteUndelivered('https://crm.example.com/activate?token=t-123'))
+	const { onCreated } = renderNewUser(() => new Promise<void>(() => {}))
+
+	await fillForm('grace@example.com', 'Grace Hopper')
+	const done = await screen.findByRole('button', { name: 'Done' })
+	await userEvent.click(done)
+
+	await waitFor(() => expect(done).toHaveAttribute('aria-disabled', 'true'))
+	await userEvent.click(done)
+	expect(onCreated).toHaveBeenCalledTimes(1)
 })
 
 test('answers the same way whatever the address', async () => {
