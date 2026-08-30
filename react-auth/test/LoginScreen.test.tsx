@@ -109,3 +109,38 @@ test('shows a generic error when the backend fails', async () => {
 	)
 	expect(onLogin).not.toHaveBeenCalled()
 })
+
+test('hints browsers to offer the saved login', async () => {
+	renderLogin()
+
+	expect(await screen.findByLabelText('Email')).toHaveAttribute('autocomplete', 'username')
+	expect(screen.getByLabelText('Password')).toHaveAttribute(
+		'autocomplete',
+		'current-password',
+	)
+})
+
+test('offers the forgotten password way only when one is provided', async () => {
+	const client = new QueryClient({
+		defaultOptions: { mutations: { retry: false } },
+	})
+	const onForgotPassword = vi.fn()
+	render(
+		<QueryClientProvider client={client}>
+			<LoginScreen brand="Testbed" onLogin={vi.fn()} onForgotPassword={onForgotPassword} />
+		</QueryClientProvider>,
+	)
+
+	await userEvent.click(await screen.findByRole('button', { name: 'Forgot your password?' }))
+
+	await waitFor(() => expect(onForgotPassword).toHaveBeenCalled())
+})
+
+test('renders no forgotten password way when none is provided', async () => {
+	renderLogin()
+
+	expect(await screen.findByLabelText('Email')).toBeInTheDocument()
+	expect(
+		screen.queryByRole('button', { name: 'Forgot your password?' }),
+	).not.toBeInTheDocument()
+})
