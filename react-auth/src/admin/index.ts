@@ -35,7 +35,7 @@ export interface NewInvite {
 
 const invitationSchema = z.discriminatedUnion('delivered', [
 	z.object({ delivered: z.literal(true) }),
-	z.object({ delivered: z.literal(false), activation_link: z.string().min(1) }),
+	z.object({ delivered: z.literal(false), activation_link: z.string().trim().min(1) }),
 ])
 
 export type Invitation = z.infer<typeof invitationSchema>
