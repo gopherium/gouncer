@@ -16,6 +16,10 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
   admit, refusing at that cap inside the same account lock that guards
   every token operation. Requires authkit v0.15.0, whose invite flow
   passes 1.
+- `ResetByToken` also deletes every other reset token the account holds
+  inside its transaction, so spending any link of a stack kills its
+  siblings.
+
 ## [0.9.0] - 2026-08-29
 
 ### Added

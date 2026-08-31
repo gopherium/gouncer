@@ -91,7 +91,13 @@ func (s *UserStore) ResetByToken(
 			if err != nil || count == 0 {
 				return count, err
 			}
-			return count, queries.DeleteUserSessions(ctx, id)
+			if err := queries.DeleteUserSessions(ctx, id); err != nil {
+				return count, err
+			}
+			return count, queries.DeleteUserTokensForPurpose(ctx, db.DeleteUserTokensForPurposeParams{
+				UserID:  id,
+				Purpose: string(gouncer.PurposeReset),
+			})
 		})
 }
 

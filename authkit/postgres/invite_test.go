@@ -393,3 +393,32 @@ func TestCreateTokenStacksUpToTheCap(t *testing.T) {
 		t.Errorf("CreateToken() beyond the cap error = %v, want gouncer.ErrTokenExists", err)
 	}
 }
+
+func TestResetByTokenEndsEveryResetSibling(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := storedUser(t, store)
+	family := make([]gouncer.Token, 3)
+	for held := range family {
+		tok, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+		if err != nil {
+			t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+		}
+		if err := store.CreateToken(t.Context(), tok, 3); err != nil {
+			t.Fatalf("CreateToken() error = %v, want nil", err)
+		}
+		family[held] = tok
+	}
+
+	if _, err := store.ResetByToken(t.Context(), family[1].TokenHash, time.Now().UTC(), "fresh-hash"); err != nil {
+		t.Fatalf("ResetByToken(middle link) error = %v, want nil", err)
+	}
+
+	for _, sibling := range []gouncer.Token{family[0], family[2]} {
+		_, err := store.ResetByToken(t.Context(), sibling.TokenHash, time.Now().UTC(), "another-hash")
+		if !errors.Is(err, gouncer.ErrTokenNotFound) {
+			t.Errorf("ResetByToken(sibling) error = %v, want the family ended with the spent link", err)
+		}
+	}
+}
