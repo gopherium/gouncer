@@ -62,7 +62,7 @@ type InvitesConfig struct {
 	InviteTTL time.Duration
 	// ResetTTL is how long a reset token lives. Zero applies DefaultResetTTL.
 	ResetTTL time.Duration
-	// ResetTokensLive is how many reset tokens may stand at once. Zero applies 1.
+	// ResetTokensLive is how many reset tokens may stand at once. Anything below one applies 1.
 	ResetTokensLive int
 }
 
@@ -86,7 +86,7 @@ func NewInvites(cfg InvitesConfig) *Invites {
 		resetTTL = DefaultResetTTL
 	}
 	resetLive := cfg.ResetTokensLive
-	if resetLive == 0 {
+	if resetLive < 1 {
 		resetLive = 1
 	}
 	return &Invites{store: cfg.Store, inviteTTL: inviteTTL, resetTTL: resetTTL, resetLive: resetLive}

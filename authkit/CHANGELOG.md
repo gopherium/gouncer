@@ -12,7 +12,9 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 ### Added
 
 - `InvitesConfig.ResetTokensLive`, how many reset tokens may stand at
-  once. Zero applies 1, which keeps the single link behaviour, so a
+  once. Anything below one applies 1, so a nonsensical cap falls back to
+  the most restrictive one rather than refusing every reset. That keeps
+  the single link behaviour, so a
   consumer is unchanged until it opts in. With a higher cap a repeated
   `RequestReset` stacks an independent link instead of refusing, and
   refuses with `gouncer.ErrTokenExists` only at the cap. No request can

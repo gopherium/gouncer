@@ -894,3 +894,27 @@ func TestInvitesStaySingleWhileResetsStack(t *testing.T) {
 		t.Error("second Invite() error = nil, want the taken address refused")
 	}
 }
+
+func TestResetTokensLiveFallsBackToOne(t *testing.T) {
+	t.Parallel()
+
+	for testName, cap := range map[string]int{"unset": 0, "negative": -1} {
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			service, store, _ := invites(authkit.InvitesConfig{ResetTokensLive: cap})
+			store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+
+			tok, err := service.RequestReset(t.Context(), "ada@example.com")
+			if err != nil {
+				t.Fatalf("RequestReset() error = %v, want a nonsensical cap to fall back to one link", err)
+			}
+			if _, err := service.RequestReset(t.Context(), "ada@example.com"); !errors.Is(err, gouncer.ErrTokenExists) {
+				t.Errorf("second RequestReset() error = %v, want the single link cap", err)
+			}
+			if _, err := service.RedeemReset(t.Context(), tok.Token, "entirely new password"); err != nil {
+				t.Errorf("RedeemReset() error = %v, want the minted link usable", err)
+			}
+		})
+	}
+}
