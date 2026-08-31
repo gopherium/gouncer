@@ -8,6 +8,14 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** `CreateToken` takes the number of live tokens it may
+  admit, refusing at that cap inside the same account lock that guards
+  every token operation. Requires authkit v0.15.0, whose invite flow
+  passes 1.
 ## [0.9.0] - 2026-08-29
 
 ### Added

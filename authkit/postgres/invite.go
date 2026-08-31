@@ -15,15 +15,16 @@ import (
 	"github.com/gopherium/gouncer/authkit/postgres/internal/db"
 )
 
-// CreateToken stores t for an enabled account, or returns
-// [gouncer.ErrTokenExists] while a live token stands for the same user
-// and purpose and [gouncer.ErrUserNotFound] for a disabled one.
-func (s *UserStore) CreateToken(ctx context.Context, t gouncer.Token) error {
+// CreateToken stores t for an enabled account while fewer than live
+// unexpired tokens stand for the same user and purpose, or returns
+// [gouncer.ErrTokenExists] at the cap and [gouncer.ErrUserNotFound] for
+// a disabled one.
+func (s *UserStore) CreateToken(ctx context.Context, t gouncer.Token, live int) error {
 	return s.inTx(ctx, "create token", func(queries *db.Queries) error {
 		if err := holdEnabled(ctx, queries, t.UserID); err != nil {
 			return err
 		}
-		live, err := queries.LiveTokenExists(ctx, db.LiveTokenExistsParams{
+		standing, err := queries.CountLiveTokens(ctx, db.CountLiveTokensParams{
 			UserID:    t.UserID,
 			Purpose:   string(t.Purpose),
 			ExpiresAt: time.Now().UTC(),
@@ -31,7 +32,7 @@ func (s *UserStore) CreateToken(ctx context.Context, t gouncer.Token) error {
 		if err != nil {
 			return err
 		}
-		if live {
+		if standing >= int64(live) {
 			return gouncer.ErrTokenExists
 		}
 		return insertToken(ctx, queries, t)

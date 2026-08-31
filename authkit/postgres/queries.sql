@@ -72,12 +72,10 @@ FOR UPDATE;
 INSERT INTO auth.tokens (token_hash, user_id, purpose, created_at, expires_at)
 VALUES ($1, $2, $3, $4, $5);
 
--- name: LiveTokenExists :one
-SELECT EXISTS (
-    SELECT 1
-    FROM auth.tokens
-    WHERE user_id = $1 AND purpose = $2 AND expires_at > $3
-);
+-- name: CountLiveTokens :one
+SELECT count(*)
+FROM auth.tokens
+WHERE user_id = $1 AND purpose = $2 AND expires_at > $3;
 
 -- name: DeleteUserTokensForPurpose :exec
 DELETE FROM auth.tokens
