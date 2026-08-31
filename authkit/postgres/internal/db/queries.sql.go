@@ -31,6 +31,25 @@ func (q *Queries) ActivateUser(ctx context.Context, arg ActivateUserParams) (int
 	return result.RowsAffected(), nil
 }
 
+const countLiveTokens = `-- name: CountLiveTokens :one
+SELECT count(*)
+FROM auth.tokens
+WHERE user_id = $1 AND purpose = $2 AND expires_at > $3
+`
+
+type CountLiveTokensParams struct {
+	UserID    uuid.UUID
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CountLiveTokens(ctx context.Context, arg CountLiveTokensParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countLiveTokens, arg.UserID, arg.Purpose, arg.ExpiresAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO auth.sessions (token_hash, user_id, created_at, expires_at)
 VALUES ($1, $2, $3, $4)
@@ -393,27 +412,6 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const liveTokenExists = `-- name: LiveTokenExists :one
-SELECT EXISTS (
-    SELECT 1
-    FROM auth.tokens
-    WHERE user_id = $1 AND purpose = $2 AND expires_at > $3
-)
-`
-
-type LiveTokenExistsParams struct {
-	UserID    uuid.UUID
-	Purpose   string
-	ExpiresAt time.Time
-}
-
-func (q *Queries) LiveTokenExists(ctx context.Context, arg LiveTokenExistsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, liveTokenExists, arg.UserID, arg.Purpose, arg.ExpiresAt)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const lockEnabledUser = `-- name: LockEnabledUser :one

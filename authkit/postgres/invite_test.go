@@ -47,7 +47,7 @@ func issuedToken(t *testing.T, store *postgres.UserStore, id uuid.UUID, purpose 
 	if err != nil {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), tok); err != nil {
+	if err := store.CreateToken(t.Context(), tok, 1); err != nil {
 		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 	return tok
@@ -89,7 +89,7 @@ func TestCreateTokenHoldsWhileALiveTokenStands(t *testing.T) {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
 
-	if err := store.CreateToken(t.Context(), second); !errors.Is(err, gouncer.ErrTokenExists) {
+	if err := store.CreateToken(t.Context(), second, 1); !errors.Is(err, gouncer.ErrTokenExists) {
 		t.Errorf("CreateToken() error = %v, want gouncer.ErrTokenExists", err)
 	}
 }
@@ -107,7 +107,7 @@ func TestCreateTokenRefusesADisabledAccount(t *testing.T) {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
 
-	if err := store.CreateToken(t.Context(), tok); !errors.Is(err, gouncer.ErrUserNotFound) {
+	if err := store.CreateToken(t.Context(), tok, 1); !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("CreateToken() error = %v, want gouncer.ErrUserNotFound", err)
 	}
 }
@@ -341,7 +341,7 @@ func TestDeleteExpiredTokensTakesTheAccountsAnExpiredInviteStrands(t *testing.T)
 	if err != nil {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), expired); err != nil {
+	if err := store.CreateToken(t.Context(), expired, 1); err != nil {
 		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 	settled := storedUser(t, store)
@@ -349,7 +349,7 @@ func TestDeleteExpiredTokensTakesTheAccountsAnExpiredInviteStrands(t *testing.T)
 	if err != nil {
 		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), stale); err != nil {
+	if err := store.CreateToken(t.Context(), stale, 1); err != nil {
 		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 
@@ -366,5 +366,59 @@ func TestDeleteExpiredTokensTakesTheAccountsAnExpiredInviteStrands(t *testing.T)
 	}
 	if _, err := store.UserByID(t.Context(), settled.ID); err != nil {
 		t.Errorf("UserByID(settled) error = %v, want the activated account spared", err)
+	}
+}
+
+func TestCreateTokenStacksUpToTheCap(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := storedUser(t, store)
+
+	for standing := 1; standing <= 3; standing++ {
+		tok, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+		if err != nil {
+			t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+		}
+		if err := store.CreateToken(t.Context(), tok, 3); err != nil {
+			t.Fatalf("CreateToken() number %d error = %v, want the cap to admit it", standing, err)
+		}
+	}
+
+	over, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+	if err != nil {
+		t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+	}
+	if err := store.CreateToken(t.Context(), over, 3); !errors.Is(err, gouncer.ErrTokenExists) {
+		t.Errorf("CreateToken() beyond the cap error = %v, want gouncer.ErrTokenExists", err)
+	}
+}
+
+func TestResetByTokenEndsEveryResetSibling(t *testing.T) {
+	t.Parallel()
+
+	store := postgres.NewUserStore(newTestPool(t))
+	u := storedUser(t, store)
+	family := make([]gouncer.Token, 3)
+	for held := range family {
+		tok, err := gouncer.NewToken(u.ID, gouncer.PurposeReset, time.Hour)
+		if err != nil {
+			t.Fatalf("gouncer.NewToken() error = %v, want nil", err)
+		}
+		if err := store.CreateToken(t.Context(), tok, 3); err != nil {
+			t.Fatalf("CreateToken() error = %v, want nil", err)
+		}
+		family[held] = tok
+	}
+
+	if _, err := store.ResetByToken(t.Context(), family[1].TokenHash, time.Now().UTC(), "fresh-hash"); err != nil {
+		t.Fatalf("ResetByToken(middle link) error = %v, want nil", err)
+	}
+
+	for _, sibling := range []gouncer.Token{family[0], family[2]} {
+		_, err := store.ResetByToken(t.Context(), sibling.TokenHash, time.Now().UTC(), "another-hash")
+		if !errors.Is(err, gouncer.ErrTokenNotFound) {
+			t.Errorf("ResetByToken(sibling) error = %v, want the family ended with the spent link", err)
+		}
 	}
 }

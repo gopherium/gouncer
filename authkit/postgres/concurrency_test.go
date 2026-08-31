@@ -140,7 +140,7 @@ func TestIssuanceWaitsForTheAccountLock(t *testing.T) {
 	}
 
 	issued := make(chan error, 1)
-	go func() { issued <- store.CreateToken(t.Context(), tok) }()
+	go func() { issued <- store.CreateToken(t.Context(), tok, 1) }()
 
 	select {
 	case err := <-issued:
@@ -177,7 +177,7 @@ func TestIssuanceCannotStraddleADisable(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		issueErr = store.CreateToken(t.Context(), tok)
+		issueErr = store.CreateToken(t.Context(), tok, 1)
 	}()
 	go func() {
 		defer wg.Done()
