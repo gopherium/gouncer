@@ -394,7 +394,7 @@ func TestRedeemInviteRefusesAnActivatedAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewToken() error = %v, want nil", err)
 	}
-	if err := store.CreateToken(t.Context(), stale); err != nil {
+	if err := store.CreateToken(t.Context(), stale, 1); err != nil {
 		t.Fatalf("CreateToken() error = %v, want nil", err)
 	}
 
@@ -647,7 +647,7 @@ func TestIssuingATokenRefusesADisabledAccount(t *testing.T) {
 		t.Fatalf("NewToken() error = %v, want nil", err)
 	}
 
-	if err := store.CreateToken(t.Context(), tok); !errors.Is(err, gouncer.ErrUserNotFound) {
+	if err := store.CreateToken(t.Context(), tok, 1); !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("CreateToken() error = %v, want gouncer.ErrUserNotFound for a disabled account", err)
 	}
 	if err := store.ReplaceToken(t.Context(), tok); !errors.Is(err, gouncer.ErrUserNotFound) {
@@ -875,5 +875,69 @@ func TestResendResetAnswersUnknownAndUnconfirmedAlike(t *testing.T) {
 		if _, err := invites.ResendReset(t.Context(), address); !errors.Is(err, gouncer.ErrUserNotFound) {
 			t.Errorf("ResendReset(%s) error = %v, want ErrUserNotFound", address, err)
 		}
+	}
+}
+
+func TestRequestResetStacksTokensUpToTheCap(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{ResetTokensLive: 3})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+
+	secrets := make(map[string]bool)
+	for request := 1; request <= 3; request++ {
+		tok, err := service.RequestReset(t.Context(), "ada@example.com")
+		if err != nil {
+			t.Fatalf("RequestReset() number %d error = %v, want the stack to admit it", request, err)
+		}
+		secrets[tok.Token] = true
+	}
+	if len(secrets) != 3 {
+		t.Errorf("minted %d distinct secrets, want 3", len(secrets))
+	}
+
+	if _, err := service.RequestReset(t.Context(), "ada@example.com"); !errors.Is(err, gouncer.ErrTokenExists) {
+		t.Errorf("request beyond the cap error = %v, want ErrTokenExists", err)
+	}
+}
+
+func TestRedeemResetEndsTheWholeFamily(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{ResetTokensLive: 3})
+	store.AddUser(t, "ada@example.com", "Ada Lovelace", "correct horse battery")
+
+	links := make([]gouncer.Token, 3)
+	for held := range links {
+		tok, err := service.RequestReset(t.Context(), "ada@example.com")
+		if err != nil {
+			t.Fatalf("RequestReset() error = %v, want nil", err)
+		}
+		links[held] = tok
+	}
+
+	if _, err := service.RedeemReset(t.Context(), links[1].Token, "entirely new password"); err != nil {
+		t.Fatalf("RedeemReset(middle link) error = %v, want nil", err)
+	}
+
+	for _, sibling := range []gouncer.Token{links[0], links[2]} {
+		_, err := service.RedeemReset(t.Context(), sibling.Token, "another password entirely")
+		if !errors.Is(err, gouncer.ErrTokenNotFound) {
+			t.Errorf("RedeemReset(sibling) error = %v, want the family ended with the spent link", err)
+		}
+	}
+}
+
+func TestInvitesStaySingleWhileResetsStack(t *testing.T) {
+	t.Parallel()
+
+	service, store, _ := invites(authkit.InvitesConfig{ResetTokensLive: 3})
+	_ = store
+
+	if _, err := service.Invite(t.Context(), "grace@example.com", "Grace Hopper", "member"); err != nil {
+		t.Fatalf("Invite() error = %v, want nil", err)
+	}
+	if _, err := service.Invite(t.Context(), "grace@example.com", "Grace Hopper", "member"); err == nil {
+		t.Error("second Invite() error = nil, want the taken address refused")
 	}
 }

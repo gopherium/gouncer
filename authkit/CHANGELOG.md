@@ -7,6 +7,25 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `InvitesConfig.ResetTokensLive`, how many reset tokens may stand at
+  once. Zero applies 1, which keeps the single link behaviour, so a
+  consumer is unchanged until it opts in. With a higher cap a repeated
+  `RequestReset` stacks an independent link instead of refusing, and
+  refuses with `gouncer.ErrTokenExists` only at the cap. No request can
+  invalidate a link someone already holds.
+
+### Changed
+
+- **Breaking.** `InviteStore.CreateToken` takes the number of live
+  tokens it may admit, refusing at that cap. The invite flow passes 1.
+- `ResetByToken` also ends every other reset token the account holds in
+  the same change, so spending any link of a stack kills its siblings.
+- The testkit store matches both.
+
 ## [0.14.0] - 2026-08-31
 
 ### Added

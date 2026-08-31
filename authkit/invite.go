@@ -27,10 +27,11 @@ var ErrAlreadyActivated = errors.New("authkit: account already activated")
 type InviteStore interface {
 	gouncer.Store
 
-	// CreateToken stores t for an enabled account, or returns
-	// gouncer.ErrTokenExists while a live token stands for the same user
-	// and purpose and gouncer.ErrUserNotFound for a disabled one.
-	CreateToken(ctx context.Context, t gouncer.Token) error
+	// CreateToken stores t for an enabled account while fewer than live
+	// unexpired tokens stand for the same user and purpose, or returns
+	// gouncer.ErrTokenExists at the cap and gouncer.ErrUserNotFound for
+	// a disabled one.
+	CreateToken(ctx context.Context, t gouncer.Token, live int) error
 
 	// ReplaceToken stores t for an enabled account in place of every
 	// token it holds for the same purpose, as one change that either
@@ -46,8 +47,8 @@ type InviteStore interface {
 	ActivateByToken(ctx context.Context, tokenHash []byte, now time.Time, passwordHash string) (uuid.UUID, error)
 
 	// ResetByToken spends the reset token, storing the password hash and
-	// ending every session the account it names holds, as one change
-	// that either lands whole or not at all. It answers the account's
+	// ending every session and every other reset token the account it
+	// names holds, as one change that either lands whole or not at all. It answers the account's
 	// id, gouncer.ErrTokenNotFound for a spent or expired token, and
 	// gouncer.ErrUserNotFound for a disabled account.
 	ResetByToken(ctx context.Context, tokenHash []byte, now time.Time, passwordHash string) (uuid.UUID, error)
@@ -61,6 +62,8 @@ type InvitesConfig struct {
 	InviteTTL time.Duration
 	// ResetTTL is how long a reset token lives. Zero applies DefaultResetTTL.
 	ResetTTL time.Duration
+	// ResetTokensLive is how many reset tokens may stand at once. Zero applies 1.
+	ResetTokensLive int
 }
 
 // Invites offers the invite and reset flows over a store. The token
@@ -69,6 +72,7 @@ type Invites struct {
 	store     InviteStore
 	inviteTTL time.Duration
 	resetTTL  time.Duration
+	resetLive int
 }
 
 // NewInvites returns Invites over cfg's store with its lifetimes.
@@ -81,7 +85,11 @@ func NewInvites(cfg InvitesConfig) *Invites {
 	if resetTTL == 0 {
 		resetTTL = DefaultResetTTL
 	}
-	return &Invites{store: cfg.Store, inviteTTL: inviteTTL, resetTTL: resetTTL}
+	resetLive := cfg.ResetTokensLive
+	if resetLive == 0 {
+		resetLive = 1
+	}
+	return &Invites{store: cfg.Store, inviteTTL: inviteTTL, resetTTL: resetTTL, resetLive: resetLive}
 }
 
 // Invite creates an unconfirmed account under the role and answers the
@@ -95,7 +103,7 @@ func (i *Invites) Invite(ctx context.Context, email, name, role string) (gouncer
 	if err := i.store.CreateUser(ctx, u); err != nil {
 		return gouncer.Token{}, err
 	}
-	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.store.CreateToken)
+	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.createWithin(1))
 }
 
 // ResendInvite replaces the pending token of an unactivated enabled
@@ -136,7 +144,7 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	if u.Disabled || !u.Confirmed {
 		return gouncer.Token{}, gouncer.ErrUserNotFound
 	}
-	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL, i.store.CreateToken)
+	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL, i.createWithin(i.resetLive))
 }
 
 // ResendReset replaces the standing reset token of a confirmed enabled
@@ -162,6 +170,13 @@ func (i *Invites) RedeemReset(ctx context.Context, token, password string) (uuid
 		return uuid.Nil, err
 	}
 	return i.store.ResetByToken(ctx, gouncer.HashToken(token), time.Now().UTC(), hash)
+}
+
+// createWithin returns a token write admitting live standing tokens.
+func (i *Invites) createWithin(live int) func(context.Context, gouncer.Token) error {
+	return func(ctx context.Context, t gouncer.Token) error {
+		return i.store.CreateToken(ctx, t, live)
+	}
 }
 
 // issue mints a token for the user and stores it with write, answering
