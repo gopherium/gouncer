@@ -191,19 +191,23 @@ func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privil
 	return nil
 }
 
-// CreateToken stores t, or returns gouncer.ErrTokenExists while a live
-// token stands for the same user and purpose.
-func (s *Store) CreateToken(_ context.Context, t gouncer.Token) error {
+// CreateToken stores t while fewer than live unexpired tokens stand for
+// the same user and purpose, or returns gouncer.ErrTokenExists at the cap.
+func (s *Store) CreateToken(_ context.Context, t gouncer.Token, live int) error {
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
 	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
 		return gouncer.ErrUserNotFound
 	}
+	standing := 0
 	for _, existing := range s.Tokens {
 		if existing.UserID == t.UserID && existing.Purpose == t.Purpose && existing.ExpiresAt.After(time.Now().UTC()) {
-			return gouncer.ErrTokenExists
+			standing++
 		}
+	}
+	if standing >= live {
+		return gouncer.ErrTokenExists
 	}
 	s.Tokens[string(t.TokenHash)] = t
 	return nil
@@ -286,6 +290,9 @@ func (s *Store) ResetByToken(
 	s.Users[t.UserID] = u
 	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
 		return sess.UserID == t.UserID
+	})
+	maps.DeleteFunc(s.Tokens, func(_ string, held gouncer.Token) bool {
+		return held.UserID == t.UserID && held.Purpose == gouncer.PurposeReset
 	})
 	delete(s.Tokens, string(tokenHash))
 	return t.UserID, nil
