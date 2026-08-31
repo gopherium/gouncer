@@ -8,7 +8,7 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
-## [Unreleased]
+## [0.10.0] - 2026-08-31
 
 ### Changed
 
