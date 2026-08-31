@@ -147,20 +147,6 @@ func (i *Invites) RequestReset(ctx context.Context, email string) (gouncer.Token
 	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL, i.createWithin(i.resetLive))
 }
 
-// ResendReset replaces the standing reset token of a confirmed enabled
-// account, answering the fresh one and gouncer.ErrUserNotFound for every
-// other address.
-func (i *Invites) ResendReset(ctx context.Context, email string) (gouncer.Token, error) {
-	u, err := i.store.UserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
-	if err != nil {
-		return gouncer.Token{}, err
-	}
-	if u.Disabled || !u.Confirmed {
-		return gouncer.Token{}, gouncer.ErrUserNotFound
-	}
-	return i.issue(ctx, u.ID, gouncer.PurposeReset, i.resetTTL, i.store.ReplaceToken)
-}
-
 // RedeemReset spends a reset token, replacing the password and ending
 // every session the account holds as one store change, answering the
 // account's id.

@@ -831,53 +831,6 @@ func TestTheSweepSparesActivatedAccountsAndLiveInvites(t *testing.T) {
 	}
 }
 
-func TestResendResetReplacesAStandingToken(t *testing.T) {
-	t.Parallel()
-
-	store := testkit.NewStore()
-	store.AddUser(t, "maria@example.com", "Maria Perez", servicePassword)
-	invites := authkit.NewInvites(authkit.InvitesConfig{Store: store})
-
-	first, err := invites.RequestReset(t.Context(), "maria@example.com")
-	if err != nil {
-		t.Fatalf("RequestReset() error = %v, want nil", err)
-	}
-	if _, err := invites.RequestReset(t.Context(), "maria@example.com"); !errors.Is(err, gouncer.ErrTokenExists) {
-		t.Fatalf("a second request error = %v, want ErrTokenExists", err)
-	}
-
-	second, err := invites.ResendReset(t.Context(), "maria@example.com")
-
-	if err != nil {
-		t.Fatalf("ResendReset() error = %v, want nil", err)
-	}
-	if second.Token == "" || second.Token == first.Token {
-		t.Errorf("ResendReset() answered %q, want a fresh secret replacing %q", second.Token, first.Token)
-	}
-	if _, err := invites.RedeemReset(t.Context(), first.Token, "brand new password"); err == nil {
-		t.Error("the replaced token still redeems, want it spent")
-	}
-	if _, err := invites.RedeemReset(t.Context(), second.Token, "brand new password"); err != nil {
-		t.Errorf("RedeemReset(fresh) error = %v, want the replacement usable", err)
-	}
-}
-
-func TestResendResetAnswersUnknownAndUnconfirmedAlike(t *testing.T) {
-	t.Parallel()
-
-	store := testkit.NewStore()
-	invites := authkit.NewInvites(authkit.InvitesConfig{Store: store})
-	if _, err := invites.Invite(t.Context(), "grace@example.com", "Grace Hopper", ""); err != nil {
-		t.Fatalf("Invite() error = %v, want nil", err)
-	}
-
-	for _, address := range []string{"nobody@example.com", "grace@example.com"} {
-		if _, err := invites.ResendReset(t.Context(), address); !errors.Is(err, gouncer.ErrUserNotFound) {
-			t.Errorf("ResendReset(%s) error = %v, want ErrUserNotFound", address, err)
-		}
-	}
-}
-
 func TestRequestResetStacksTokensUpToTheCap(t *testing.T) {
 	t.Parallel()
 

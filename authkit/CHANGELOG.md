@@ -26,6 +26,13 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   the same change, so spending any link of a stack kills its siblings.
 - The testkit store matches both.
 
+### Removed
+
+- **Breaking.** `Invites.ResendReset`, one release after it shipped.
+  Nothing consumed it, stacking covers the delivery retry it existed
+  for, and replacing a standing reset token is exactly the operation a
+  public endpoint must never reach. No alias keeps the name.
+
 ## [0.14.0] - 2026-08-31
 
 ### Added
