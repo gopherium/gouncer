@@ -24,8 +24,14 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 
 - **Breaking.** `InviteStore.CreateToken` takes the number of live
   tokens it may admit, refusing at that cap. The invite flow passes 1.
-- `ResetByToken` also ends every other reset token the account holds in
-  the same change, so spending any link of a stack kills its siblings.
+- **Breaking behaviour, unchanged signature.** `ResetByToken` must also
+  end every other reset token the account holds, in the same change, so
+  spending any link of a stack kills its siblings. A store adopting this
+  release has to write both. Adopting only the signature leaves siblings
+  redeemable after a completed reset, which the compiler cannot catch.
+  A store that writes neither still behaves correctly while
+  `ResetTokensLive` is left at 1, since a single standing link is its
+  own family.
 - The testkit store matches both.
 
 ### Removed
