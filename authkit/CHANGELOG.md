@@ -7,6 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Invites.ResendReset`, replacing the standing reset token of a
+  confirmed account so a failed delivery can be retried.
+
 ## [0.13.0] - 2026-08-30
 
 ### Added
