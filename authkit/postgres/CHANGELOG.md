@@ -8,7 +8,7 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
-## [Unreleased]
+## [0.11.0] - 2026-09-02
 
 ### Added
 
@@ -165,6 +165,8 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 - `testdb` package with pgtestdb wiring that migrates test databases
   through `Migrate` itself.
 
+[0.11.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.11.0
+[0.10.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.10.0
 [0.9.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.9.0
 [0.8.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.8.0
 [0.7.0]: https://github.com/gopherium/gouncer/releases/tag/authkit%2Fpostgres%2Fv0.7.0
