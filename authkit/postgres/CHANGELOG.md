@@ -8,6 +8,15 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `UserStore.Within` answers a store running every call inside a
+  caller's `pgx.Tx`, so account and token creation can join a larger
+  atomic write. The store's own transactions become savepoints there,
+  and a refused savepoint leaves the caller's transaction usable.
+
 ## [0.10.0] - 2026-08-31
 
 ### Changed

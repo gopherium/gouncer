@@ -19,6 +19,8 @@ import (
 
 var _ gouncer.Store = (*UserStore)(nil)
 
+var _ pgxPool = pgx.Tx(nil)
+
 const uniqueViolationCode = "23505"
 
 // pgxPool is the subset of [*pgxpool.Pool] the store depends on: the query
@@ -42,6 +44,11 @@ func NewUserStore(pool *pgxpool.Pool) *UserStore {
 // newUserStore builds a [UserStore] over any [pgxPool].
 func newUserStore(pool pgxPool) *UserStore {
 	return &UserStore{pool: pool, queries: db.New(pool)}
+}
+
+// Within returns a [UserStore] running every call inside tx.
+func (s *UserStore) Within(tx pgx.Tx) *UserStore {
+	return newUserStore(tx)
 }
 
 // CreateUser stores a new user, or [gouncer.ErrEmailTaken] when the email is
