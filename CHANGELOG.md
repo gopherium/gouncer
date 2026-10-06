@@ -11,6 +11,10 @@ at v0.x, minor releases may contain breaking changes.
 
 - `ErrNilUserID`, returned by `NewToken` and `NewSession` for the nil UUID.
 
+### Changed
+
+- The module needs Go 1.27.1.
+
 ## [0.4.0] - 2026-08-29
 
 ### Added
