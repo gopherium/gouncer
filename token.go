@@ -11,6 +11,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// ErrNilUserID reports a token or session requested for the nil UUID.
+var ErrNilUserID = errors.New("gouncer: nil user id")
+
 // ErrEmptyPurpose reports a token requested without a purpose.
 var ErrEmptyPurpose = errors.New("gouncer: empty token purpose")
 
@@ -49,6 +52,9 @@ type Token struct {
 
 // NewToken issues a token for the user with a fresh random secret living for ttl.
 func NewToken(userID uuid.UUID, purpose TokenPurpose, ttl time.Duration) (Token, error) {
+	if userID == uuid.Nil {
+		return Token{}, ErrNilUserID
+	}
 	if purpose == "" {
 		return Token{}, ErrEmptyPurpose
 	}

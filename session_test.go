@@ -4,6 +4,7 @@ package gouncer_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -36,6 +37,16 @@ func TestNewSessionIssuesAHashedRandomToken(t *testing.T) {
 	}
 	if s.CreatedAt.Location() != time.UTC {
 		t.Errorf("created_at location = %v, want UTC", s.CreatedAt.Location())
+	}
+}
+
+func TestNewSessionRejectsANilUserID(t *testing.T) {
+	t.Parallel()
+
+	_, err := gouncer.NewSession(uuid.Nil)
+
+	if !errors.Is(err, gouncer.ErrNilUserID) {
+		t.Errorf("NewSession() error = %v, want ErrNilUserID", err)
 	}
 }
 

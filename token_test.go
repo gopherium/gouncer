@@ -70,6 +70,16 @@ func TestNewTokenRejectsAnEmptyPurpose(t *testing.T) {
 	}
 }
 
+func TestNewTokenRejectsANilUserID(t *testing.T) {
+	t.Parallel()
+
+	_, err := gouncer.NewToken(uuid.Nil, gouncer.PurposeInvite, time.Hour)
+
+	if !errors.Is(err, gouncer.ErrNilUserID) {
+		t.Errorf("NewToken() error = %v, want ErrNilUserID", err)
+	}
+}
+
 func TestNewTokenRejectsANonPositiveLifetime(t *testing.T) {
 	t.Parallel()
 

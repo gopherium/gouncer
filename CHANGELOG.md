@@ -5,6 +5,12 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/). While
 at v0.x, minor releases may contain breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- `ErrNilUserID`, returned by `NewToken` and `NewSession` for the nil UUID.
+
 ## [0.4.0] - 2026-08-29
 
 ### Added

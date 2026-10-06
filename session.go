@@ -28,6 +28,9 @@ type Session struct {
 
 // NewSession issues a session for the user with a fresh random token.
 func NewSession(userID uuid.UUID) (Session, error) {
+	if userID == uuid.Nil {
+		return Session{}, ErrNilUserID
+	}
 	raw := make([]byte, sessionTokenBytes)
 	if _, err := randRead(raw); err != nil {
 		return Session{}, fmt.Errorf("gouncer: generate session token: %w", err)
