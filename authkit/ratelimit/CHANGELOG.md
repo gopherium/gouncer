@@ -15,6 +15,7 @@ Releases of this module are tagged `authkit/ratelimit/vX.Y.Z`.
 - `X-Forwarded-For` names the client only when the connecting peer sits inside `TrustedProxies`, any other peer is keyed by its own address.
 - A v4-mapped trusted peer that forwards no client is keyed by its own address instead of `::`.
 - A trusted range written in IPv4-mapped form, such as `::ffff:10.42.0.0/112`, is read as the IPv4 range it covers.
+- `ParseTrustedProxies` refuses an IPv4-mapped range shorter than `/96`, such as `::ffff:0:0/0`, which trusted every IPv6 peer.
 
 ### Changed
 
