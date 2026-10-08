@@ -8,6 +8,17 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/ratelimit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+
+- `X-Forwarded-For` names the client only when the connecting peer sits inside `TrustedProxies`, any other peer is keyed by its own address.
+- A v4-mapped trusted peer that forwards no client is keyed by its own address instead of `::`.
+
+### Changed
+
+- The module needs Go 1.27.1.
+
 ## [0.3.0] - 2026-08-16
 
 ### Added
