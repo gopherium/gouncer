@@ -139,7 +139,53 @@ func clientIPResolver(trustedProxies []string) func(http.Handler) http.Handler {
 	if len(trustedProxies) == 0 {
 		return middleware.ClientIPFromRemoteAddr
 	}
-	return middleware.ClientIPFromXFF(trustedProxies...)
+	prefixes := make([]netip.Prefix, len(trustedProxies))
+	for i, trusted := range trustedProxies {
+		prefixes[i] = netip.MustParsePrefix(trusted)
+	}
+	fromForwardedFor := middleware.ClientIPFromXFF(trustedProxies...)
+	return func(next http.Handler) http.Handler {
+		fromPeer := middleware.ClientIPFromRemoteAddr(next)
+		behindProxy := fromForwardedFor(peerWhenUnset(next))
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if peerTrusted(r.RemoteAddr, prefixes) {
+				behindProxy.ServeHTTP(w, r)
+				return
+			}
+			fromPeer.ServeHTTP(w, r)
+		})
+	}
+}
+
+// peerWhenUnset returns middleware recording the connecting peer as the client IP when none is recorded yet.
+func peerWhenUnset(next http.Handler) http.Handler {
+	fromPeer := middleware.ClientIPFromRemoteAddr(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if middleware.GetClientIPAddr(r.Context()).IsValid() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		fromPeer.ServeHTTP(w, r)
+	})
+}
+
+// peerTrusted reports whether the connecting address falls inside one of the trusted prefixes.
+func peerTrusted(remoteAddr string, prefixes []netip.Prefix) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	peer, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	peer = peer.Unmap().WithZone("")
+	for _, prefix := range prefixes {
+		if prefix.Contains(peer) {
+			return true
+		}
+	}
+	return false
 }
 
 // keyByRemoteIP returns a request's canonical client IP for rate limiting.
