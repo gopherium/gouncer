@@ -330,6 +330,40 @@ func TestClientIPResolutionTable(t *testing.T) {
 	}
 }
 
+func TestClientIPReadsATrustedRangeWrittenInMappedForm(t *testing.T) {
+	t.Parallel()
+
+	mapped := []string{"::ffff:10.42.0.0/112"}
+	tests := map[string]struct {
+		remoteAddr   string
+		forwardedFor string
+		want         string
+	}{
+		"a plain proxy appending the client":    {"10.42.0.7:40000", "198.51.100.20", "198.51.100.20"},
+		"a mapped proxy appending the client":   {"[::ffff:10.42.0.7]:40000", "198.51.100.21", "198.51.100.21"},
+		"a proxy behind a second trusted hop":   {"10.42.0.7:40000", "198.51.100.22, 10.42.0.8", "198.51.100.22"},
+		"an untrusted peer forging an entry":    {"203.0.113.9:40000", "198.51.100.23", "203.0.113.9"},
+		"a plain proxy that forwards no client": {"10.42.0.7:40000", "", "10.42.0.7"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var forwarded []string
+			if tc.forwardedFor != "" {
+				forwarded = []string{tc.forwardedFor}
+			}
+
+			key := clientIPOf(t, mapped, tc.remoteAddr, forwarded...)
+
+			if key != tc.want {
+				t.Errorf("ClientIP() = %q, want %q", key, tc.want)
+			}
+		})
+	}
+}
+
 func TestMiddlewareHandlesAddressWithoutPort(t *testing.T) {
 	t.Parallel()
 

@@ -140,10 +140,12 @@ func clientIPResolver(trustedProxies []string) func(http.Handler) http.Handler {
 		return middleware.ClientIPFromRemoteAddr
 	}
 	prefixes := make([]netip.Prefix, len(trustedProxies))
+	written := make([]string, len(trustedProxies))
 	for i, trusted := range trustedProxies {
-		prefixes[i] = netip.MustParsePrefix(trusted)
+		prefixes[i] = unmappedPrefix(netip.MustParsePrefix(trusted))
+		written[i] = prefixes[i].String()
 	}
-	fromForwardedFor := middleware.ClientIPFromXFF(trustedProxies...)
+	fromForwardedFor := middleware.ClientIPFromXFF(written...)
 	return func(next http.Handler) http.Handler {
 		fromPeer := middleware.ClientIPFromRemoteAddr(next)
 		behindProxy := fromForwardedFor(peerWhenUnset(next))
@@ -155,6 +157,14 @@ func clientIPResolver(trustedProxies []string) func(http.Handler) http.Handler {
 			fromPeer.ServeHTTP(w, r)
 		})
 	}
+}
+
+// unmappedPrefix returns an IPv4-mapped prefix as the IPv4 prefix it covers, and any other prefix unchanged.
+func unmappedPrefix(prefix netip.Prefix) netip.Prefix {
+	if !prefix.Addr().Is4In6() || prefix.Bits() < 96 {
+		return prefix
+	}
+	return netip.PrefixFrom(prefix.Addr().Unmap(), prefix.Bits()-96).Masked()
 }
 
 // peerWhenUnset returns middleware recording the connecting peer as the client IP when none is recorded yet.
