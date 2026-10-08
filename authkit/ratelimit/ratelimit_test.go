@@ -384,13 +384,16 @@ func TestParseTrustedProxies(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		"empty":            {raw: "", want: nil},
-		"whitespace only":  {raw: "  ,  ", want: nil},
-		"single cidr":      {raw: "10.0.0.0/8", want: []string{"10.0.0.0/8"}},
-		"trims and splits": {raw: " 10.0.0.0/8 , 192.168.0.0/16 ", want: []string{"10.0.0.0/8", "192.168.0.0/16"}},
-		"ipv6 cidr":        {raw: "::1/128", want: []string{"::1/128"}},
-		"invalid cidr":     {raw: "10.0.0.0/8,nonsense", wantErr: true},
-		"bare ip rejected": {raw: "10.0.0.1", wantErr: true},
+		"empty":                      {raw: "", want: nil},
+		"whitespace only":            {raw: "  ,  ", want: nil},
+		"single cidr":                {raw: "10.0.0.0/8", want: []string{"10.0.0.0/8"}},
+		"trims and splits":           {raw: " 10.0.0.0/8 , 192.168.0.0/16 ", want: []string{"10.0.0.0/8", "192.168.0.0/16"}},
+		"ipv6 cidr":                  {raw: "::1/128", want: []string{"::1/128"}},
+		"invalid cidr":               {raw: "10.0.0.0/8,nonsense", wantErr: true},
+		"bare ip rejected":           {raw: "10.0.0.1", wantErr: true},
+		"mapped range at /96":        {raw: "::ffff:0:0/96", want: []string{"::ffff:0:0/96"}},
+		"mapped range of every ip":   {raw: "::ffff:0:0/0", wantErr: true},
+		"mapped range one bit short": {raw: "::ffff:10.0.0.0/95", wantErr: true},
 	}
 
 	for name, tc := range tests {

@@ -219,8 +219,12 @@ func ParseTrustedProxies(raw string) ([]string, error) {
 		if part == "" {
 			continue
 		}
-		if _, err := netip.ParsePrefix(part); err != nil {
+		prefix, err := netip.ParsePrefix(part)
+		if err != nil {
 			return nil, fmt.Errorf("ratelimit: invalid CIDR %q: %w", part, err)
+		}
+		if prefix.Addr().Is4In6() && prefix.Bits() < 96 {
+			return nil, fmt.Errorf("ratelimit: invalid CIDR %q: an IPv4-mapped range needs at least 96 bits", part)
 		}
 		prefixes = append(prefixes, part)
 	}
