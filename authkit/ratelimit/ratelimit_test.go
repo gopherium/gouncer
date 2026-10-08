@@ -241,6 +241,129 @@ func TestMiddlewareIgnoresForwardedForWithoutTrustedProxy(t *testing.T) {
 	}
 }
 
+// clientIPOf resolves one request through ResolveClientIP and answers the key ClientIP reads back.
+func clientIPOf(t *testing.T, trustedProxies []string, remoteAddr string, forwardedFor ...string) string {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodPost, "/login", nil)
+	request.RemoteAddr = remoteAddr
+	for _, value := range forwardedFor {
+		request.Header.Add("X-Forwarded-For", value)
+	}
+	var key string
+	ratelimit.ResolveClientIP(trustedProxies)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		key = ratelimit.ClientIP(r)
+	})).ServeHTTP(httptest.NewRecorder(), request)
+	return key
+}
+
+func TestClientIPIgnoresForwardedHeaderFromUntrustedPeer(t *testing.T) {
+	t.Parallel()
+
+	key := clientIPOf(t, []string{"10.42.0.0/16"}, "203.0.113.9:40000", "198.51.100.1")
+
+	if key != "203.0.113.9" {
+		t.Errorf("ClientIP() = %q, want the untrusted peer %q, never its forged header", key, "203.0.113.9")
+	}
+}
+
+func TestMiddlewareLimitsUntrustedPeerRotatingForwardedHeader(t *testing.T) {
+	t.Parallel()
+
+	handler := newLimitedServer(ratelimit.Config{TrustedProxies: []string{"10.42.0.0/16"}})
+	const untrustedPeer = "203.0.113.9:40000"
+
+	var blocked bool
+	for i := range 50 {
+		forged := fmt.Sprintf("198.51.100.%d", i+1)
+		if loginVia(t, handler, untrustedPeer, forged, wrongBody).Code == http.StatusTooManyRequests {
+			blocked = true
+			break
+		}
+	}
+	if !blocked {
+		t.Fatal("an untrusted peer rotating X-Forwarded-For was never rate limited")
+	}
+}
+
+func TestClientIPResolutionTable(t *testing.T) {
+	t.Parallel()
+
+	trusted := []string{"10.42.0.0/16"}
+	const (
+		untrustedPeer     = "203.0.113.9:40000"
+		trustedPeer       = "10.42.0.7:40000"
+		mappedTrustedPeer = "[::ffff:10.42.0.7]:40000"
+	)
+	tests := map[string]struct {
+		remoteAddr   string
+		forwardedFor []string
+		want         string
+	}{
+		"an untrusted peer forging one entry":    {untrustedPeer, []string{"198.51.100.1"}, "203.0.113.9"},
+		"an untrusted peer forging past garbage": {untrustedPeer, []string{"garbage, 198.51.100.2"}, "203.0.113.9"},
+		"an untrusted peer sending two headers":  {untrustedPeer, []string{"198.51.100.3", "198.51.100.4"}, "203.0.113.9"},
+		"an untrusted peer forging a mapped IP":  {untrustedPeer, []string{"::ffff:198.51.100.5"}, "203.0.113.9"},
+		"an untrusted bare peer forging":         {"203.0.113.9", []string{"198.51.100.6"}, "203.0.113.9"},
+		"an untrusted IPv6 peer forging":         {"[2001:db8:1:2::9]:40000", []string{"198.51.100.7"}, "2001:db8:1:2::"},
+		"an untrusted zoned peer forging":        {"[fe80::1%eth0]:40000", []string{"198.51.100.8"}, "fe80::1%eth0"},
+		"an unparseable peer forging":            {"@", []string{"198.51.100.14"}, "@"},
+		"an untrusted peer with no header":       {untrustedPeer, nil, "203.0.113.9"},
+		"a trusted peer appending the client":    {trustedPeer, []string{"198.51.100.9"}, "198.51.100.9"},
+		"a trusted peer behind a forged head":    {trustedPeer, []string{"198.51.100.10, 198.51.100.11"}, "198.51.100.11"},
+		"a mapped trusted peer with a client":    {mappedTrustedPeer, []string{"198.51.100.12"}, "198.51.100.12"},
+		"a trusted peer with no header":          {trustedPeer, nil, "10.42.0.7"},
+		"a trusted peer forwarding only proxies": {trustedPeer, []string{"10.42.0.8"}, "10.42.0.7"},
+		"a trusted peer with garbage rightmost":  {trustedPeer, []string{"198.51.100.13, garbage"}, "10.42.0.7"},
+		"a mapped trusted peer with no header":   {mappedTrustedPeer, nil, "10.42.0.7"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			key := clientIPOf(t, trusted, tc.remoteAddr, tc.forwardedFor...)
+
+			if key != tc.want {
+				t.Errorf("ClientIP() = %q, want %q", key, tc.want)
+			}
+		})
+	}
+}
+
+func TestClientIPReadsATrustedRangeWrittenInMappedForm(t *testing.T) {
+	t.Parallel()
+
+	mapped := []string{"::ffff:10.42.0.0/112"}
+	tests := map[string]struct {
+		remoteAddr   string
+		forwardedFor string
+		want         string
+	}{
+		"a plain proxy appending the client":    {"10.42.0.7:40000", "198.51.100.20", "198.51.100.20"},
+		"a mapped proxy appending the client":   {"[::ffff:10.42.0.7]:40000", "198.51.100.21", "198.51.100.21"},
+		"a proxy behind a second trusted hop":   {"10.42.0.7:40000", "198.51.100.22, 10.42.0.8", "198.51.100.22"},
+		"an untrusted peer forging an entry":    {"203.0.113.9:40000", "198.51.100.23", "203.0.113.9"},
+		"a plain proxy that forwards no client": {"10.42.0.7:40000", "", "10.42.0.7"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var forwarded []string
+			if tc.forwardedFor != "" {
+				forwarded = []string{tc.forwardedFor}
+			}
+
+			key := clientIPOf(t, mapped, tc.remoteAddr, forwarded...)
+
+			if key != tc.want {
+				t.Errorf("ClientIP() = %q, want %q", key, tc.want)
+			}
+		})
+	}
+}
+
 func TestMiddlewareHandlesAddressWithoutPort(t *testing.T) {
 	t.Parallel()
 
@@ -253,6 +376,30 @@ func TestMiddlewareHandlesAddressWithoutPort(t *testing.T) {
 	}
 }
 
+func TestEveryResolverRefusesAShortMappedRange(t *testing.T) {
+	t.Parallel()
+
+	short := []string{"::ffff:0:0/0"}
+	constructors := map[string]func(){
+		"ResolveClientIP": func() { ratelimit.ResolveClientIP(short) },
+		"Middleware":      func() { ratelimit.Middleware(ratelimit.Config{TrustedProxies: short}) },
+	}
+
+	for name, construct := range constructors {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s accepted %q, want it refused as ParseTrustedProxies refuses it", name, short[0])
+				}
+			}()
+
+			construct()
+		})
+	}
+}
+
 func TestParseTrustedProxies(t *testing.T) {
 	t.Parallel()
 
@@ -261,13 +408,16 @@ func TestParseTrustedProxies(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		"empty":            {raw: "", want: nil},
-		"whitespace only":  {raw: "  ,  ", want: nil},
-		"single cidr":      {raw: "10.0.0.0/8", want: []string{"10.0.0.0/8"}},
-		"trims and splits": {raw: " 10.0.0.0/8 , 192.168.0.0/16 ", want: []string{"10.0.0.0/8", "192.168.0.0/16"}},
-		"ipv6 cidr":        {raw: "::1/128", want: []string{"::1/128"}},
-		"invalid cidr":     {raw: "10.0.0.0/8,nonsense", wantErr: true},
-		"bare ip rejected": {raw: "10.0.0.1", wantErr: true},
+		"empty":                      {raw: "", want: nil},
+		"whitespace only":            {raw: "  ,  ", want: nil},
+		"single cidr":                {raw: "10.0.0.0/8", want: []string{"10.0.0.0/8"}},
+		"trims and splits":           {raw: " 10.0.0.0/8 , 192.168.0.0/16 ", want: []string{"10.0.0.0/8", "192.168.0.0/16"}},
+		"ipv6 cidr":                  {raw: "::1/128", want: []string{"::1/128"}},
+		"invalid cidr":               {raw: "10.0.0.0/8,nonsense", wantErr: true},
+		"bare ip rejected":           {raw: "10.0.0.1", wantErr: true},
+		"mapped range at /96":        {raw: "::ffff:0:0/96", want: []string{"::ffff:0:0/96"}},
+		"mapped range of every ip":   {raw: "::ffff:0:0/0", wantErr: true},
+		"mapped range one bit short": {raw: "::ffff:10.0.0.0/95", wantErr: true},
 	}
 
 	for name, tc := range tests {
