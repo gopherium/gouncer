@@ -376,6 +376,30 @@ func TestMiddlewareHandlesAddressWithoutPort(t *testing.T) {
 	}
 }
 
+func TestEveryResolverRefusesAShortMappedRange(t *testing.T) {
+	t.Parallel()
+
+	short := []string{"::ffff:0:0/0"}
+	constructors := map[string]func(){
+		"ResolveClientIP": func() { ratelimit.ResolveClientIP(short) },
+		"Middleware":      func() { ratelimit.Middleware(ratelimit.Config{TrustedProxies: short}) },
+	}
+
+	for name, construct := range constructors {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s accepted %q, want it refused as ParseTrustedProxies refuses it", name, short[0])
+				}
+			}()
+
+			construct()
+		})
+	}
+}
+
 func TestParseTrustedProxies(t *testing.T) {
 	t.Parallel()
 

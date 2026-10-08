@@ -30,7 +30,7 @@ type Config struct {
 	// Window is the counting window. Zero applies DefaultWindow.
 	Window time.Duration
 	// TrustedProxies lists the CIDR ranges of reverse proxies permitted to
-	// set X-Forwarded-For.
+	// set X-Forwarded-For, each one ParseTrustedProxies accepts.
 	TrustedProxies []string
 }
 
@@ -124,7 +124,8 @@ func middlewareUsing(cfg Config, counter httprate.LimitCounter) func(http.Handle
 	}
 }
 
-// ResolveClientIP returns middleware recording the request's client IP under the trusted proxy rules.
+// ResolveClientIP returns middleware recording the request's client IP under the trusted proxy rules,
+// panicking on a range ParseTrustedProxies refuses.
 func ResolveClientIP(trustedProxies []string) func(http.Handler) http.Handler {
 	return clientIPResolver(trustedProxies)
 }
@@ -142,7 +143,11 @@ func clientIPResolver(trustedProxies []string) func(http.Handler) http.Handler {
 	prefixes := make([]netip.Prefix, len(trustedProxies))
 	written := make([]string, len(trustedProxies))
 	for i, trusted := range trustedProxies {
-		prefixes[i] = unmappedPrefix(netip.MustParsePrefix(trusted))
+		prefix, err := trustedPrefix(trusted)
+		if err != nil {
+			panic(err)
+		}
+		prefixes[i] = unmappedPrefix(prefix)
 		written[i] = prefixes[i].String()
 	}
 	fromForwardedFor := middleware.ClientIPFromXFF(written...)
@@ -161,7 +166,7 @@ func clientIPResolver(trustedProxies []string) func(http.Handler) http.Handler {
 
 // unmappedPrefix returns an IPv4-mapped prefix as the IPv4 prefix it covers, and any other prefix unchanged.
 func unmappedPrefix(prefix netip.Prefix) netip.Prefix {
-	if !prefix.Addr().Is4In6() || prefix.Bits() < 96 {
+	if !prefix.Addr().Is4In6() {
 		return prefix
 	}
 	return netip.PrefixFrom(prefix.Addr().Unmap(), prefix.Bits()-96).Masked()
@@ -219,16 +224,24 @@ func ParseTrustedProxies(raw string) ([]string, error) {
 		if part == "" {
 			continue
 		}
-		prefix, err := netip.ParsePrefix(part)
-		if err != nil {
-			return nil, fmt.Errorf("ratelimit: invalid CIDR %q: %w", part, err)
-		}
-		if prefix.Addr().Is4In6() && prefix.Bits() < 96 {
-			return nil, fmt.Errorf("ratelimit: invalid CIDR %q: an IPv4-mapped range needs at least 96 bits", part)
+		if _, err := trustedPrefix(part); err != nil {
+			return nil, err
 		}
 		prefixes = append(prefixes, part)
 	}
 	return prefixes, nil
+}
+
+// trustedPrefix parses one trusted proxy range, refusing an IPv4-mapped range shorter than /96.
+func trustedPrefix(raw string) (netip.Prefix, error) {
+	prefix, err := netip.ParsePrefix(raw)
+	if err != nil {
+		return netip.Prefix{}, fmt.Errorf("ratelimit: invalid CIDR %q: %w", raw, err)
+	}
+	if prefix.Addr().Is4In6() && prefix.Bits() < 96 {
+		return netip.Prefix{}, fmt.Errorf("ratelimit: invalid CIDR %q: an IPv4-mapped range needs at least 96 bits", raw)
+	}
+	return prefix, nil
 }
 
 // writeError writes a JSON error response naming the reason as a code beside its message.
