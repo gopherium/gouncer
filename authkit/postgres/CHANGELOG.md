@@ -8,6 +8,13 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- Requires `golang.org/x/text` v0.41.0, which carries the fix for
+  GO-2026-6629.
+
 ## [0.11.2] - 2026-10-01
 
 ### Fixed
