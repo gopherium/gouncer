@@ -13,7 +13,7 @@ at v0.x, minor releases may contain breaking changes.
 
 ### Changed
 
-- The module needs Go 1.27.1.
+- The module needs Go 1.27.2.
 
 ## [0.4.0] - 2026-08-29
 
