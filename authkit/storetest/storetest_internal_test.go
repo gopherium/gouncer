@@ -118,6 +118,22 @@ func TestGatheredKeepsAnEarlyAnswerAndWaitsForTheRest(t *testing.T) {
 	}
 }
 
+func TestGatheredGivesAllTheAnswersOneDeadline(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan error, 3)
+	go func() {
+		for range 3 {
+			time.Sleep(100 * time.Millisecond)
+			ch <- nil
+		}
+	}()
+
+	if got := gathered(ch, 3, nil, false, 150*time.Millisecond); len(got) != 1 {
+		t.Errorf("gathered() = %v, want only the answer that came before the one deadline", got)
+	}
+}
+
 func TestGatheredStopsAtASilentChannel(t *testing.T) {
 	t.Parallel()
 

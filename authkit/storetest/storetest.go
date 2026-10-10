@@ -898,18 +898,20 @@ func later[T any](ch <-chan T, early T, arrived bool) (T, bool) {
 	return settle(ch, releaseWait)
 }
 
-// gathered returns n answers from ch, the first being the one that came early, or fewer when ch stays silent for wait.
+// gathered returns the n answers that reach ch within wait, the first being the one that came early.
 func gathered(ch <-chan error, n int, first error, early bool, wait time.Duration) []error {
 	var answers []error
 	if early {
 		answers = append(answers, first)
 	}
+	deadline := time.After(wait)
 	for len(answers) < n {
-		answer, arrived := settle(ch, wait)
-		if !arrived {
-			break
+		select {
+		case answer := <-ch:
+			answers = append(answers, answer)
+		case <-deadline:
+			return answers
 		}
-		answers = append(answers, answer)
 	}
 	return answers
 }
