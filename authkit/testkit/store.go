@@ -294,16 +294,14 @@ func (s *Store) CreateToken(_ context.Context, t gouncer.Token, live int) error 
 	return nil
 }
 
-// ReplaceToken stores t in place of every token the account holds for
-// the same purpose, or returns gouncer.ErrUserNotFound for an unknown
-// or disabled account, replacing nothing when it refuses.
+// ReplaceToken swaps t in for the account's tokens of its purpose, refusing a disabled or, under invite, confirmed one.
 func (s *Store) ReplaceToken(_ context.Context, t gouncer.Token) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
-	if u, ok := s.Users[t.UserID]; !ok || u.Disabled {
+	if u, ok := s.Users[t.UserID]; !ok || u.Disabled || (t.Purpose == gouncer.PurposeInvite && u.Confirmed) {
 		return gouncer.ErrUserNotFound
 	}
 	maps.DeleteFunc(s.Tokens, func(_ string, held gouncer.Token) bool {
@@ -385,28 +383,53 @@ func (s *Store) ResetByToken(
 	return t.UserID, nil
 }
 
-// DeleteExpiredTokens removes expired tokens and the unconfirmed
-// accounts an expired invite leaves behind, reporting how many tokens went.
+// DeleteExpiredTokens removes the expired tokens and the unconfirmed accounts they strand, counting the tokens.
 func (s *Store) DeleteExpiredTokens(_ context.Context, now time.Time) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return 0, s.TokenErr
 	}
+	stranded := map[uuid.UUID]bool{}
 	var count int64
 	for hash, t := range s.Tokens {
 		if t.ExpiresAt.After(now) {
 			continue
 		}
 		if t.Purpose == gouncer.PurposeInvite {
-			if u, ok := s.Users[t.UserID]; ok && !u.Confirmed {
-				delete(s.Users, t.UserID)
-			}
+			stranded[t.UserID] = true
 		}
 		delete(s.Tokens, hash)
 		count++
 	}
+	for id := range stranded {
+		s.dropStranded(id, now)
+	}
 	return count, nil
+}
+
+// dropStranded deletes an unconfirmed account holding no live invite, with its sessions and tokens.
+func (s *Store) dropStranded(id uuid.UUID, now time.Time) {
+	if u, ok := s.Users[id]; !ok || u.Confirmed || s.holdsLiveInvite(id, now) {
+		return
+	}
+	delete(s.Users, id)
+	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
+		return sess.UserID == id
+	})
+	maps.DeleteFunc(s.Tokens, func(_ string, held gouncer.Token) bool {
+		return held.UserID == id
+	})
+}
+
+// holdsLiveInvite reports whether the account holds an invite still live at now.
+func (s *Store) holdsLiveInvite(id uuid.UUID, now time.Time) bool {
+	for _, held := range s.Tokens {
+		if held.UserID == id && held.Purpose == gouncer.PurposeInvite && held.ExpiresAt.After(now) {
+			return true
+		}
+	}
+	return false
 }
 
 // SetUserDisabledUnderCover disables an account under the guard, counting the call.
