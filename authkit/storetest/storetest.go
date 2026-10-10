@@ -749,19 +749,19 @@ func heldResets(t testing.TB, fixture Fixture) {
 	user := created(t, fixture, account("alpha@example.com", "alpha account"))
 	reset := issued(t, fixture, user, gouncer.PurposeReset, time.Hour, 1)
 	hold := held(t, fixture, user.ID)
-	queued := make(chan []error, 1)
-	go func() {
-		queued <- raced(func(int) error {
-			return errOf(fixture.Store.ResetByToken(t.Context(), reset.TokenHash, now(), "reset hash"))
-		})
-	}()
-	early, arrived := settle(queued, holdWait)
-	expect(t, !arrived, "the resets finished while the account was held, want them to wait")
+	queued := make(chan error, workers)
+	for range workers {
+		go func() {
+			queued <- errOf(fixture.Store.ResetByToken(t.Context(), reset.TokenHash, now(), "reset hash"))
+		}()
+	}
+	first, early := settle(queued, holdWait)
+	expect(t, !early, "a reset finished while the account was held, want every one to wait")
 	must(t, hold.Rollback(t.Context()), "ending the hold")
-	answers, done := later(queued, early, arrived)
+	answers := gathered(queued, workers, first, early, releaseWait)
 	won, refused := tally(answers, gouncer.ErrTokenNotFound)
-	expect(t, done && won == 1 && refused == workers-1, "the queued resets finished %t with %v, want one nil and "+
-		"ErrTokenNotFound for the rest", done, answers)
+	expect(t, len(answers) == workers && won == 1 && refused == workers-1, "the queued resets answered %v, "+
+		"want one nil and ErrTokenNotFound for the other %d", answers, workers-1)
 	expect(t, byID(t, fixture, user.ID).PasswordHash == "reset hash", "the account lost the reset hash")
 }
 
@@ -848,10 +848,35 @@ func isAdmin(role string) bool {
 // held opens the fixture's hold on the account id and rolls it back when the check ends, ending the check on failure.
 func held(t testing.TB, fixture Fixture, id uuid.UUID) Held {
 	t.Helper()
-	hold, err := fixture.Hold(t.Context(), id)
+	opened, err := fixture.Hold(t.Context(), id)
 	must(t, err, "Hold")
+	hold := &endOnce{Held: opened}
 	t.Cleanup(func() { _ = hold.Rollback(context.Background()) })
 	return hold
+}
+
+// endOnce is a hold that passes on only the first Commit or Rollback.
+type endOnce struct {
+	Held
+	// once guards the end of the hold.
+	once sync.Once
+}
+
+// Commit ends the hold unless it has ended already.
+func (h *endOnce) Commit(ctx context.Context) error {
+	return h.end(func() error { return h.Held.Commit(ctx) })
+}
+
+// Rollback ends the hold unless it has ended already.
+func (h *endOnce) Rollback(ctx context.Context) error {
+	return h.end(func() error { return h.Held.Rollback(ctx) })
+}
+
+// end runs finish when no end call came before and returns what it answered.
+func (h *endOnce) end(finish func() error) error {
+	var err error
+	h.once.Do(func() { err = finish() })
+	return err
 }
 
 // settle returns what arrives on ch within d and whether anything arrived.
@@ -871,6 +896,22 @@ func later[T any](ch <-chan T, early T, arrived bool) (T, bool) {
 		return early, true
 	}
 	return settle(ch, releaseWait)
+}
+
+// gathered returns n answers from ch, the first being the one that came early, or fewer when ch stays silent for wait.
+func gathered(ch <-chan error, n int, first error, early bool, wait time.Duration) []error {
+	var answers []error
+	if early {
+		answers = append(answers, first)
+	}
+	for len(answers) < n {
+		answer, arrived := settle(ch, wait)
+		if !arrived {
+			break
+		}
+		answers = append(answers, answer)
+	}
+	return answers
 }
 
 // errOf returns the error of a call, dropping its value.

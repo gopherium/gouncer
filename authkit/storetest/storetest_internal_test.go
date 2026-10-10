@@ -3,12 +3,17 @@
 package storetest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/gopherium/gouncer"
 )
 
 // errProbe is the error the meta-tests hand the helpers.
@@ -96,6 +101,80 @@ func TestLaterWaitsWhenNothingCameEarly(t *testing.T) {
 
 	if got, arrived := later(ch, 0, false); got != 9 || !arrived {
 		t.Errorf("later() = %d, %t, want 9, true", got, arrived)
+	}
+}
+
+func TestGatheredKeepsAnEarlyAnswerAndWaitsForTheRest(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan error, 2)
+	ch <- nil
+	ch <- errProbe
+
+	got := gathered(ch, 3, errProbe, true, time.Second)
+
+	if want := []error{errProbe, nil, errProbe}; !slices.Equal(got, want) {
+		t.Errorf("gathered() = %v, want the early answer, then the two waiting", got)
+	}
+}
+
+func TestGatheredStopsAtASilentChannel(t *testing.T) {
+	t.Parallel()
+
+	if got := gathered(make(chan error), 2, nil, false, time.Millisecond); len(got) != 0 {
+		t.Errorf("gathered() = %v, want nothing from a silent channel", got)
+	}
+}
+
+// countedHold is a hold that counts how often it ends.
+type countedHold struct {
+	// ends counts the Commit and Rollback calls.
+	ends int
+}
+
+// Renew does nothing.
+func (*countedHold) Renew(context.Context, gouncer.Token, gouncer.Token) error { return nil }
+
+// Commit counts one end.
+func (h *countedHold) Commit(context.Context) error {
+	h.ends++
+	return nil
+}
+
+// Rollback counts one end.
+func (h *countedHold) Rollback(context.Context) error {
+	h.ends++
+	return nil
+}
+
+// holdingFixture returns a fixture whose Hold hook answers hold.
+func holdingFixture(hold Held) Fixture {
+	return Fixture{Hold: func(context.Context, uuid.UUID) (Held, error) { return hold, nil }}
+}
+
+func TestHeldEndsAHoldOnceWhenTheCheckEndsIt(t *testing.T) {
+	t.Parallel()
+
+	hold := &countedHold{}
+	t.Run("a check that commits its hold", func(t *testing.T) {
+		must(t, held(t, holdingFixture(hold), firstTwin).Commit(t.Context()), "Commit")
+	})
+
+	if hold.ends != 1 {
+		t.Errorf("the hold ended %d times, want once", hold.ends)
+	}
+}
+
+func TestHeldRollsBackAHoldTheCheckLeftOpen(t *testing.T) {
+	t.Parallel()
+
+	hold := &countedHold{}
+	t.Run("a check that stops with its hold open", func(t *testing.T) {
+		held(t, holdingFixture(hold), firstTwin)
+	})
+
+	if hold.ends != 1 {
+		t.Errorf("the hold ended %d times, want the cleanup to end it once", hold.ends)
 	}
 }
 
