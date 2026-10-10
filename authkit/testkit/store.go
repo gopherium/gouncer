@@ -214,7 +214,7 @@ func (s *Store) setDisabled(id uuid.UUID, disabled bool) error {
 	return nil
 }
 
-// SetUserRole writes the role an account holds, or returns the configured error.
+// SetUserRole writes an account's role, refusing to leave no enabled account under a privileged one.
 func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privileged gouncer.Roles) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -226,9 +226,48 @@ func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privil
 	if !ok {
 		return gouncer.ErrUserNotFound
 	}
+	if err := s.refuseUncovered(id, privileged, !privileged.Holds(role)); err != nil {
+		return err
+	}
 	u.Role = role
 	s.Users[id] = u
 	return nil
+}
+
+// refuseUncovered returns gouncer.ErrLastPrivileged for a write that removes the last enabled privileged account.
+func (s *Store) refuseUncovered(id uuid.UUID, privileged gouncer.Roles, removesCover bool) error {
+	if !removesCover || !privilegedAccount(s.Users[id], privileged) {
+		return nil
+	}
+	for other, u := range s.Users {
+		if other != id && privilegedAccount(u, privileged) {
+			return nil
+		}
+	}
+	return gouncer.ErrLastPrivileged
+}
+
+// privilegedAccount reports whether user is enabled and holds one of the privileged roles.
+func privilegedAccount(user gouncer.User, privileged gouncer.Roles) bool {
+	return !user.Disabled && privileged.Holds(user.Role)
+}
+
+// GrantRoleToRoleless gives role to every account holding none and returns how many it changed.
+func (s *Store) GrantRoleToRoleless(_ context.Context, role string) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if role == "" {
+		return 0, gouncer.ErrEmptyRole
+	}
+	var granted int64
+	for id, u := range s.Users {
+		if u.Role == "" {
+			u.Role = role
+			s.Users[id] = u
+			granted++
+		}
+	}
+	return granted, nil
 }
 
 // CreateToken stores t while fewer than live unexpired tokens stand for
@@ -381,5 +420,8 @@ func (s *Store) SetUserDisabledUnderCover(
 	defer s.mu.Unlock()
 	s.CoverGiven = privileged
 	s.DisabledUnderCover++
+	if err := s.refuseUncovered(id, privileged, disabled); err != nil {
+		return err
+	}
 	return s.setDisabled(id, disabled)
 }
