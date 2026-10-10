@@ -15,6 +15,10 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
   both counts, with `ErrSweepSessions` and `ErrSweepTokens` marking the
   half that failed.
 
+### Changed
+
+- The module needs Go 1.27.2.
+
 ## [0.16.0] - 2026-10-05
 
 ### Added
