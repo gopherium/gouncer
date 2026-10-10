@@ -7,6 +7,28 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `storetest`, the contract every account store keeps: `Run` for any
+  store, and `RunHeld` for a store that can hold an account in a write
+  transaction.
+- The in-memory store in `testkit` gains `DeleteExpiredSessions` and
+  `GrantRoleToRoleless`.
+
+### Fixed
+
+- The in-memory store takes calls from several goroutines at once.
+- The in-memory store's `SetUserRole` and `SetUserDisabledUnderCover`
+  refuse with `gouncer.ErrLastPrivileged` to leave no enabled account
+  under a privileged role, as the PostgreSQL store does.
+- The in-memory store's `ReplaceToken` refuses an invite for a confirmed
+  account.
+- The in-memory store's `DeleteExpiredTokens` spares an unconfirmed
+  account that still holds a live invite, and removes a stranded
+  account's sessions and tokens with it.
+
 ## [0.17.0] - 2026-10-10
 
 ### Added
