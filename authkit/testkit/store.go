@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,9 @@ import (
 // contract semantics for tests. Set an Err field to force that method
 // to fail.
 type Store struct {
+	// mu makes every method safe to call from several goroutines at once.
+	mu sync.Mutex
+
 	Users    map[uuid.UUID]gouncer.User
 	Sessions map[string]gouncer.Session
 	Tokens   map[string]gouncer.Token
@@ -58,12 +62,16 @@ func (s *Store) AddUser(tb testing.TB, email, name, password string) gouncer.Use
 	if err != nil {
 		tb.Fatalf("gouncer.NewUser() error = %v, want nil", err)
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.Users[u.ID] = u
 	return u
 }
 
 // CreateUser stores u, or returns gouncer.ErrEmailTaken for a known email.
 func (s *Store) CreateUser(_ context.Context, u gouncer.User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.CreateUserErr != nil {
 		return s.CreateUserErr
 	}
@@ -78,6 +86,8 @@ func (s *Store) CreateUser(_ context.Context, u gouncer.User) error {
 
 // UserByEmail returns the user with the normalized email, or gouncer.ErrUserNotFound.
 func (s *Store) UserByEmail(_ context.Context, email string) (gouncer.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.LookupErr != nil {
 		return gouncer.User{}, s.LookupErr
 	}
@@ -92,6 +102,8 @@ func (s *Store) UserByEmail(_ context.Context, email string) (gouncer.User, erro
 // UserByID returns the user with the given id, disabled or not, or
 // gouncer.ErrUserNotFound.
 func (s *Store) UserByID(_ context.Context, id uuid.UUID) (gouncer.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.LookupErr != nil {
 		return gouncer.User{}, s.LookupErr
 	}
@@ -104,6 +116,8 @@ func (s *Store) UserByID(_ context.Context, id uuid.UUID) (gouncer.User, error) 
 
 // CreateSession stores sess.
 func (s *Store) CreateSession(_ context.Context, sess gouncer.Session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.CreateSessionErr != nil {
 		return s.CreateSessionErr
 	}
@@ -113,6 +127,8 @@ func (s *Store) CreateSession(_ context.Context, sess gouncer.Session) error {
 
 // UserBySession returns the user owning a live session, or gouncer.ErrSessionNotFound.
 func (s *Store) UserBySession(_ context.Context, tokenHash []byte, now time.Time) (gouncer.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.SessionErr != nil {
 		return gouncer.User{}, s.SessionErr
 	}
@@ -129,6 +145,8 @@ func (s *Store) UserBySession(_ context.Context, tokenHash []byte, now time.Time
 
 // DeleteSession removes the session. Removing an absent one is not an error.
 func (s *Store) DeleteSession(_ context.Context, tokenHash []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.DeleteErr != nil {
 		return s.DeleteErr
 	}
@@ -136,8 +154,21 @@ func (s *Store) DeleteSession(_ context.Context, tokenHash []byte) error {
 	return nil
 }
 
+// DeleteExpiredSessions removes the sessions that expired by now and returns how many went.
+func (s *Store) DeleteExpiredSessions(_ context.Context, now time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	held := len(s.Sessions)
+	maps.DeleteFunc(s.Sessions, func(_ string, sess gouncer.Session) bool {
+		return !sess.ExpiresAt.After(now)
+	})
+	return int64(held - len(s.Sessions)), nil
+}
+
 // ListUsers returns every account ordered by name then id, with password hashes stripped.
 func (s *Store) ListUsers(_ context.Context) ([]gouncer.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.ListUsersErr != nil {
 		return nil, s.ListUsersErr
 	}
@@ -156,6 +187,13 @@ func (s *Store) ListUsers(_ context.Context) ([]gouncer.User, error) {
 
 // SetUserDisabled updates whether the account may log in, revoking its sessions on disable.
 func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.setDisabled(id, disabled)
+}
+
+// setDisabled updates whether the account may log in, revoking its sessions and tokens on disable.
+func (s *Store) setDisabled(id uuid.UUID, disabled bool) error {
 	if s.SetDisabledErr != nil {
 		return s.SetDisabledErr
 	}
@@ -178,6 +216,8 @@ func (s *Store) SetUserDisabled(_ context.Context, id uuid.UUID, disabled bool) 
 
 // SetUserRole writes the role an account holds, or returns the configured error.
 func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privileged gouncer.Roles) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.CoverGiven = privileged
 	if s.SetRoleErr != nil {
 		return s.SetRoleErr
@@ -194,6 +234,8 @@ func (s *Store) SetUserRole(_ context.Context, id uuid.UUID, role string, privil
 // CreateToken stores t while fewer than live unexpired tokens stand for
 // the same user and purpose, or returns gouncer.ErrTokenExists at the cap.
 func (s *Store) CreateToken(_ context.Context, t gouncer.Token, live int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
@@ -217,6 +259,8 @@ func (s *Store) CreateToken(_ context.Context, t gouncer.Token, live int) error 
 // the same purpose, or returns gouncer.ErrUserNotFound for an unknown
 // or disabled account, replacing nothing when it refuses.
 func (s *Store) ReplaceToken(_ context.Context, t gouncer.Token) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return s.TokenErr
 	}
@@ -240,6 +284,8 @@ func (s *Store) ActivateByToken(
 	now time.Time,
 	passwordHash string,
 ) (uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return uuid.Nil, s.TokenErr
 	}
@@ -272,6 +318,8 @@ func (s *Store) ResetByToken(
 	now time.Time,
 	passwordHash string,
 ) (uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return uuid.Nil, s.TokenErr
 	}
@@ -301,6 +349,8 @@ func (s *Store) ResetByToken(
 // DeleteExpiredTokens removes expired tokens and the unconfirmed
 // accounts an expired invite leaves behind, reporting how many tokens went.
 func (s *Store) DeleteExpiredTokens(_ context.Context, now time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.TokenErr != nil {
 		return 0, s.TokenErr
 	}
@@ -322,12 +372,14 @@ func (s *Store) DeleteExpiredTokens(_ context.Context, now time.Time) (int64, er
 
 // SetUserDisabledUnderCover disables an account under the guard, counting the call.
 func (s *Store) SetUserDisabledUnderCover(
-	ctx context.Context,
+	_ context.Context,
 	id uuid.UUID,
 	disabled bool,
 	privileged gouncer.Roles,
 ) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.CoverGiven = privileged
 	s.DisabledUnderCover++
-	return s.SetUserDisabled(ctx, id, disabled)
+	return s.setDisabled(id, disabled)
 }
