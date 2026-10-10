@@ -7,6 +7,14 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `Sweep`, one sweep of expired sessions and tokens now, which returns
+  both counts, with `ErrSweepSessions` and `ErrSweepTokens` marking the
+  half that failed.
+
 ## [0.16.0] - 2026-10-05
 
 ### Added
