@@ -758,7 +758,7 @@ func heldResets(t testing.TB, fixture Fixture) {
 	first, early := settle(queued, holdWait)
 	expect(t, !early, "a reset finished while the account was held, want every one to wait")
 	must(t, hold.Rollback(t.Context()), "ending the hold")
-	answers := gathered(queued, workers, first, early, releaseWait)
+	answers := gathered(queued, workers, first, early, time.After(releaseWait))
 	won, refused := tally(answers, gouncer.ErrTokenNotFound)
 	expect(t, len(answers) == workers && won == 1 && refused == workers-1, "the queued resets answered %v, "+
 		"want one nil and ErrTokenNotFound for the other %d", answers, workers-1)
@@ -898,13 +898,12 @@ func later[T any](ch <-chan T, early T, arrived bool) (T, bool) {
 	return settle(ch, releaseWait)
 }
 
-// gathered returns the n answers that reach ch within wait, the first being the one that came early.
-func gathered(ch <-chan error, n int, first error, early bool, wait time.Duration) []error {
+// gathered returns the n answers that reach ch before deadline fires, the first being the one that came early.
+func gathered(ch <-chan error, n int, first error, early bool, deadline <-chan time.Time) []error {
 	var answers []error
 	if early {
 		answers = append(answers, first)
 	}
-	deadline := time.After(wait)
 	for len(answers) < n {
 		select {
 		case answer := <-ch:

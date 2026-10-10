@@ -111,33 +111,35 @@ func TestGatheredKeepsAnEarlyAnswerAndWaitsForTheRest(t *testing.T) {
 	ch <- nil
 	ch <- errProbe
 
-	got := gathered(ch, 3, errProbe, true, time.Second)
+	got := gathered(ch, 3, errProbe, true, nil)
 
 	if want := []error{errProbe, nil, errProbe}; !slices.Equal(got, want) {
 		t.Errorf("gathered() = %v, want the early answer, then the two waiting", got)
 	}
 }
 
-func TestGatheredGivesAllTheAnswersOneDeadline(t *testing.T) {
+func TestGatheredStopsAtItsOneDeadline(t *testing.T) {
 	t.Parallel()
 
-	ch := make(chan error, 3)
+	ch := make(chan error)
+	deadline := make(chan time.Time)
 	go func() {
-		for range 3 {
-			time.Sleep(100 * time.Millisecond)
-			ch <- nil
-		}
+		ch <- nil
+		deadline <- time.Time{}
 	}()
 
-	if got := gathered(ch, 3, nil, false, 150*time.Millisecond); len(got) != 1 {
-		t.Errorf("gathered() = %v, want only the answer that came before the one deadline", got)
+	if got := gathered(ch, 3, nil, false, deadline); len(got) != 1 {
+		t.Errorf("gathered() = %v, want only the answer that came before the deadline", got)
 	}
 }
 
 func TestGatheredStopsAtASilentChannel(t *testing.T) {
 	t.Parallel()
 
-	if got := gathered(make(chan error), 2, nil, false, time.Millisecond); len(got) != 0 {
+	passed := make(chan time.Time)
+	close(passed)
+
+	if got := gathered(make(chan error), 2, nil, false, passed); len(got) != 0 {
 		t.Errorf("gathered() = %v, want nothing from a silent channel", got)
 	}
 }
