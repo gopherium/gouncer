@@ -15,6 +15,13 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 - Requires `golang.org/x/text` v0.41.0, which carries the fix for
   GO-2026-6629.
 - The module needs Go 1.27.2.
+- Requires authkit v0.18.0.
+
+### Fixed
+
+- `ListUsers` orders by name regardless of ASCII case, then by id, under
+  any collation. It listed capitalised names first under `C`, and a
+  lowercase name before its capitalised twin elsewhere.
 
 ## [0.11.2] - 2026-10-01
 
