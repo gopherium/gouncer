@@ -4,7 +4,6 @@ package testkit
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,8 +16,6 @@ import (
 type storeHold struct {
 	// store is the held store.
 	store *Store
-	// once ends the hold a single time.
-	once sync.Once
 }
 
 // Renew swaps renewed in for expired while the store is held.
@@ -30,13 +27,13 @@ func (h *storeHold) Renew(_ context.Context, expired, renewed gouncer.Token) err
 
 // Commit ends the hold.
 func (h *storeHold) Commit(context.Context) error {
-	h.once.Do(h.store.mu.Unlock)
+	h.store.mu.Unlock()
 	return nil
 }
 
 // Rollback ends the hold.
 func (h *storeHold) Rollback(context.Context) error {
-	h.once.Do(h.store.mu.Unlock)
+	h.store.mu.Unlock()
 	return nil
 }
 
