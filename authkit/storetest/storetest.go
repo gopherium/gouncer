@@ -25,6 +25,15 @@ const placeholderHash = "storetest placeholder hash"
 // workers is how many goroutines call the store at once.
 const workers = 8
 
+// password is the password of every account EnsureAdmin creates for the suite.
+const password = "correct horse battery"
+
+// The privileged roles the guard checks run under.
+var (
+	admins = gouncer.Roles{"admin"}
+	owners = gouncer.Roles{"admin", "owner"}
+)
+
 // The ids of the two accounts that share one name, in rising order.
 var (
 	firstTwin  = uuid.MustParse("019a0000-0000-7000-8000-000000000001")
@@ -39,6 +48,8 @@ type Store interface {
 	UserByID(ctx context.Context, id uuid.UUID) (gouncer.User, error)
 	// SetUserDisabled updates whether the account may log in and ends its sessions on disable.
 	SetUserDisabled(ctx context.Context, id uuid.UUID, disabled bool) error
+	// GrantRoleToRoleless gives role to every account holding none and returns how many it changed.
+	GrantRoleToRoleless(ctx context.Context, role string) (int64, error)
 }
 
 // Fixture is one fresh, empty store and the hooks the suite drives it with.
@@ -72,6 +83,17 @@ var checks = []check{
 	{"disabling an account ends its sessions", disableEndsSessions},
 	{"disabling an unknown account answers ErrUserNotFound", disableUnknown},
 	{"the store takes calls from several goroutines at once", concurrentCalls},
+	{"an account's role reads back through every read", roleOnEveryRead},
+	{"SetUserRole writes the role, and an unknown account answers ErrUserNotFound", roleWritten},
+	{"the guard refuses to demote the last enabled privileged account and keeps its role", lastDemotion},
+	{"the guard refuses to disable the last enabled privileged account and keeps it enabled", lastDisable},
+	{"a disabled account holding a privileged role covers no other", disabledCover},
+	{"any privileged role covers another, and moving between them needs no cover", twoPrivilegedRoles},
+	{"an account holding no privileged role, or an empty privileged set, passes the guard", unguarded},
+	{"a guarded disable of a covered account ends its sessions, and a guarded enable needs no cover", coveredDisable},
+	{"EnsureAdmin creates a missing account, stamps a roleless one and keeps a held role", ensuredAdmins},
+	{"GrantRoleToRoleless gives the role once to every account holding none, disabled ones too", grantedRoleless},
+	{"GrantRoleToRoleless refuses the empty role and changes nothing", grantedNothing},
 }
 
 // Run checks every rule of the contract as a parallel subtest, each on a fresh fixture that build returns.
@@ -136,9 +158,7 @@ func liveSession(t testing.TB, fixture Fixture) {
 // unusableSessions fails t unless an unknown token, an expired session and a disabled account's session read nothing.
 func unusableSessions(t testing.TB, fixture Fixture) {
 	user := created(t, fixture, account("alpha@example.com", "alpha account"))
-	disabled := account("bravo@example.com", "Bravo account")
-	disabled.Disabled = true
-	created(t, fixture, disabled)
+	disabled := created(t, fixture, closed(account("bravo@example.com", "Bravo account")))
 	for what, hash := range map[string][]byte{
 		"an unknown token":                  gouncer.HashToken("unknown token"),
 		"an expired session":                opened(t, fixture, user, -time.Hour).TokenHash,
@@ -253,6 +273,154 @@ func concurrentCalls(t testing.TB, fixture Fixture) {
 	expect(t, len(listed) == workers, "ListUsers() after the workers = %d accounts, want %d", len(listed), workers)
 }
 
+// roleOnEveryRead fails t unless the role an account holds reads back by email, by id, by session and in the list.
+func roleOnEveryRead(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	session := opened(t, fixture, user, time.Hour)
+	bySession, err := fixture.Store.UserBySession(t.Context(), session.TokenHash, now())
+	must(t, err, "UserBySession")
+	byEmail, err := fixture.Store.UserByEmail(t.Context(), user.Email)
+	must(t, err, "UserByEmail")
+	listed, err := fixture.Store.ListUsers(t.Context())
+	must(t, err, "ListUsers")
+	roles := append([]string{bySession.Role, byEmail.Role, byID(t, fixture, user.ID).Role}, rolesOf(listed)...)
+	expect(t, slices.Equal(roles, []string{"admin", "admin", "admin", "admin"}), "the reads by session, email, id "+
+		"and list carried the roles %q, want admin in each", roles)
+}
+
+// roleWritten fails t unless SetUserRole writes a covered account's role and refuses an unknown account.
+func roleWritten(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "admin"))
+	must(t, fixture.Store.SetUserRole(t.Context(), alpha.ID, "editor", admins), "SetUserRole")
+	expect(t, byID(t, fixture, alpha.ID).Role == "editor", "the role after SetUserRole is not editor")
+	err := fixture.Store.SetUserRole(t.Context(), firstTwin, "editor", admins)
+	expect(t, errors.Is(err, gouncer.ErrUserNotFound), "SetUserRole() of an unknown account error = %v, "+
+		"want ErrUserNotFound", err)
+}
+
+// lastDemotion fails t unless demoting the last enabled privileged account answers ErrLastPrivileged, keeping the role.
+func lastDemotion(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "editor"))
+	err := fixture.Store.SetUserRole(t.Context(), alpha.ID, "editor", admins)
+	expect(t, errors.Is(err, gouncer.ErrLastPrivileged), "SetUserRole() error = %v, want ErrLastPrivileged", err)
+	expect(t, byID(t, fixture, alpha.ID).Role == "admin", "the refused demotion changed the role")
+}
+
+// lastDisable fails t unless disabling the last enabled privileged account answers ErrLastPrivileged and keeps it.
+func lastDisable(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "editor"))
+	err := fixture.Store.SetUserDisabledUnderCover(t.Context(), alpha.ID, true, admins)
+	expect(t, errors.Is(err, gouncer.ErrLastPrivileged), "SetUserDisabledUnderCover() error = %v, "+
+		"want ErrLastPrivileged", err)
+	expect(t, !byID(t, fixture, alpha.ID).Disabled, "the refused disable disabled the account")
+}
+
+// disabledCover fails t unless a disabled account holding a privileged role leaves the enabled one uncovered.
+func disabledCover(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	created(t, fixture, closed(holding(account("bravo@example.com", "Bravo account"), "admin")))
+	demoted := fixture.Store.SetUserRole(t.Context(), alpha.ID, "editor", admins)
+	disabled := fixture.Store.SetUserDisabledUnderCover(t.Context(), alpha.ID, true, admins)
+	expect(t, errors.Is(demoted, gouncer.ErrLastPrivileged) && errors.Is(disabled, gouncer.ErrLastPrivileged),
+		"the demotion and the disable covered by a disabled admin answered %v and %v, want ErrLastPrivileged",
+		demoted, disabled)
+}
+
+// twoPrivilegedRoles fails t unless each privileged role covers the other and moving between them needs no cover.
+func twoPrivilegedRoles(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	bravo := created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "owner"))
+	must(t, fixture.Store.SetUserRole(t.Context(), alpha.ID, "editor", owners), "SetUserRole of the covered admin")
+	demoted := fixture.Store.SetUserRole(t.Context(), bravo.ID, "editor", owners)
+	disabled := fixture.Store.SetUserDisabledUnderCover(t.Context(), bravo.ID, true, owners)
+	expect(t, errors.Is(demoted, gouncer.ErrLastPrivileged) && errors.Is(disabled, gouncer.ErrLastPrivileged),
+		"the demotion and the disable of the last owner answered %v and %v, want ErrLastPrivileged", demoted, disabled)
+	must(t, fixture.Store.SetUserRole(t.Context(), bravo.ID, "admin", owners), "SetUserRole of the last owner to admin")
+	expect(t, byID(t, fixture, bravo.ID).Role == "admin", "the move between privileged roles did not land")
+}
+
+// unguarded fails t unless an account holding no privileged role, or any account under an empty set, passes the guard.
+func unguarded(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	bravo := created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "editor"))
+	must(t, fixture.Store.SetUserRole(t.Context(), bravo.ID, "author", admins), "SetUserRole of the editor")
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), bravo.ID, true, admins), "the guarded disable "+
+		"of the editor")
+	must(t, fixture.Store.SetUserRole(t.Context(), alpha.ID, "editor", nil), "SetUserRole of the lone admin under "+
+		"no privileged role")
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), alpha.ID, true, nil), "the guarded disable of the "+
+		"former admin under no privileged role")
+	got := []gouncer.User{byID(t, fixture, bravo.ID), byID(t, fixture, alpha.ID)}
+	expect(t, got[0].Role == "author" && got[0].Disabled && got[1].Role == "editor" && got[1].Disabled,
+		"the unguarded writes left %s, want both accounts disabled under author and editor", describedAll(got))
+}
+
+// coveredDisable fails t unless a guarded disable of a covered account ends its sessions and a guarded enable lands.
+func coveredDisable(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, holding(account("alpha@example.com", "alpha account"), "admin"))
+	created(t, fixture, holding(account("bravo@example.com", "Bravo account"), "admin"))
+	session := opened(t, fixture, alpha, time.Hour)
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), alpha.ID, true, admins), "the guarded disable")
+	_, ended := fixture.Store.UserBySession(t.Context(), session.TokenHash, now())
+	disabled := byID(t, fixture, alpha.ID).Disabled
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), alpha.ID, false, admins), "the guarded enable")
+	unknown := fixture.Store.SetUserDisabledUnderCover(t.Context(), firstTwin, true, admins)
+	expect(t, disabled && !byID(t, fixture, alpha.ID).Disabled, "the guarded disable and enable did not flip the flag")
+	expect(t, errors.Is(ended, gouncer.ErrSessionNotFound), "UserBySession() after the guarded disable error = %v, "+
+		"want ErrSessionNotFound", ended)
+	expect(t, errors.Is(unknown, gouncer.ErrUserNotFound), "the guarded disable of an unknown account error = %v, "+
+		"want ErrUserNotFound", unknown)
+}
+
+// ensuredAdmins fails t unless EnsureAdmin creates a missing account, stamps a roleless one and keeps a held role.
+func ensuredAdmins(t testing.TB, fixture Fixture) {
+	created(t, fixture, account("roleless@example.com", "roleless account"))
+	created(t, fixture, holding(account("editor@example.com", "editor account"), "editor"))
+	made, err := authkit.EnsureAdmin(t.Context(), fixture.Store, "new@example.com", "new account", password, "admin")
+	must(t, err, "EnsureAdmin of a new address")
+	stamped, err := authkit.EnsureAdmin(t.Context(), fixture.Store, "roleless@example.com", "roleless account",
+		password, "admin")
+	must(t, err, "EnsureAdmin of the roleless account")
+	kept, err := authkit.EnsureAdmin(t.Context(), fixture.Store, "editor@example.com", "editor account", password,
+		"admin")
+	must(t, err, "EnsureAdmin of the editor")
+	expect(t, made && !stamped && !kept, "EnsureAdmin() created %t, %t and %t, want true, false and false", made,
+		stamped, kept)
+	roles := []string{
+		byEmail(t, fixture, "new@example.com").Role, byEmail(t, fixture, "roleless@example.com").Role,
+		byEmail(t, fixture, "editor@example.com").Role,
+	}
+	expect(t, slices.Equal(roles, []string{"admin", "admin", "editor"}), "EnsureAdmin() left the roles %q, "+
+		"want admin, admin and editor", roles)
+}
+
+// grantedRoleless fails t unless GrantRoleToRoleless gives the role once to every account holding none.
+func grantedRoleless(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, account("alpha@example.com", "alpha account"))
+	bravo := created(t, fixture, closed(account("bravo@example.com", "Bravo account")))
+	charlie := created(t, fixture, holding(account("charlie@example.com", "charlie account"), "editor"))
+	granted, err := fixture.Store.GrantRoleToRoleless(t.Context(), "member")
+	must(t, err, "GrantRoleToRoleless")
+	again, err := fixture.Store.GrantRoleToRoleless(t.Context(), "member")
+	must(t, err, "the second GrantRoleToRoleless")
+	expect(t, granted == 2 && again == 0, "GrantRoleToRoleless() granted %d, then %d, want 2, then 0", granted, again)
+	roles := []string{byID(t, fixture, alpha.ID).Role, byID(t, fixture, bravo.ID).Role, byID(t, fixture, charlie.ID).Role}
+	expect(t, slices.Equal(roles, []string{"member", "member", "editor"}), "GrantRoleToRoleless() left the roles %q, "+
+		"want member, member and editor", roles)
+}
+
+// grantedNothing fails t unless GrantRoleToRoleless refuses the empty role with ErrEmptyRole and changes nothing.
+func grantedNothing(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, account("alpha@example.com", "alpha account"))
+	granted, err := fixture.Store.GrantRoleToRoleless(t.Context(), "")
+	expect(t, errors.Is(err, gouncer.ErrEmptyRole) && granted == 0, "GrantRoleToRoleless(\"\") = %d, %v, "+
+		"want 0 and ErrEmptyRole", granted, err)
+	expect(t, byID(t, fixture, alpha.ID).Role == "", "the refused grant gave the account a role")
+}
+
 // worker creates user, opens a session for it and reads both back, answering every failure.
 func worker(ctx context.Context, store Store, user gouncer.User) error {
 	session := sessionOf(user, time.Hour)
@@ -274,6 +442,43 @@ func account(email, name string) gouncer.User {
 		ID: uuid.Must(uuid.NewV7()), Email: email, Name: name, PasswordHash: placeholderHash, Confirmed: true,
 		CreatedAt: now(),
 	}
+}
+
+// holding returns user under role.
+func holding(user gouncer.User, role string) gouncer.User {
+	user.Role = role
+	return user
+}
+
+// closed returns user disabled.
+func closed(user gouncer.User) gouncer.User {
+	user.Disabled = true
+	return user
+}
+
+// byID returns the account the store holds under id, ending the check when it holds none.
+func byID(t testing.TB, fixture Fixture, id uuid.UUID) gouncer.User {
+	t.Helper()
+	user, err := fixture.Store.UserByID(t.Context(), id)
+	must(t, err, "UserByID "+id.String())
+	return user
+}
+
+// byEmail returns the account the store holds at email, ending the check when it holds none.
+func byEmail(t testing.TB, fixture Fixture, email string) gouncer.User {
+	t.Helper()
+	user, err := fixture.Store.UserByEmail(t.Context(), email)
+	must(t, err, "UserByEmail "+email)
+	return user
+}
+
+// rolesOf returns the role of each account.
+func rolesOf(users []gouncer.User) []string {
+	roles := make([]string, 0, len(users))
+	for _, user := range users {
+		roles = append(roles, user.Role)
+	}
+	return roles
 }
 
 // created stores user and returns it, ending the check when the store refuses.
