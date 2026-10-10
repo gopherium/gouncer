@@ -443,6 +443,9 @@ func (s *Store) SetUserDisabledUnderCover(
 	defer s.mu.Unlock()
 	s.CoverGiven = privileged
 	s.DisabledUnderCover++
+	if s.SetDisabledErr != nil {
+		return s.SetDisabledErr
+	}
 	if err := s.refuseUncovered(id, privileged, disabled); err != nil {
 		return err
 	}

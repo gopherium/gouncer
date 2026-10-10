@@ -83,6 +83,12 @@ func TestEveryErrorHookFailsItsMethod(t *testing.T) {
 			func(ctx context.Context, s *testkit.Store) error {
 				return s.SetUserDisabledUnderCover(ctx, id, true, nil)
 			}},
+		{"SetDisabledErr fails the guarded disable of the last admin", func(s *testkit.Store) {
+			s.SetDisabledErr = errHook
+			s.Users[id] = gouncer.User{ID: id, Email: user.Email, Role: "admin"}
+		}, func(ctx context.Context, s *testkit.Store) error {
+			return s.SetUserDisabledUnderCover(ctx, id, true, gouncer.Roles{"admin"})
+		}},
 		{"SetRoleErr fails SetUserRole", func(s *testkit.Store) { s.SetRoleErr = errHook },
 			func(ctx context.Context, s *testkit.Store) error { return s.SetUserRole(ctx, id, "editor", nil) }},
 		{"TokenErr fails CreateToken", func(s *testkit.Store) { s.TokenErr = errHook },
