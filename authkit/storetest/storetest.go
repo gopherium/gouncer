@@ -25,6 +25,12 @@ const placeholderHash = "storetest placeholder hash"
 // workers is how many goroutines call the store at once.
 const workers = 8
 
+// holdWait is how long a call behind a hold must stay blocked to show that it waits.
+const holdWait = 300 * time.Millisecond
+
+// releaseWait is how long a call may take to finish once the hold ends.
+const releaseWait = 10 * time.Second
+
 // password is the password of every account EnsureAdmin creates for the suite.
 const password = "correct horse battery"
 
@@ -60,6 +66,18 @@ type Fixture struct {
 	Store Store
 	// Plant stores token as it stands, past the store's own checks, for any account and with any expiry.
 	Plant func(ctx context.Context, token gouncer.Token) error
+	// Hold opens a write transaction that keeps the account id held, which RunHeld needs and Run never calls.
+	Hold func(ctx context.Context, id uuid.UUID) (Held, error)
+}
+
+// Held is an open write transaction that keeps one account held until it ends.
+type Held interface {
+	// Renew deletes the token expired and stores renewed inside the transaction.
+	Renew(ctx context.Context, expired, renewed gouncer.Token) error
+	// Commit ends the hold and keeps what it wrote.
+	Commit(ctx context.Context) error
+	// Rollback ends the hold and discards what it wrote.
+	Rollback(ctx context.Context) error
 }
 
 // check is one rule of the contract.
@@ -110,10 +128,33 @@ var checks = []check{
 	{"the token sweep counts the expired tokens and takes the accounts an expired invite strands", sweptTokens},
 	{"the token sweep spares an unconfirmed account that still holds a live invite", sparedInvite},
 	{"disabling an account, guarded or not, ends its tokens", disableEndsTokens},
+	{"concurrent activations spend the invite once", racedActivations},
+	{"an issuance racing a guarded disable leaves no token behind", racedIssuance},
+	{"a redemption racing a guarded disable settles both", racedRedemption},
+	{"concurrent demotions leave exactly one privileged account", racedDemotions},
+}
+
+// heldChecks are the rules that need a second transaction holding an account.
+var heldChecks = []check{
+	{"an issuance waits while the account is held and lands once the hold ends", heldIssuance},
+	{"resets queued behind a hold spend the token once", heldResets},
+	{"the token sweep spares an invite renewed under a hold beside it", renewedInvite},
 }
 
 // Run checks every rule of the contract as a parallel subtest, each on a fresh fixture that build returns.
 func Run(t *testing.T, build func(t *testing.T) Fixture) {
+	t.Helper()
+	runChecks(t, build, checks)
+}
+
+// RunHeld checks every rule that needs the fixture's Hold hook, each on a fresh fixture that build returns.
+func RunHeld(t *testing.T, build func(t *testing.T) Fixture) {
+	t.Helper()
+	runChecks(t, build, heldChecks)
+}
+
+// runChecks runs each check as a parallel subtest on a fresh fixture that build returns.
+func runChecks(t *testing.T, build func(t *testing.T) Fixture, checks []check) {
 	t.Helper()
 	for _, c := range checks {
 		t.Run(c.name, func(t *testing.T) {
@@ -512,10 +553,10 @@ func unusableInvites(t testing.TB, fixture Fixture) {
 	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
 	reset := issued(t, fixture, settled, gouncer.PurposeReset, time.Hour, 1)
 	for what, err := range map[string]error{
-		"an expired invite": second(fixture.Store.ActivateByToken(t.Context(), invite.TokenHash,
+		"an expired invite": errOf(fixture.Store.ActivateByToken(t.Context(), invite.TokenHash,
 			invite.ExpiresAt.Add(time.Second), "settled hash")),
-		"a reset token":    second(fixture.Store.ActivateByToken(t.Context(), reset.TokenHash, now(), "settled hash")),
-		"an unknown token": second(fixture.Store.ActivateByToken(t.Context(), unknownHash(), now(), "settled hash")),
+		"a reset token":    errOf(fixture.Store.ActivateByToken(t.Context(), reset.TokenHash, now(), "settled hash")),
+		"an unknown token": errOf(fixture.Store.ActivateByToken(t.Context(), unknownHash(), now(), "settled hash")),
 	} {
 		expect(t, errors.Is(err, gouncer.ErrTokenNotFound), "ActivateByToken() of %s error = %v, want ErrTokenNotFound",
 			what, err)
@@ -569,8 +610,8 @@ func refusedResets(t testing.TB, fixture Fixture) {
 	expect(t, errors.Is(ofDisabled, gouncer.ErrUserNotFound), "ResetByToken() for a disabled account error = %v, "+
 		"want ErrUserNotFound", ofDisabled)
 	for what, err := range map[string]error{
-		"an expired reset token": second(fixture.Store.ResetByToken(t.Context(), expired.TokenHash, now(), "reset hash")),
-		"an invite":              second(fixture.Store.ResetByToken(t.Context(), invite.TokenHash, now(), "reset hash")),
+		"an expired reset token": errOf(fixture.Store.ResetByToken(t.Context(), expired.TokenHash, now(), "reset hash")),
+		"an invite":              errOf(fixture.Store.ResetByToken(t.Context(), invite.TokenHash, now(), "reset hash")),
 	} {
 		expect(t, errors.Is(err, gouncer.ErrTokenNotFound), "ResetByToken() of %s error = %v, want ErrTokenNotFound",
 			what, err)
@@ -626,18 +667,214 @@ func disableEndsTokens(t testing.TB, fixture Fixture) {
 		"after the plain and the guarded disable answered %v and %v, want ErrTokenNotFound", first, guarded)
 }
 
+// racedActivations fails t unless invites redeemed by several goroutines at once confirm the account once.
+func racedActivations(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	answers := raced(func(int) error {
+		return errOf(fixture.Store.ActivateByToken(t.Context(), invite.TokenHash, now(), "settled hash"))
+	})
+	won, refused := tally(answers, gouncer.ErrTokenNotFound)
+	expect(t, won == 1 && refused == workers-1, "the racing activations answered %v, want one nil and "+
+		"ErrTokenNotFound for the rest", answers)
+	expect(t, byID(t, fixture, user.ID).PasswordHash == "settled hash", "the account lost the settled hash")
+}
+
+// racedIssuance fails t unless a token issued beside a guarded disable is gone once the account is enabled again.
+func racedIssuance(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	invite := tokenFor(user, gouncer.PurposeInvite, time.Hour)
+	issuedErr, disabled := paired(
+		func() error { return fixture.Store.CreateToken(t.Context(), invite, 1) },
+		func() error { return fixture.Store.SetUserDisabledUnderCover(t.Context(), user.ID, true, admins) },
+	)
+	expect(t, disabled == nil && (issuedErr == nil || errors.Is(issuedErr, gouncer.ErrUserNotFound)), "the issuance "+
+		"and the disable answered %v and %v, want nil or ErrUserNotFound, then nil", issuedErr, disabled)
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), user.ID, false, admins), "the guarded enable")
+	_, err := fixture.Store.ActivateByToken(t.Context(), invite.TokenHash, now(), "intruding hash")
+	expect(t, errors.Is(err, gouncer.ErrTokenNotFound), "ActivateByToken() after the disable error = %v, "+
+		"want ErrTokenNotFound", err)
+}
+
+// racedRedemption fails t unless a redemption racing a guarded disable ends in a refusal or a success, never a fault.
+func racedRedemption(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	redeemed, disabled := paired(
+		func() error {
+			return errOf(fixture.Store.ActivateByToken(t.Context(), invite.TokenHash, now(), "settled hash"))
+		},
+		func() error { return fixture.Store.SetUserDisabledUnderCover(t.Context(), user.ID, true, admins) },
+	)
+	settled := redeemed == nil || errors.Is(redeemed, gouncer.ErrUserNotFound) ||
+		errors.Is(redeemed, gouncer.ErrTokenNotFound)
+	expect(t, settled && disabled == nil, "the redemption and the disable answered %v and %v, want nil or a "+
+		"gouncer refusal, then nil", redeemed, disabled)
+}
+
+// racedDemotions fails t unless demotions of every privileged account at once leave exactly one of them.
+func racedDemotions(t testing.TB, fixture Fixture) {
+	ids := make([]uuid.UUID, workers)
+	for i := range ids {
+		user := holding(account(fmt.Sprintf("admin-%d@example.com", i), "admin account"), "admin")
+		ids[i] = created(t, fixture, user).ID
+	}
+	answers := raced(func(i int) error {
+		return fixture.Store.SetUserRole(t.Context(), ids[i], "editor", admins)
+	})
+	won, refused := tally(answers, gouncer.ErrLastPrivileged)
+	listed, err := fixture.Store.ListUsers(t.Context())
+	must(t, err, "ListUsers")
+	roles := rolesOf(listed)
+	left := len(roles) - len(slices.DeleteFunc(slices.Clone(roles), isAdmin))
+	expect(t, won == workers-1 && refused == 1 && left == 1, "the racing demotions answered %v and left the roles %q, "+
+		"want ErrLastPrivileged once and one admin left", answers, roles)
+}
+
+// heldIssuance fails t unless CreateToken waits while the account is held and lands once the hold ends.
+func heldIssuance(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, account("alpha@example.com", "alpha account"))
+	hold := held(t, fixture, user.ID)
+	issuedErr := make(chan error, 1)
+	go func() { issuedErr <- fixture.Store.CreateToken(t.Context(), resetFor(user), 1) }()
+	early, arrived := settle(issuedErr, holdWait)
+	expect(t, !arrived, "CreateToken() returned while the account was held, want it to wait")
+	must(t, hold.Rollback(t.Context()), "ending the hold")
+	err, done := later(issuedErr, early, arrived)
+	expect(t, done && err == nil, "CreateToken() after the hold finished %t with %v, want true with nil", done, err)
+}
+
+// heldResets fails t unless resets queued behind a hold on the account spend the reset token once.
+func heldResets(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, account("alpha@example.com", "alpha account"))
+	reset := issued(t, fixture, user, gouncer.PurposeReset, time.Hour, 1)
+	hold := held(t, fixture, user.ID)
+	queued := make(chan []error, 1)
+	go func() {
+		queued <- raced(func(int) error {
+			return errOf(fixture.Store.ResetByToken(t.Context(), reset.TokenHash, now(), "reset hash"))
+		})
+	}()
+	early, arrived := settle(queued, holdWait)
+	expect(t, !arrived, "the resets finished while the account was held, want them to wait")
+	must(t, hold.Rollback(t.Context()), "ending the hold")
+	answers, done := later(queued, early, arrived)
+	won, refused := tally(answers, gouncer.ErrTokenNotFound)
+	expect(t, done && won == 1 && refused == workers-1, "the queued resets finished %t with %v, want one nil and "+
+		"ErrTokenNotFound for the rest", done, answers)
+	expect(t, byID(t, fixture, user.ID).PasswordHash == "reset hash", "the account lost the reset hash")
+}
+
+// renewedInvite fails t unless the sweep waiting on a hold spares the account whose invite the hold renews.
+func renewedInvite(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	expired := issued(t, fixture, user, gouncer.PurposeInvite, -time.Hour, 1)
+	hold := held(t, fixture, user.ID)
+	swept := make(chan error, 1)
+	go func() { swept <- errOf(fixture.Store.DeleteExpiredTokens(t.Context(), now())) }()
+	early, arrived := settle(swept, holdWait)
+	expect(t, !arrived, "the sweep finished while the account was held, want it to wait")
+	renewed := tokenFor(user, gouncer.PurposeInvite, time.Hour)
+	must(t, hold.Renew(t.Context(), expired, renewed), "renewing the invite under the hold")
+	must(t, hold.Commit(t.Context()), "committing the hold")
+	err, done := later(swept, early, arrived)
+	expect(t, done && err == nil, "the sweep after the hold finished %t with %v, want true with nil", done, err)
+	id, err := fixture.Store.ActivateByToken(t.Context(), renewed.TokenHash, now(), "settled hash")
+	expect(t, err == nil && id == user.ID, "the renewed invite activated %s with %v, want %s with nil", id, err, user.ID)
+}
+
 // worker creates user, opens a session for it and reads both back, answering every failure.
 func worker(ctx context.Context, store Store, user gouncer.User) error {
 	session := sessionOf(user, time.Hour)
 	return errors.Join(
 		store.CreateUser(ctx, user), store.CreateSession(ctx, session),
-		second(store.UserBySession(ctx, session.TokenHash, now())), second(store.UserByEmail(ctx, user.Email)),
-		second(store.ListUsers(ctx)),
+		errOf(store.UserBySession(ctx, session.TokenHash, now())), errOf(store.UserByEmail(ctx, user.Email)),
+		errOf(store.ListUsers(ctx)),
 	)
 }
 
-// second returns the error of a call, dropping its value.
-func second[T any](_ T, err error) error {
+// raced runs body for each of the workers on goroutines released at once and returns every answer in order.
+func raced(body func(i int) error) []error {
+	answers := make([]error, workers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range workers {
+		wg.Go(func() {
+			<-start
+			answers[i] = body(i)
+		})
+	}
+	close(start)
+	wg.Wait()
+	return answers
+}
+
+// paired runs first and second on two goroutines released at once and returns both answers.
+func paired(first, second func() error) (error, error) {
+	var firstErr, secondErr error
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		<-start
+		firstErr = first()
+	})
+	wg.Go(func() {
+		<-start
+		secondErr = second()
+	})
+	close(start)
+	wg.Wait()
+	return firstErr, secondErr
+}
+
+// tally counts the answers that are nil and the ones that match want.
+func tally(answers []error, want error) (won, refused int) {
+	for _, err := range answers {
+		switch {
+		case err == nil:
+			won++
+		case errors.Is(err, want):
+			refused++
+		}
+	}
+	return won, refused
+}
+
+// isAdmin reports whether role is admin.
+func isAdmin(role string) bool {
+	return role == "admin"
+}
+
+// held opens the fixture's hold on the account id and rolls it back when the check ends, ending the check on failure.
+func held(t testing.TB, fixture Fixture, id uuid.UUID) Held {
+	t.Helper()
+	hold, err := fixture.Hold(t.Context(), id)
+	must(t, err, "Hold")
+	t.Cleanup(func() { _ = hold.Rollback(context.Background()) })
+	return hold
+}
+
+// settle returns what arrives on ch within d and whether anything arrived.
+func settle[T any](ch <-chan T, d time.Duration) (T, bool) {
+	select {
+	case value := <-ch:
+		return value, true
+	case <-time.After(d):
+		var zero T
+		return zero, false
+	}
+}
+
+// later returns the answer that arrived early, or else what arrives on ch within releaseWait.
+func later[T any](ch <-chan T, early T, arrived bool) (T, bool) {
+	if arrived {
+		return early, true
+	}
+	return settle(ch, releaseWait)
+}
+
+// errOf returns the error of a call, dropping its value.
+func errOf[T any](_ T, err error) error {
 	return err
 }
 

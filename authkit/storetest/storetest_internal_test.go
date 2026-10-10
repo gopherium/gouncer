@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"slices"
 	"testing"
+	"time"
 )
 
 // errProbe is the error the meta-tests hand the helpers.
@@ -57,6 +58,44 @@ func TestExpectReportsAFalseCondition(t *testing.T) {
 
 	if want := []string{"the count is wrong"}; !slices.Equal(got, want) {
 		t.Errorf("expect reported %q, want %q", got, want)
+	}
+}
+
+func TestSettleAnswersAValueThatArrives(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan int, 1)
+	ch <- 7
+
+	if got, arrived := settle(ch, time.Second); got != 7 || !arrived {
+		t.Errorf("settle() = %d, %t, want 7, true", got, arrived)
+	}
+}
+
+func TestSettleGivesUpOnASilentChannel(t *testing.T) {
+	t.Parallel()
+
+	if got, arrived := settle(make(chan int), time.Millisecond); got != 0 || arrived {
+		t.Errorf("settle() = %d, %t, want 0, false", got, arrived)
+	}
+}
+
+func TestLaterKeepsAnAnswerThatCameEarly(t *testing.T) {
+	t.Parallel()
+
+	if got, arrived := later(make(chan int), 5, true); got != 5 || !arrived {
+		t.Errorf("later() = %d, %t, want the early 5, true", got, arrived)
+	}
+}
+
+func TestLaterWaitsWhenNothingCameEarly(t *testing.T) {
+	t.Parallel()
+
+	ch := make(chan int, 1)
+	ch <- 9
+
+	if got, arrived := later(ch, 0, false); got != 9 || !arrived {
+		t.Errorf("later() = %d, %t, want 9, true", got, arrived)
 	}
 }
 
