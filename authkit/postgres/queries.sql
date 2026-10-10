@@ -17,7 +17,7 @@ WHERE id = $1;
 -- name: ListUsers :many
 SELECT id, email, name, disabled, confirmed, created_at, role
 FROM auth.users
-ORDER BY name, id;
+ORDER BY lower(name), id;
 
 -- name: SetUserDisabled :execrows
 UPDATE auth.users

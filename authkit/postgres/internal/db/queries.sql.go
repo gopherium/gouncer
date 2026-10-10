@@ -373,7 +373,7 @@ func (q *Queries) GrantRoleToRoleless(ctx context.Context, role string) (int64, 
 const listUsers = `-- name: ListUsers :many
 SELECT id, email, name, disabled, confirmed, created_at, role
 FROM auth.users
-ORDER BY name, id
+ORDER BY lower(name), id
 `
 
 type ListUsersRow struct {

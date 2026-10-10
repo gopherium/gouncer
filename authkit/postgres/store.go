@@ -130,8 +130,7 @@ func (s *UserStore) UserBySession(ctx context.Context, tokenHash []byte, now tim
 	return userFromRow(row), nil
 }
 
-// ListUsers returns every user ordered by name. The listing never reads
-// password hashes, so the returned users carry none.
+// ListUsers returns every user ordered by name regardless of ASCII case, then by id, without password hashes.
 func (s *UserStore) ListUsers(ctx context.Context) ([]gouncer.User, error) {
 	rows, err := s.queries.ListUsers(ctx)
 	if err != nil {
