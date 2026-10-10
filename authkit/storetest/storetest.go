@@ -43,7 +43,9 @@ var (
 // Store is every method of an account store the suite checks.
 type Store interface {
 	authkit.AdminStore
+	authkit.InviteStore
 	authkit.SessionReaper
+	authkit.TokenReaper
 	// UserByID returns the account with id, disabled or not, or gouncer.ErrUserNotFound.
 	UserByID(ctx context.Context, id uuid.UUID) (gouncer.User, error)
 	// SetUserDisabled updates whether the account may log in and ends its sessions on disable.
@@ -56,6 +58,8 @@ type Store interface {
 type Fixture struct {
 	// Store is the store under test.
 	Store Store
+	// Plant stores token as it stands, past the store's own checks, for any account and with any expiry.
+	Plant func(ctx context.Context, token gouncer.Token) error
 }
 
 // check is one rule of the contract.
@@ -94,6 +98,18 @@ var checks = []check{
 	{"EnsureAdmin creates a missing account, stamps a roleless one and keeps a held role", ensuredAdmins},
 	{"GrantRoleToRoleless gives the role once to every account holding none, disabled ones too", grantedRoleless},
 	{"GrantRoleToRoleless refuses the empty role and changes nothing", grantedNothing},
+	{"CreateToken counts only the account's live tokens of the same purpose against the cap", tokenCap},
+	{"CreateToken and ReplaceToken refuse a disabled or unknown account with ErrUserNotFound", refusedIssues},
+	{"ReplaceToken supersedes the tokens of its purpose and leaves the others", replacedToken},
+	{"ReplaceToken refuses an invite for a confirmed account and keeps the invite it holds", refusedReplacement},
+	{"ActivateByToken confirms the account, stores the hash, answers its id and spends the invite", activated},
+	{"ActivateByToken answers ErrTokenNotFound for an expired invite, a reset token or an unknown one", unusableInvites},
+	{"ActivateByToken refuses a confirmed or disabled account with ErrUserNotFound, changing nothing", refusedActivations},
+	{"ResetByToken stores the hash and ends every session and every reset token of the account", resetDone},
+	{"ResetByToken refuses a disabled account, an expired reset token and an invite", refusedResets},
+	{"the token sweep counts the expired tokens and takes the accounts an expired invite strands", sweptTokens},
+	{"the token sweep spares an unconfirmed account that still holds a live invite", sparedInvite},
+	{"disabling an account, guarded or not, ends its tokens", disableEndsTokens},
 }
 
 // Run checks every rule of the contract as a parallel subtest, each on a fresh fixture that build returns.
@@ -160,7 +176,7 @@ func unusableSessions(t testing.TB, fixture Fixture) {
 	user := created(t, fixture, account("alpha@example.com", "alpha account"))
 	disabled := created(t, fixture, closed(account("bravo@example.com", "Bravo account")))
 	for what, hash := range map[string][]byte{
-		"an unknown token":                  gouncer.HashToken("unknown token"),
+		"an unknown token":                  unknownHash(),
 		"an expired session":                opened(t, fixture, user, -time.Hour).TokenHash,
 		"the session of a disabled account": opened(t, fixture, disabled, time.Hour).TokenHash,
 	} {
@@ -421,6 +437,195 @@ func grantedNothing(t testing.TB, fixture Fixture) {
 	expect(t, byID(t, fixture, alpha.ID).Role == "", "the refused grant gave the account a role")
 }
 
+// tokenCap fails t unless an expired token and a token of another purpose leave room under the cap.
+func tokenCap(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, account("alpha@example.com", "alpha account"))
+	issued(t, fixture, user, gouncer.PurposeReset, -time.Hour, 3)
+	issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 3)
+	for range 3 {
+		issued(t, fixture, user, gouncer.PurposeReset, time.Hour, 3)
+	}
+	err := fixture.Store.CreateToken(t.Context(), tokenFor(user, gouncer.PurposeReset, time.Hour), 3)
+	expect(t, errors.Is(err, gouncer.ErrTokenExists), "CreateToken() past the cap error = %v, want ErrTokenExists", err)
+}
+
+// refusedIssues fails t unless CreateToken and ReplaceToken refuse a disabled or unknown account.
+func refusedIssues(t testing.TB, fixture Fixture) {
+	disabled := created(t, fixture, closed(account("alpha@example.com", "alpha account")))
+	unknown := account("nobody@example.com", "unknown account")
+	for what, err := range map[string]error{
+		"CreateToken for a disabled account":  fixture.Store.CreateToken(t.Context(), resetFor(disabled), 1),
+		"ReplaceToken for a disabled account": fixture.Store.ReplaceToken(t.Context(), resetFor(disabled)),
+		"CreateToken for an unknown account":  fixture.Store.CreateToken(t.Context(), resetFor(unknown), 1),
+		"ReplaceToken for an unknown account": fixture.Store.ReplaceToken(t.Context(), resetFor(unknown)),
+	} {
+		expect(t, errors.Is(err, gouncer.ErrUserNotFound), "%s error = %v, want ErrUserNotFound", what, err)
+	}
+}
+
+// replacedToken fails t unless ReplaceToken spends the invites the account held and leaves its reset token.
+func replacedToken(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	first := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	reset := issued(t, fixture, user, gouncer.PurposeReset, time.Hour, 1)
+	replacement := tokenFor(user, gouncer.PurposeInvite, time.Hour)
+	must(t, fixture.Store.ReplaceToken(t.Context(), replacement), "ReplaceToken")
+	_, superseded := fixture.Store.ActivateByToken(t.Context(), first.TokenHash, now(), "settled hash")
+	_, err := fixture.Store.ResetByToken(t.Context(), reset.TokenHash, now(), "reset hash")
+	must(t, err, "ResetByToken of the token of another purpose")
+	id, err := fixture.Store.ActivateByToken(t.Context(), replacement.TokenHash, now(), "settled hash")
+	must(t, err, "ActivateByToken of the replacement")
+	expect(t, errors.Is(superseded, gouncer.ErrTokenNotFound) && id == user.ID, "the superseded invite answered %v "+
+		"and the replacement activated %s, want ErrTokenNotFound and %s", superseded, id, user.ID)
+}
+
+// refusedReplacement fails t unless ReplaceToken refuses an invite for a confirmed account and keeps its invite.
+func refusedReplacement(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, account("alpha@example.com", "alpha account"))
+	held := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	err := fixture.Store.ReplaceToken(t.Context(), tokenFor(user, gouncer.PurposeInvite, time.Hour))
+	_, kept := fixture.Store.ActivateByToken(t.Context(), held.TokenHash, now(), "settled hash")
+	expect(t, errors.Is(err, gouncer.ErrUserNotFound), "ReplaceToken() of an invite for a confirmed account "+
+		"error = %v, want ErrUserNotFound", err)
+	expect(t, errors.Is(kept, gouncer.ErrUserNotFound), "ActivateByToken() of the held invite after the refusal "+
+		"error = %v, want ErrUserNotFound from the invite the refusal kept", kept)
+}
+
+// activated fails t unless ActivateByToken confirms the account under the hash and spends the invite.
+func activated(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	id, err := fixture.Store.ActivateByToken(t.Context(), invite.TokenHash, now(), "settled hash")
+	must(t, err, "ActivateByToken")
+	_, again := fixture.Store.ActivateByToken(t.Context(), invite.TokenHash, now(), "another hash")
+	held := byID(t, fixture, user.ID)
+	expect(t, id == user.ID && held.Confirmed && held.PasswordHash == "settled hash", "ActivateByToken() answered %s "+
+		"and left %s, want %s confirmed under the settled hash", id, described(held), user.ID)
+	expect(t, errors.Is(again, gouncer.ErrTokenNotFound), "the second ActivateByToken() error = %v, "+
+		"want ErrTokenNotFound", again)
+}
+
+// unusableInvites fails t unless an expired invite, a reset token and an unknown token activate nothing.
+func unusableInvites(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	settled := created(t, fixture, account("bravo@example.com", "Bravo account"))
+	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	reset := issued(t, fixture, settled, gouncer.PurposeReset, time.Hour, 1)
+	for what, err := range map[string]error{
+		"an expired invite": second(fixture.Store.ActivateByToken(t.Context(), invite.TokenHash,
+			invite.ExpiresAt.Add(time.Second), "settled hash")),
+		"a reset token":    second(fixture.Store.ActivateByToken(t.Context(), reset.TokenHash, now(), "settled hash")),
+		"an unknown token": second(fixture.Store.ActivateByToken(t.Context(), unknownHash(), now(), "settled hash")),
+	} {
+		expect(t, errors.Is(err, gouncer.ErrTokenNotFound), "ActivateByToken() of %s error = %v, want ErrTokenNotFound",
+			what, err)
+	}
+}
+
+// refusedActivations fails t unless an invite for a confirmed or a disabled account activates nothing.
+func refusedActivations(t testing.TB, fixture Fixture) {
+	settled := created(t, fixture, account("alpha@example.com", "alpha account"))
+	disabled := created(t, fixture, closed(invited("bravo@example.com", "Bravo account")))
+	held := issued(t, fixture, settled, gouncer.PurposeInvite, time.Hour, 1)
+	planted := plantedFor(t, fixture, disabled, gouncer.PurposeInvite)
+	_, ofSettled := fixture.Store.ActivateByToken(t.Context(), held.TokenHash, now(), "intruding hash")
+	_, ofDisabled := fixture.Store.ActivateByToken(t.Context(), planted.TokenHash, now(), "intruding hash")
+	expect(t, errors.Is(ofSettled, gouncer.ErrUserNotFound) && errors.Is(ofDisabled, gouncer.ErrUserNotFound),
+		"ActivateByToken() for the confirmed and the disabled account answered %v and %v, want ErrUserNotFound",
+		ofSettled, ofDisabled)
+	got := []gouncer.User{byID(t, fixture, settled.ID), byID(t, fixture, disabled.ID)}
+	expect(t, got[0].PasswordHash == placeholderHash && !got[1].Confirmed, "the refused activations left %s, "+
+		"want the first hash kept and the second account unconfirmed", describedAll(got))
+}
+
+// resetDone fails t unless ResetByToken stores the hash and ends every session and reset token of the account.
+func resetDone(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, account("alpha@example.com", "alpha account"))
+	session := opened(t, fixture, user, time.Hour)
+	family := make([]gouncer.Token, 0, 3)
+	for range 3 {
+		family = append(family, issued(t, fixture, user, gouncer.PurposeReset, time.Hour, 3))
+	}
+	id, err := fixture.Store.ResetByToken(t.Context(), family[1].TokenHash, now(), "reset hash")
+	must(t, err, "ResetByToken")
+	_, ended := fixture.Store.UserBySession(t.Context(), session.TokenHash, now())
+	_, before := fixture.Store.ResetByToken(t.Context(), family[0].TokenHash, now(), "another hash")
+	_, after := fixture.Store.ResetByToken(t.Context(), family[2].TokenHash, now(), "another hash")
+	expect(t, id == user.ID && byID(t, fixture, user.ID).PasswordHash == "reset hash", "ResetByToken() answered %s, "+
+		"want %s under the reset hash", id, user.ID)
+	expect(t, errors.Is(ended, gouncer.ErrSessionNotFound) && errors.Is(before, gouncer.ErrTokenNotFound) &&
+		errors.Is(after, gouncer.ErrTokenNotFound), "after the reset the session answered %v and the sibling tokens "+
+		"%v and %v, want ErrSessionNotFound and ErrTokenNotFound", ended, before, after)
+}
+
+// refusedResets fails t unless a disabled account, an expired reset token and an invite reset nothing.
+func refusedResets(t testing.TB, fixture Fixture) {
+	disabled := created(t, fixture, closed(account("alpha@example.com", "alpha account")))
+	user := created(t, fixture, account("bravo@example.com", "Bravo account"))
+	planted := plantedFor(t, fixture, disabled, gouncer.PurposeReset)
+	expired := issued(t, fixture, user, gouncer.PurposeReset, -time.Hour, 1)
+	invite := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	_, ofDisabled := fixture.Store.ResetByToken(t.Context(), planted.TokenHash, now(), "intruding hash")
+	expect(t, errors.Is(ofDisabled, gouncer.ErrUserNotFound), "ResetByToken() for a disabled account error = %v, "+
+		"want ErrUserNotFound", ofDisabled)
+	for what, err := range map[string]error{
+		"an expired reset token": second(fixture.Store.ResetByToken(t.Context(), expired.TokenHash, now(), "reset hash")),
+		"an invite":              second(fixture.Store.ResetByToken(t.Context(), invite.TokenHash, now(), "reset hash")),
+	} {
+		expect(t, errors.Is(err, gouncer.ErrTokenNotFound), "ResetByToken() of %s error = %v, want ErrTokenNotFound",
+			what, err)
+	}
+	expect(t, byID(t, fixture, disabled.ID).PasswordHash == placeholderHash, "the refused reset changed the hash")
+}
+
+// sweptTokens fails t unless the sweep counts the expired tokens and takes a stranded account with all it held.
+func sweptTokens(t testing.TB, fixture Fixture) {
+	stranded := created(t, fixture, invited("stranded@example.com", "stranded account"))
+	issued(t, fixture, stranded, gouncer.PurposeInvite, -time.Hour, 1)
+	issued(t, fixture, stranded, gouncer.PurposeReset, time.Hour, 1)
+	opened(t, fixture, stranded, time.Hour)
+	settled := created(t, fixture, account("settled@example.com", "settled account"))
+	issued(t, fixture, settled, gouncer.PurposeReset, -time.Hour, 1)
+	swept, err := fixture.Store.DeleteExpiredTokens(t.Context(), now())
+	must(t, err, "DeleteExpiredTokens")
+	_, gone := fixture.Store.UserByID(t.Context(), stranded.ID)
+	_, kept := fixture.Store.UserByID(t.Context(), settled.ID)
+	later, err := fixture.Store.DeleteExpiredTokens(t.Context(), now().Add(2*time.Hour))
+	must(t, err, "the later DeleteExpiredTokens")
+	expect(t, swept == 2 && later == 0, "the sweeps counted %d, then %d, want the 2 expired tokens, then none left "+
+		"of the stranded account", swept, later)
+	expect(t, errors.Is(gone, gouncer.ErrUserNotFound) && kept == nil, "after the sweep the stranded account answered "+
+		"%v and the settled one %v, want ErrUserNotFound and nil", gone, kept)
+}
+
+// sparedInvite fails t unless the sweep keeps an unconfirmed account and the live invite beside its expired one.
+func sparedInvite(t testing.TB, fixture Fixture) {
+	user := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	issued(t, fixture, user, gouncer.PurposeInvite, -time.Hour, 1)
+	live := issued(t, fixture, user, gouncer.PurposeInvite, time.Hour, 1)
+	swept, err := fixture.Store.DeleteExpiredTokens(t.Context(), now())
+	must(t, err, "DeleteExpiredTokens")
+	id, err := fixture.Store.ActivateByToken(t.Context(), live.TokenHash, now(), "settled hash")
+	expect(t, swept == 1 && err == nil && id == user.ID, "the sweep counted %d and the live invite activated %s with "+
+		"%v, want 1 and %s with nil", swept, id, err, user.ID)
+}
+
+// disableEndsTokens fails t unless a disable, guarded or not, ends the tokens the account held.
+func disableEndsTokens(t testing.TB, fixture Fixture) {
+	alpha := created(t, fixture, invited("alpha@example.com", "alpha account"))
+	bravo := created(t, fixture, invited("bravo@example.com", "Bravo account"))
+	ofAlpha := issued(t, fixture, alpha, gouncer.PurposeInvite, time.Hour, 1)
+	ofBravo := issued(t, fixture, bravo, gouncer.PurposeInvite, time.Hour, 1)
+	must(t, fixture.Store.SetUserDisabled(t.Context(), alpha.ID, true), "SetUserDisabled(true)")
+	must(t, fixture.Store.SetUserDisabled(t.Context(), alpha.ID, false), "SetUserDisabled(false)")
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), bravo.ID, true, admins), "the guarded disable")
+	must(t, fixture.Store.SetUserDisabledUnderCover(t.Context(), bravo.ID, false, admins), "the guarded enable")
+	_, first := fixture.Store.ActivateByToken(t.Context(), ofAlpha.TokenHash, now(), "settled hash")
+	_, guarded := fixture.Store.ActivateByToken(t.Context(), ofBravo.TokenHash, now(), "settled hash")
+	expect(t, errors.Is(first, gouncer.ErrTokenNotFound) && errors.Is(guarded, gouncer.ErrTokenNotFound), "the invites "+
+		"after the plain and the guarded disable answered %v and %v, want ErrTokenNotFound", first, guarded)
+}
+
 // worker creates user, opens a session for it and reads both back, answering every failure.
 func worker(ctx context.Context, store Store, user gouncer.User) error {
 	session := sessionOf(user, time.Hour)
@@ -442,6 +647,50 @@ func account(email, name string) gouncer.User {
 		ID: uuid.Must(uuid.NewV7()), Email: email, Name: name, PasswordHash: placeholderHash, Confirmed: true,
 		CreatedAt: now(),
 	}
+}
+
+// invited returns an enabled account at email named name that has not set a password yet.
+func invited(email, name string) gouncer.User {
+	user := account(email, name)
+	user.Confirmed, user.PasswordHash = false, ""
+	return user
+}
+
+// tokenFor returns a token for user under purpose with a fresh random secret, created now and expiring after lasts.
+func tokenFor(user gouncer.User, purpose gouncer.TokenPurpose, lasts time.Duration) gouncer.Token {
+	secret := uuid.NewString()
+	return gouncer.Token{
+		Token: secret, TokenHash: gouncer.HashToken(secret), UserID: user.ID, Purpose: purpose, CreatedAt: now(),
+		ExpiresAt: now().Add(lasts),
+	}
+}
+
+// resetFor returns a live reset token for user.
+func resetFor(user gouncer.User) gouncer.Token {
+	return tokenFor(user, gouncer.PurposeReset, time.Hour)
+}
+
+// unknownHash returns the hash of a token no store holds.
+func unknownHash() []byte {
+	return gouncer.HashToken("unknown token")
+}
+
+// issued stores a token for user through CreateToken under the cap live, ending the check when the store refuses.
+func issued(
+	t testing.TB, fixture Fixture, user gouncer.User, purpose gouncer.TokenPurpose, lasts time.Duration, live int,
+) gouncer.Token {
+	t.Helper()
+	token := tokenFor(user, purpose, lasts)
+	must(t, fixture.Store.CreateToken(t.Context(), token, live), "CreateToken "+string(purpose))
+	return token
+}
+
+// plantedFor stores a live token for user through the fixture's Plant hook, ending the check when it fails.
+func plantedFor(t testing.TB, fixture Fixture, user gouncer.User, purpose gouncer.TokenPurpose) gouncer.Token {
+	t.Helper()
+	token := tokenFor(user, purpose, time.Hour)
+	must(t, fixture.Plant(t.Context(), token), "Plant "+string(purpose))
+	return token
 }
 
 // holding returns user under role.
