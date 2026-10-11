@@ -27,12 +27,6 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 - `userWithCapabilities` in `testing`, a canned account holding
   capabilities and the roles it may hand out.
 
-### Changed
-
-- The canned `defaultUser` is now Maria Perez,
-  `maria.perez@example.com`, under the same id. Tests that look for the
-  old name or address need the new ones.
-
 ## [0.10.0] - 2026-10-04
 
 ### Changed
