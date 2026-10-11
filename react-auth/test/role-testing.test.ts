@@ -12,11 +12,11 @@ describe('the canned accounts', () => {
 		expect(defaultUser.role).toBe('')
 	})
 
-	it('signs tests in as Maria Perez under the same identifier', () => {
+	it('keeps the default account under its name, address and identifier', () => {
 		expect(defaultUser).toEqual({
 			id: '0198b2f0-0000-7000-8000-000000000001',
-			email: 'maria.perez@example.com',
-			name: 'Maria Perez',
+			email: 'grace@example.com',
+			name: 'Grace Hopper',
 			role: '',
 		})
 	})

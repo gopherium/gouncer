@@ -47,7 +47,7 @@ test('shows the log out button busy while the session is ending', async () => {
 test('shows the signed-in user and a logout control', async () => {
 	renderPanel()
 
-	expect(await screen.findByText('Maria Perez')).toBeInTheDocument()
+	expect(await screen.findByText('Grace Hopper')).toBeInTheDocument()
 	expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
 })
 
@@ -93,5 +93,5 @@ test('renders nothing when no user is present', async () => {
 	await waitFor(() =>
 		expect(screen.queryByRole('button', { name: 'Log out' })).toBeNull(),
 	)
-	expect(screen.queryByText('Maria Perez')).toBeNull()
+	expect(screen.queryByText('Grace Hopper')).toBeNull()
 })
