@@ -20,8 +20,8 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 ### Fixed
 
 - `ListUsers` orders by name regardless of ASCII case, then by id, under
-  any collation. It listed capitalised names first under `C`, and a
-  lowercase name before its capitalised twin elsewhere.
+  any collation. It listed capitalised names first under `C`, and names
+  that differ only in case by the collation instead of by id.
 
 ## [0.11.2] - 2026-10-01
 
