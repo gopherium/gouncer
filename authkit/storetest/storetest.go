@@ -50,6 +50,7 @@ var (
 type Store interface {
 	authkit.AdminStore
 	authkit.InviteStore
+	authkit.SetupStore
 	authkit.SessionReaper
 	authkit.TokenReaper
 	// UserByID returns the account with id, disabled or not, or gouncer.ErrUserNotFound.
@@ -144,6 +145,10 @@ var checks = []check{
 	{"an issuance racing a guarded disable leaves no token behind", racedIssuance},
 	{"a redemption racing a guarded disable settles both", racedRedemption},
 	{"concurrent demotions leave exactly one privileged account", racedDemotions},
+	{"HasUsers answers false on an empty store and true once any account exists, disabled or unconfirmed too", hasUsers},
+	{"CreateFirstUser stores the first account, and answers ErrSetupDone and stores nothing once any account exists",
+		firstUser},
+	{"first account creations racing from several goroutines land once", racedFirstUsers},
 }
 
 // heldChecks are the rules that need a second transaction holding an account.
@@ -853,6 +858,49 @@ func racedDemotions(t testing.TB, fixture Fixture) {
 	left := len(roles) - len(slices.DeleteFunc(slices.Clone(roles), isAdmin))
 	expect(t, won == workers-1 && refused == 1 && left == 1, "the racing demotions answered %v and left the roles %q, "+
 		"want ErrLastPrivileged once and one admin left", answers, roles)
+}
+
+// hasUsers fails t unless HasUsers answers false on an empty store and true once it holds any account.
+func hasUsers(t testing.TB, fixture Fixture) {
+	empty, err := fixture.Store.HasUsers(t.Context())
+	must(t, err, "HasUsers of an empty store")
+	expect(t, !empty, "HasUsers() on an empty store = true, want false")
+	user := created(t, fixture, invited("maria@example.com", "Maria Perez"))
+	unconfirmed, err := fixture.Store.HasUsers(t.Context())
+	must(t, err, "HasUsers after an unconfirmed account")
+	must(t, fixture.Store.SetUserDisabled(t.Context(), user.ID, true), "SetUserDisabled")
+	disabled, err := fixture.Store.HasUsers(t.Context())
+	must(t, err, "HasUsers after the disable")
+	expect(t, unconfirmed && disabled, "HasUsers() after an account = %t while unconfirmed and %t once disabled, "+
+		"want true and true", unconfirmed, disabled)
+}
+
+// firstUser fails t unless CreateFirstUser stores the first account and refuses a later one, storing nothing.
+func firstUser(t testing.TB, fixture Fixture) {
+	first := account("maria@example.com", "Maria Perez")
+	must(t, fixture.Store.CreateFirstUser(t.Context(), first), "CreateFirstUser on an empty store")
+	held := byEmail(t, fixture, first.Email)
+	expect(t, sameUser(held, first), "the first account read back %s, want %s", described(held), described(first))
+	must(t, fixture.Store.SetUserDisabled(t.Context(), first.ID, true), "SetUserDisabled")
+	err := fixture.Store.CreateFirstUser(t.Context(), account("maria+2@example.com", "Maria Perez"))
+	expect(t, errors.Is(err, authkit.ErrSetupDone), "CreateFirstUser() on a store with an account = %v, "+
+		"want ErrSetupDone", err)
+	listed, err := fixture.Store.ListUsers(t.Context())
+	must(t, err, "ListUsers")
+	expect(t, len(listed) == 1, "the refused first account left %d accounts, want 1", len(listed))
+}
+
+// racedFirstUsers fails t unless first account creations racing from several goroutines store exactly one account.
+func racedFirstUsers(t testing.TB, fixture Fixture) {
+	answers := raced(func(i int) error {
+		return fixture.Store.CreateFirstUser(t.Context(), account(fmt.Sprintf("maria+%d@example.com", i), "Maria Perez"))
+	})
+	won, refused := tally(answers, authkit.ErrSetupDone)
+	listed, err := fixture.Store.ListUsers(t.Context())
+	must(t, err, "ListUsers")
+	expect(t, won == 1 && refused == workers-1 && len(listed) == 1, "the racing first account creations answered %v "+
+		"and stored %d accounts, want one nil, ErrSetupDone for the other %d, and 1 account", answers, len(listed),
+		workers-1)
 }
 
 // heldIssuance fails t unless CreateToken waits while the account is held and lands once the hold ends.

@@ -70,6 +70,8 @@ type hookCase struct {
 var hookCases = []hookCase{
 	{"CreateUserErr fails CreateUser", func(s *testkit.Store) { s.CreateUserErr = errHook },
 		func(ctx context.Context, s *testkit.Store) error { return s.CreateUser(ctx, hookUser) }},
+	{"CreateUserErr fails CreateFirstUser", func(s *testkit.Store) { s.CreateUserErr = errHook },
+		func(ctx context.Context, s *testkit.Store) error { return s.CreateFirstUser(ctx, hookUser) }},
 	{"LookupErr fails UserByEmail", func(s *testkit.Store) { s.LookupErr = errHook },
 		func(ctx context.Context, s *testkit.Store) error { return errOf(s.UserByEmail(ctx, hookUser.Email)) }},
 	{"LookupErr fails UserByID", func(s *testkit.Store) { s.LookupErr = errHook },
@@ -78,6 +80,8 @@ var hookCases = []hookCase{
 		func(ctx context.Context, s *testkit.Store) error {
 			return errOf(s.UsersByIDs(ctx, []uuid.UUID{hookID}))
 		}},
+	{"LookupErr fails HasUsers", func(s *testkit.Store) { s.LookupErr = errHook },
+		func(ctx context.Context, s *testkit.Store) error { return errOf(s.HasUsers(ctx)) }},
 	{"CreateSessionErr fails CreateSession", func(s *testkit.Store) { s.CreateSessionErr = errHook },
 		func(ctx context.Context, s *testkit.Store) error { return s.CreateSession(ctx, gouncer.Session{}) }},
 	{"SessionErr fails UserBySession", func(s *testkit.Store) { s.SessionErr = errHook },

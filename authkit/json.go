@@ -60,6 +60,8 @@ var authErrors = []struct {
 	status   int
 	response ErrorResponse
 }{
+	{ErrSetupMisconfigured, http.StatusInternalServerError,
+		ErrorResponse{Message: "internal error", Code: "internal"}},
 	{gouncer.ErrInvalidEmail, http.StatusUnprocessableEntity,
 		ErrorResponse{Message: "invalid email address", Code: "email_invalid"}},
 	{gouncer.ErrEmptyName, http.StatusUnprocessableEntity,
@@ -81,6 +83,14 @@ var authErrors = []struct {
 		ErrorResponse{Message: "unknown role", Code: "role_unknown", Meta: map[string]any{"field": "role"}}},
 	{ErrRoleChanged, http.StatusConflict,
 		ErrorResponse{Message: "role changed", Code: "role_changed"}},
+	{ErrSetupDone, http.StatusConflict,
+		ErrorResponse{Message: "setup already done", Code: "setup_done"}},
+	{ErrSetupCodeInvalid, http.StatusUnauthorized,
+		ErrorResponse{Message: "setup code invalid", Code: "setup_code_invalid"}},
+	{ErrSetupCodeExpired, http.StatusUnauthorized,
+		ErrorResponse{Message: "setup code expired", Code: "setup_code_expired"}},
+	{ErrSetupCodeFile, http.StatusInternalServerError,
+		ErrorResponse{Message: "setup code file unusable", Code: "setup_code_file"}},
 }
 
 // ErrorResponseForAuthError returns the HTTP status code and error body for a

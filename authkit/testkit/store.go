@@ -85,6 +85,30 @@ func (s *Store) CreateUser(_ context.Context, u gouncer.User) error {
 	return nil
 }
 
+// HasUsers reports whether the store holds any account, disabled and unconfirmed ones included.
+func (s *Store) HasUsers(_ context.Context) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.LookupErr != nil {
+		return false, s.LookupErr
+	}
+	return len(s.Users) > 0, nil
+}
+
+// CreateFirstUser stores u while the store holds no account, or answers authkit.ErrSetupDone and stores nothing.
+func (s *Store) CreateFirstUser(_ context.Context, u gouncer.User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.CreateUserErr != nil {
+		return s.CreateUserErr
+	}
+	if len(s.Users) > 0 {
+		return authkit.ErrSetupDone
+	}
+	s.Users[u.ID] = u
+	return nil
+}
+
 // UserByEmail returns the user with the normalized email, or gouncer.ErrUserNotFound.
 func (s *Store) UserByEmail(_ context.Context, email string) (gouncer.User, error) {
 	s.mu.Lock()

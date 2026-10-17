@@ -7,6 +7,24 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `NewSetup` and `SetupConfig`, the one-time setup of a site's first account from a setup code in a file the application names, at mode 0600.
+- The code works for `CodeLifetime`, or `DefaultSetupCodeLifetime` (one hour) when zero, and a negative lifetime is refused.
+- `Setup.Prepare` keeps or writes the code while the store holds no account, and removes it once one exists.
+- `Setup.Check` checks a code against the file and the store, and writes a fresh code when the old one expired.
+- On systems with `flock`, a renewal takes a lock file kept beside the code file, its path plus `.lock`, so two copies write one fresh code. Elsewhere only renewals in one process take turns.
+- `Setup.CreateFirstAccount` creates the first account from a `FirstAccount` under the application's role and spends the code.
+- `Setup.Status`, `Setup.CheckCode` and `Setup.Create` serve these over HTTP, with no session after the account.
+- `SetupStore`, with `HasUsers` and `CreateFirstUser`.
+- The errors `ErrSetupDone` (409 `setup_done`), `ErrSetupCodeInvalid` (401 `setup_code_invalid`), `ErrSetupCodeExpired` (401 `setup_code_expired`), `ErrSetupCodeFile` (500 `setup_code_file`) and `ErrSetupMisconfigured` (500 `internal`).
+
+### Changed
+
+- **Breaking.** `storetest.Store` gains `HasUsers` and `CreateFirstUser`. `testkit` implements them and `storetest` checks them.
+
 ## [0.21.0] - 2026-10-14
 
 ### Changed

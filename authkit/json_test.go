@@ -5,6 +5,7 @@ package authkit_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,19 +92,39 @@ func TestRespondErrorLeavesAnEmptyCodeOffTheWire(t *testing.T) {
 func TestErrorResponseForAuthErrorNamesACode(t *testing.T) {
 	t.Parallel()
 
-	status, response, ok := authkit.ErrorResponseForAuthError(gouncer.ErrEmailTaken)
+	for _, tt := range []struct {
+		err     error
+		status  int
+		code    string
+		message string
+	}{
+		{gouncer.ErrEmailTaken, http.StatusConflict, "email_taken", "email already in use"},
+		{authkit.ErrSetupMisconfigured, http.StatusInternalServerError, "internal", "internal error"},
+		{authkit.ErrSetupDone, http.StatusConflict, "setup_done", "setup already done"},
+		{authkit.ErrSetupCodeInvalid, http.StatusUnauthorized, "setup_code_invalid", "setup code invalid"},
+		{authkit.ErrSetupCodeExpired, http.StatusUnauthorized, "setup_code_expired", "setup code expired"},
+		{authkit.ErrSetupCodeFile, http.StatusInternalServerError, "setup_code_file", "setup code file unusable"},
+		{fmt.Errorf("%w: %w", authkit.ErrSetupMisconfigured, authkit.ErrUnknownRole), http.StatusInternalServerError,
+			"internal", "internal error"},
+	} {
+		t.Run(tt.err.Error(), func(t *testing.T) {
+			t.Parallel()
 
-	if !ok {
-		t.Fatalf("ErrorResponseForAuthError() ok = false, want the error recognized")
-	}
-	if status != http.StatusConflict {
-		t.Errorf("status = %d, want %d", status, http.StatusConflict)
-	}
-	if response.Code != "email_taken" {
-		t.Errorf("code = %q, want the taken email named", response.Code)
-	}
-	if response.Message != "email already in use" {
-		t.Errorf("message = %q, want the prose kept beside the code", response.Message)
+			status, response, ok := authkit.ErrorResponseForAuthError(tt.err)
+
+			if !ok {
+				t.Fatalf("ErrorResponseForAuthError() ok = false, want the error recognized")
+			}
+			if status != tt.status {
+				t.Errorf("status = %d, want %d", status, tt.status)
+			}
+			if response.Code != tt.code {
+				t.Errorf("code = %q, want %q", response.Code, tt.code)
+			}
+			if response.Message != tt.message {
+				t.Errorf("message = %q, want %q kept beside the code", response.Message, tt.message)
+			}
+		})
 	}
 }
 
