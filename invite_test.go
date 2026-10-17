@@ -58,6 +58,15 @@ func TestNewInvitedUserRejectsInvalidIdentity(t *testing.T) {
 		"empty email":        {"", "Maria", gouncer.ErrInvalidEmail},
 		"email without at":   {"maria.example.com", "Maria", gouncer.ErrInvalidEmail},
 		"email with display": {"Maria <maria@example.com>", "Maria", gouncer.ErrInvalidEmail},
+		"email with C0 control": {
+			"a\x05b@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
+		"email with C1 control U+0085": {
+			"a\u0085b@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
+		"email with C1 control U+009B": {
+			"a\u009b8mb@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
 		"empty name":         {"maria@example.com", "   ", gouncer.ErrEmptyName},
 		"name too long":      {"maria@example.com", strings.Repeat("m", 257), gouncer.ErrNameTooLong},
 	}
@@ -136,5 +145,14 @@ func TestSetPasswordRejectsOutOfBoundsPasswords(t *testing.T) {
 				t.Errorf("password hash = %q, want untouched by a refused password", u.PasswordHash)
 			}
 		})
+	}
+}
+
+func TestNewInvitedUserRefusesControlCharactersInEmail(t *testing.T) {
+	t.Parallel()
+
+	_, err := gouncer.NewInvitedUser("a\u0085b@example.com", "Maria Perez")
+	if !errors.Is(err, gouncer.ErrInvalidEmail) {
+		t.Errorf("NewInvitedUser() error = %v, want %v", err, gouncer.ErrInvalidEmail)
 	}
 }
