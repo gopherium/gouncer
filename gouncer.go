@@ -10,6 +10,7 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -125,5 +126,5 @@ func isValidEmail(email string) bool {
 		return false
 	}
 	parsed, err := mail.ParseAddress(email)
-	return err == nil && parsed.Address == email
+	return err == nil && parsed.Address == email && !strings.ContainsFunc(email, unicode.IsControl)
 }

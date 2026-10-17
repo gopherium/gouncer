@@ -56,6 +56,15 @@ func TestNewUserRejectsInvalidInput(t *testing.T) {
 		"empty email":        {"", "Ada", "correct horse battery", gouncer.ErrInvalidEmail},
 		"email without at":   {"ada.example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail},
 		"email with display": {"Ada <ada@example.com>", "Ada", "correct horse battery", gouncer.ErrInvalidEmail},
+		"email with C0 control": {
+			"a\x1bb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with C1 control U+0085": {
+			"a\u0085b@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with C1 control U+009B": {
+			"a\u009b8mb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
 		"email too long": {
 			strings.Repeat("a", 250) + "@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
@@ -160,5 +169,14 @@ func TestPasswordHashesAreSalted(t *testing.T) {
 
 	if first.PasswordHash == second.PasswordHash {
 		t.Error("two hashes of the same password are identical, want unique salts")
+	}
+}
+
+func TestNewUserRefusesControlCharactersInEmail(t *testing.T) {
+	t.Parallel()
+
+	_, err := gouncer.NewUser("a\u009b8mb@example.com", "Maria Perez", "correct horse battery")
+	if !errors.Is(err, gouncer.ErrInvalidEmail) {
+		t.Errorf("NewUser() error = %v, want %v", err, gouncer.ErrInvalidEmail)
 	}
 }
