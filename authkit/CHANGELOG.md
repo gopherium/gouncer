@@ -7,6 +7,13 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+
+- `AdminHandlers.SetAccountRoleFrom` and `SetAccountDisabledFrom`, the writes the handlers use, answering `ErrRoleChanged` under `AdminConfig.Roles` when the role moved.
+- `ErrBeyondReach`, answered as a 403 with the code `role_beyond_reach`, which `SetAccountDisabledFrom` returns when re-enabling an account whose held role `AdminConfig.Roles` does not declare.
+
 ## [0.22.0] - 2026-10-18
 
 ### Added

@@ -125,16 +125,29 @@ func (a *AdminHandlers) CreateAccount(ctx context.Context, email, name, password
 
 // SetAccountDisabled updates whether the account may log in, refusing an actor disabling itself.
 func (a *AdminHandlers) SetAccountDisabled(ctx context.Context, actorID, id uuid.UUID, disabled bool) error {
-	if disabled && actorID == id {
+	if selfDisabling(actorID, id, disabled) {
 		return ErrSelfDisable
 	}
 	return a.store.SetUserDisabledUnderCover(ctx, id, disabled, a.privileged)
 }
 
-// setDisabledFrom updates whether the account may log in while it holds held, under SetAccountDisabled's checks.
-func (a *AdminHandlers) setDisabledFrom(ctx context.Context, actorID, id uuid.UUID, held string, disabled bool) error {
-	if a.roles == nil || (disabled && actorID == id) {
+// selfDisabling reports whether the write disables the actor's own account.
+func selfDisabling(actorID, id uuid.UUID, disabled bool) bool {
+	return disabled && actorID == id
+}
+
+// SetAccountDisabledFrom is SetAccountDisabled checked against held, refusing to re-enable an undeclared held role.
+func (a *AdminHandlers) SetAccountDisabledFrom(
+	ctx context.Context,
+	actorID, id uuid.UUID,
+	held string,
+	disabled bool,
+) error {
+	if a.roles == nil || selfDisabling(actorID, id, disabled) {
 		return a.SetAccountDisabled(ctx, actorID, id, disabled)
+	}
+	if !disabled && !declared(a.roles, held) {
+		return ErrBeyondReach
 	}
 	return a.store.SetUserDisabledFrom(ctx, id, held, disabled, a.privileged)
 }
@@ -150,8 +163,8 @@ func (a *AdminHandlers) SetAccountRole(ctx context.Context, actorID, id uuid.UUI
 	return a.store.SetUserRole(ctx, id, role, a.privileged)
 }
 
-// setRoleFrom writes the role an account holds while it holds held, under SetAccountRole's checks.
-func (a *AdminHandlers) setRoleFrom(ctx context.Context, actorID, id uuid.UUID, held, role string) error {
+// SetAccountRoleFrom is SetAccountRole, answering [ErrRoleChanged] under a role source once the role left held.
+func (a *AdminHandlers) SetAccountRoleFrom(ctx context.Context, actorID, id uuid.UUID, held, role string) error {
 	if a.roles == nil {
 		return a.SetAccountRole(ctx, actorID, id, role)
 	}
@@ -245,7 +258,7 @@ func (a *AdminHandlers) SetDisabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor := IdentityFromContext(r.Context())
-	err = a.setDisabledFrom(r.Context(), actor.ID, id, held, *req.Disabled)
+	err = a.SetAccountDisabledFrom(r.Context(), actor.ID, id, held, *req.Disabled)
 	if errors.Is(err, ErrSelfDisable) {
 		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "cannot disable your own account", Code: "self_disable_refused",
@@ -304,7 +317,7 @@ func (a *AdminHandlers) SetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor := IdentityFromContext(r.Context())
-	err = a.setRoleFrom(r.Context(), actor.ID, id, held, *req.Role)
+	err = a.SetAccountRoleFrom(r.Context(), actor.ID, id, held, *req.Role)
 	if errors.Is(err, ErrSelfRole) {
 		RespondError(w, http.StatusUnprocessableEntity, ErrorResponse{
 			Message: "cannot change your own role", Code: "self_role_refused",

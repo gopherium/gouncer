@@ -15,6 +15,9 @@ import (
 // ErrUnknownRole reports a role the role source does not declare.
 var ErrUnknownRole = errors.New("authkit: unknown role")
 
+// ErrBeyondReach reports a role or an account that lies beyond the actor's reach.
+var ErrBeyondReach = errors.New("authkit: role beyond reach")
+
 // ErrRoleChanged reports an account whose role is no longer the one the write was checked against.
 var ErrRoleChanged = errors.New("authkit: role changed")
 
@@ -90,7 +93,7 @@ func (a *AdminHandlers) refuseOutranking(w http.ResponseWriter, r *http.Request,
 
 // respondBeyondReach answers that the role lies beyond the actor's reach.
 func respondBeyondReach(w http.ResponseWriter) {
-	RespondError(w, http.StatusForbidden, ErrorResponse{Message: "role beyond reach", Code: "role_beyond_reach"})
+	respondAuthError(w, ErrBeyondReach)
 }
 
 // accountReader is a store that reads one account by id.

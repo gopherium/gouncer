@@ -81,6 +81,8 @@ var authErrors = []struct {
 		ErrorResponse{Message: "email already in use", Code: "email_taken"}},
 	{ErrUnknownRole, http.StatusUnprocessableEntity,
 		ErrorResponse{Message: "unknown role", Code: "role_unknown", Meta: map[string]any{"field": "role"}}},
+	{ErrBeyondReach, http.StatusForbidden,
+		ErrorResponse{Message: "role beyond reach", Code: "role_beyond_reach"}},
 	{ErrRoleChanged, http.StatusConflict,
 		ErrorResponse{Message: "role changed", Code: "role_changed"}},
 	{ErrSetupDone, http.StatusConflict,
