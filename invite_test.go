@@ -67,8 +67,8 @@ func TestNewInvitedUserRejectsInvalidIdentity(t *testing.T) {
 		"email with C1 control U+009B": {
 			"a\u009b8mb@example.com", "Maria", gouncer.ErrInvalidEmail,
 		},
-		"empty name":         {"maria@example.com", "   ", gouncer.ErrEmptyName},
-		"name too long":      {"maria@example.com", strings.Repeat("m", 257), gouncer.ErrNameTooLong},
+		"empty name":    {"maria@example.com", "   ", gouncer.ErrEmptyName},
+		"name too long": {"maria@example.com", strings.Repeat("m", 257), gouncer.ErrNameTooLong},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
