@@ -42,7 +42,7 @@ importers:
         version: 4.4.5
       '@vitejs/plugin-react':
         specifier: ^6.0.3
-        version: 6.0.3(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+        version: 6.0.3(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
       '@vitest/coverage-v8':
         specifier: ^5.0.3
         version: 5.0.3(vitest@5.0.3)
@@ -54,10 +54,10 @@ importers:
         version: 18.0.0(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@wordpress/theme':
         specifier: 2.3.0
-        version: 2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+        version: 2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
       '@wordpress/ui':
         specifier: 0.24.0
-        version: 0.24.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+        version: 0.24.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(supports-color@7.2.0)
@@ -99,10 +99,10 @@ importers:
         version: 8.64.0(eslint@9.39.5(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       vite:
         specifier: ^8.1.4
-        version: 8.1.5(@types/node@26.1.1)(yaml@2.9.0)
+        version: 8.1.6(@types/node@26.1.1)(yaml@2.9.0)
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+        version: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
 
 packages:
 
@@ -1769,10 +1769,6 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  picomatch@4.0.5:
-    resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
-    engines: {node: '>=12'}
-
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
@@ -2058,8 +2054,8 @@ packages:
     peerDependencies:
       react: ^19.2.8
 
-  vite@8.1.5:
-    resolution: {integrity: sha512-7ULLwsCdYx/nRyrpiEwvqb5TFHrMVZyBt+rg/OAXT7rgj/z+DtTDyKFeLAdDkubDVDKD8jOsndmy7m55XcfUsw==}
+  vite@8.1.6:
+    resolution: {integrity: sha512-aRAHIxx5SW5zc1sMqFwJU/t5qaFfXb5Hj0J7W0VXihu/X99+346tz6080tO1T1xVIJORX/b3zVTXGFqUXh35uw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -2664,7 +2660,7 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
     optionalDependencies:
-      vitest: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+      vitest: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
 
   '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
@@ -2812,10 +2808,10 @@ snapshots:
       '@typescript-eslint/types': 8.64.0
       eslint-visitor-keys: 5.0.1
 
-  '@vitejs/plugin-react@6.0.3(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))':
+  '@vitejs/plugin-react@6.0.3(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.1.5(@types/node@26.1.1)(yaml@2.9.0)
+      vite: 8.1.6(@types/node@26.1.1)(yaml@2.9.0)
 
   '@vitest/coverage-v8@5.0.3(vitest@5.0.3)':
     dependencies:
@@ -2827,7 +2823,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+      vitest: 5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
 
   '@vitest/istanbul-lib-coverage@1.0.2': {}
 
@@ -2835,7 +2831,7 @@ snapshots:
     dependencies:
       '@vitest/istanbul-lib-coverage': 1.0.2
 
-  '@vitest/mocker@5.0.3(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))':
+  '@vitest/mocker@5.0.3(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
@@ -2843,7 +2839,7 @@ snapshots:
       magic-string: 1.4.3
     optionalDependencies:
       msw: 2.15.0(@types/node@26.1.1)(typescript@6.0.3)
-      vite: 8.1.5(@types/node@26.1.1)(yaml@2.9.0)
+      vite: 8.1.6(@types/node@26.1.1)(yaml@2.9.0)
 
   '@vitest/spy@5.0.3': {}
 
@@ -2942,7 +2938,7 @@ snapshots:
 
   '@wordpress/style-runtime@0.13.0': {}
 
-  '@wordpress/theme@2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))':
+  '@wordpress/theme@2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))':
     dependencies:
       '@babel/parser': 7.29.7
       '@babel/types': 7.29.7
@@ -2961,11 +2957,11 @@ snapshots:
       postcss: 8.5.29
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-      vite: 8.1.5(@types/node@26.1.1)(yaml@2.9.0)
+      vite: 8.1.6(@types/node@26.1.1)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@types/react-dom'
 
-  '@wordpress/ui@0.24.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))':
+  '@wordpress/ui@0.24.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))':
     dependencies:
       '@base-ui/react': 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@daypicker/react': 10.0.1(@types/react@19.2.17)(react@19.2.8)
@@ -2979,7 +2975,7 @@ snapshots:
       '@wordpress/private-apis': 2.0.0
       '@wordpress/react-inert-value': 1.0.0(@types/react@19.2.17)(react@19.2.8)
       '@wordpress/style-runtime': 0.13.0
-      '@wordpress/theme': 2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+      '@wordpress/theme': 2.3.0(@types/react@19.2.17)(postcss@8.5.29)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
       '@wordpress/warning': 3.57.0
       clsx: 2.1.1
       date-fns: 4.4.0
@@ -3340,9 +3336,9 @@ snapshots:
     dependencies:
       fast-string-width: 3.0.2
 
-  fdir@6.5.0(picomatch@4.0.5):
+  fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
-      picomatch: 4.0.5
+      picomatch: 4.0.7
 
   file-entry-cache@8.0.0:
     dependencies:
@@ -3761,8 +3757,6 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  picomatch@4.0.5: {}
-
   picomatch@4.0.7: {}
 
   pofile@1.0.11: {}
@@ -3948,8 +3942,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.5)
-      picomatch: 4.0.5
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
 
   tinyrainbow@3.2.0: {}
 
@@ -4023,10 +4017,10 @@ snapshots:
     dependencies:
       react: 19.2.8
 
-  vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0):
+  vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.29
       rolldown: 1.1.5
       tinyglobby: 0.2.17
@@ -4035,10 +4029,10 @@ snapshots:
       fsevents: 2.3.3
       yaml: 2.9.0
 
-  vitest@5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0)):
+  vitest@5.0.3(@types/node@26.1.1)(@vitest/coverage-v8@5.0.3)(jsdom@30.1.2)(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.5(@types/node@26.1.1)(yaml@2.9.0))
+      '@vitest/mocker': 5.0.3(msw@2.15.0(@types/node@26.1.1)(typescript@6.0.3))(vite@8.1.6(@types/node@26.1.1)(yaml@2.9.0))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -4049,7 +4043,7 @@ snapshots:
       tinybench: 6.2.1
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.1.5(@types/node@26.1.1)(yaml@2.9.0)
+      vite: 8.1.6(@types/node@26.1.1)(yaml@2.9.0)
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.1.1
