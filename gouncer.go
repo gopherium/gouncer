@@ -17,7 +17,7 @@ import (
 // ErrInvalidEmail reports that an email address is not a plain valid address.
 var ErrInvalidEmail = errors.New("gouncer: invalid email")
 
-// ErrEmptyName reports that a user name is empty or only whitespace.
+// ErrEmptyName reports that a user name is empty after cleaning.
 var ErrEmptyName = errors.New("gouncer: empty name")
 
 // ErrWeakPassword reports that a password is shorter than the minimum length.
@@ -53,7 +53,7 @@ type User struct {
 }
 
 // NewUser returns a validated confirmed [User] with a normalized email,
-// a trimmed name, and the password stored as an argon2id hash. Invalid
+// a cleaned name, and the password stored as an argon2id hash. Invalid
 // input returns one of the package's Err* sentinels.
 func NewUser(email, name, password string) (User, error) {
 	u, err := newIdentity(email, name)
@@ -90,17 +90,17 @@ func (u *User) SetPassword(password string) error {
 }
 
 // newIdentity returns an unconfirmed [User] with a validated normalized
-// email and trimmed name, and no password.
+// email and cleaned name, and no password.
 func newIdentity(email, name string) (User, error) {
 	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
 	if !isValidEmail(normalizedEmail) {
 		return User{}, ErrInvalidEmail
 	}
-	trimmedName := strings.TrimSpace(name)
-	if trimmedName == "" {
+	cleanedName := cleanName(name)
+	if cleanedName == "" {
 		return User{}, ErrEmptyName
 	}
-	if len([]rune(trimmedName)) > maxNameLength {
+	if len([]rune(cleanedName)) > maxNameLength {
 		return User{}, ErrNameTooLong
 	}
 	id, err := uuid.NewV7()
@@ -110,7 +110,7 @@ func newIdentity(email, name string) (User, error) {
 	return User{
 		ID:        id,
 		Email:     normalizedEmail,
-		Name:      trimmedName,
+		Name:      cleanedName,
 		CreatedAt: time.Now().UTC(),
 	}, nil
 }
