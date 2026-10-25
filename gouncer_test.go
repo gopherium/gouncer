@@ -65,6 +65,15 @@ func TestNewUserRejectsInvalidInput(t *testing.T) {
 		"email with C1 control U+009B": {
 			"a\u009b8mb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
+		"email with an invalid UTF-8 byte": {
+			"a\x9bb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with U+0130": {
+			"Aİ@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with Kelvin sign U+212A": {
+			"Kelvin@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
 		"email too long": {
 			strings.Repeat("a", 250) + "@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
