@@ -90,7 +90,11 @@ func (u *User) SetPassword(password string) error {
 
 // newIdentity returns an unconfirmed [User] with a normalized email, a cleaned name and no password.
 func newIdentity(email, name string) (User, error) {
-	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	trimmedEmail := strings.TrimSpace(email)
+	if !isValidEmail(trimmedEmail) || strings.ContainsFunc(trimmedEmail, lowersToASCII) {
+		return User{}, ErrInvalidEmail
+	}
+	normalizedEmail := strings.ToLower(trimmedEmail)
 	if !isValidEmail(normalizedEmail) {
 		return User{}, ErrInvalidEmail
 	}
@@ -111,6 +115,12 @@ func newIdentity(email, name string) (User, error) {
 		Name:      cleanedName,
 		CreatedAt: time.Now().UTC(),
 	}, nil
+}
+
+// lowersToASCII reports whether r is outside ASCII but lowercases to an
+// ASCII character, such as U+0130 or the Kelvin sign U+212A.
+func lowersToASCII(r rune) bool {
+	return r > unicode.MaxASCII && unicode.ToLower(r) <= unicode.MaxASCII
 }
 
 // maxEmailLength is the RFC 5321 address-length limit.
