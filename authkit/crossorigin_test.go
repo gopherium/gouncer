@@ -11,7 +11,9 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/gopherium/gouncer/authkit"
 )
@@ -25,6 +27,7 @@ const proxyPeer = "10.0.0.2:1234"
 // browserCall describes one request as it reaches the guard.
 type browserCall struct {
 	method         string
+	path           string
 	host           string
 	remote         string
 	fetchSite      string
@@ -36,7 +39,7 @@ type browserCall struct {
 
 // request builds the HTTP request call describes.
 func (c browserCall) request() *http.Request {
-	request := httptest.NewRequest(cmp.Or(c.method, http.MethodPost), "/api/graphql", nil)
+	request := httptest.NewRequest(cmp.Or(c.method, http.MethodPost), cmp.Or(c.path, "/api/graphql"), nil)
 	request.Host = cmp.Or(c.host, siteHost)
 	request.RemoteAddr = cmp.Or(c.remote, request.RemoteAddr)
 	headers := map[string]string{
@@ -234,6 +237,49 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 				"fetch_site": "",
 			},
 		},
+		{
+			name: "encoded control in path",
+			call: browserCall{path: "/%C2%9B31m", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/%C2%9B31m", "fetch_site": ""},
+		},
+		{
+			name: "preserved path escaping",
+			call: browserCall{path: "/api%2fgraphql", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/api%2fgraphql", "fetch_site": ""},
+		},
+		{
+			name: "control in origin",
+			call: browserCall{origin: "https://example.org/\u009b31m"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": `https://example.org/\u009b31m`,
+				"fetch_site": ""},
+		},
+		{
+			name: "control in fetch site",
+			call: browserCall{fetchSite: "same-site\u009b31m", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "host": siteHost, "origin": "https://example.org",
+				"fetch_site": `same-site\u009b31m`},
+		},
+		{
+			name: "control in host",
+			call: browserCall{host: "app.example.com\u009b31m", fetchSite: "cross-site", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "host": `app.example.com\u009b31m`, "origin": "https://example.org",
+				"fetch_site": "cross-site"},
+		},
+		{
+			name: "other controls in host and origin",
+			call: browserCall{host: "app\x00\t\n\r\x1b\x7f\u0080\u009f", fetchSite: "cross-site",
+				origin: "https://example.org/\x00\t\n\r\x1b\x7f\u0080\u009f"},
+			want: map[string]any{"reason": "fetch-site", "host": `app\x00\t\n\r\x1b\x7f\u0080\u009f`,
+				"origin": `https://example.org/\x00\t\n\r\x1b\x7f\u0080\u009f`, "fetch_site": "cross-site"},
+		},
+		{
+			name: "printable characters are unchanged",
+			call: browserCall{host: "例子.example", fetchSite: "cross-site", origin: `https://例子.example/"\literal`},
+			want: map[string]any{"reason": "fetch-site", "host": "例子.example", "origin": `https://例子.example/"\literal`,
+				"fetch_site": "cross-site"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -243,12 +289,15 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 
 			handler.ServeHTTP(httptest.NewRecorder(), tc.call.request())
 
+			if strings.ContainsAny(logged.String(), "\x00\t\r\x1b\x7f\u0080\u009b\u009f") {
+				t.Errorf("log = %q, want no raw control characters", logged.String())
+			}
 			line := loggedLine(t, logged)
 			want := map[string]any{"level": "WARN", "msg": "write refused", "method": http.MethodPost, "path": "/api/graphql"}
 			maps.Copy(want, tc.want)
 			for key, value := range want {
 				if line[key] != value {
-					t.Errorf("log %s = %v, want %v", key, line[key], value)
+					t.Errorf("log %s = %q, want %q", key, line[key], value)
 				}
 			}
 			delete(line, "time")
@@ -256,6 +305,44 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 				t.Errorf("log = %v, want only the fields %v", line, want)
 			}
 		})
+	}
+}
+
+func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
+	t.Parallel()
+
+	var controls strings.Builder
+	for control := rune(0); control <= 0x9f; control++ {
+		if control <= 0x1f || control >= 0x7f {
+			controls.WriteRune(control)
+		}
+	}
+	var logged bytes.Buffer
+	seen := make(map[string]bool)
+	logger := slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+			if attr.Key == "host" || attr.Key == "origin" || attr.Key == "fetch_site" {
+				seen[attr.Key] = true
+				if value := attr.Value.String(); strings.ContainsFunc(value, unicode.IsControl) {
+					t.Errorf("handler received %s = %q, want controls escaped", attr.Key, value)
+				}
+			}
+			return attr
+		},
+	}))
+	handler := authkit.CrossOriginGuard(logger)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("refused request reached the handler")
+	}))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, browserCall{
+		host: "app.example.com" + controls.String(), origin: "https://example.org/" + controls.String(),
+		fetchSite: "same-site" + controls.String(),
+	}.request())
+	if recorder.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+	}
+	if !seen["host"] || !seen["origin"] || !seen["fetch_site"] {
+		t.Errorf("logged fields = %v, want host, origin and fetch_site", seen)
 	}
 }
 

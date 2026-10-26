@@ -5,6 +5,9 @@ package authkit
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
+	"unicode"
 )
 
 // CrossOriginGuard returns root middleware refusing cross-origin browser writes, logging to logger or slog.Default.
@@ -26,10 +29,28 @@ func refuseCrossOrigin(w http.ResponseWriter, r *http.Request, logger *slog.Logg
 	if fetchSite != "" {
 		reason = "fetch-site"
 	}
-	logger.WarnContext(r.Context(), "write refused", "reason", reason, "method", r.Method, "path", r.URL.Path,
-		"host", r.Host, "origin", r.Header.Get("Origin"), "fetch_site", fetchSite)
+	logger.WarnContext(r.Context(), "write refused", "reason", reason, "method", r.Method, "path", r.URL.EscapedPath(),
+		"host", escapeLogControls(r.Host), "origin", escapeLogControls(r.Header.Get("Origin")),
+		"fetch_site", escapeLogControls(fetchSite))
 	w.Header().Set("Cache-Control", "no-store")
 	RespondError(w, http.StatusForbidden, ErrorResponse{
 		Message: "cross-origin request refused", Code: "request_cross_origin",
 	})
+}
+
+// escapeLogControls escapes control characters before any log handler can write them.
+func escapeLogControls(value string) string {
+	if !strings.ContainsFunc(value, unicode.IsControl) {
+		return value
+	}
+	var escaped strings.Builder
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			quoted := strconv.QuoteRune(r)
+			escaped.WriteString(quoted[1 : len(quoted)-1])
+		} else {
+			escaped.WriteRune(r)
+		}
+	}
+	return escaped.String()
 }
