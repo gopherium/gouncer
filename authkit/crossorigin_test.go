@@ -78,6 +78,46 @@ func loggedLine(t *testing.T, logged *bytes.Buffer) map[string]any {
 	return line
 }
 
+// assertRefusedWriteLog checks safe JSON output and exactly the expected refusal fields, ignoring the timestamp.
+func assertRefusedWriteLog(t *testing.T, logged *bytes.Buffer, fields map[string]any) {
+	t.Helper()
+	if value := strings.TrimSuffix(logged.String(), "\n"); strings.ContainsFunc(value, unicode.IsControl) {
+		t.Errorf("log = %q, want no raw control characters", logged.String())
+	}
+	line := loggedLine(t, logged)
+	delete(line, "time")
+	want := map[string]any{"level": "WARN", "msg": "write refused", "method": http.MethodPost, "path": "/api/graphql"}
+	maps.Copy(want, fields)
+	if !maps.Equal(line, want) {
+		t.Errorf("log = %#v, want exactly the fields %#v", line, want)
+	}
+}
+
+// controlCharacters returns all C0 and C1 control characters, including DEL.
+func controlCharacters() string {
+	var controls strings.Builder
+	for control := rune(0); control <= 0x1f; control++ {
+		controls.WriteRune(control)
+	}
+	for control := rune(0x7f); control <= 0x9f; control++ {
+		controls.WriteRune(control)
+	}
+	return controls.String()
+}
+
+// assertEscapedLogAttr checks request headers before serialization and records which fields the handler received.
+func assertEscapedLogAttr(t *testing.T, seen map[string]bool, attr slog.Attr) slog.Attr {
+	t.Helper()
+	switch attr.Key {
+	case "host", "origin", "fetch_site":
+		seen[attr.Key] = true
+		if value := attr.Value.String(); strings.ContainsFunc(value, unicode.IsControl) {
+			t.Errorf("handler received %s = %q, want controls escaped", attr.Key, value)
+		}
+	}
+	return attr
+}
+
 func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	t.Parallel()
 
@@ -211,6 +251,7 @@ func TestCrossOriginGuardAnswersAnUncachedJSONError(t *testing.T) {
 	}
 }
 
+// TestCrossOriginGuardLogsTheRefusedWrite verifies the refusal fields for ordinary requests.
 func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 	t.Parallel()
 
@@ -237,6 +278,27 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 				"fetch_site": "",
 			},
 		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler, _, logged := guarded()
+			handler.ServeHTTP(httptest.NewRecorder(), tc.call.request())
+			assertRefusedWriteLog(t, logged, tc.want)
+		})
+	}
+}
+
+// TestCrossOriginGuardLogsEscapedRefusalFields verifies path encoding and safe header values in JSON logs.
+func TestCrossOriginGuardLogsEscapedRefusalFields(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		call browserCall
+		want map[string]any
+	}{
 		{
 			name: "encoded control in path",
 			call: browserCall{path: "/%C2%9B31m", origin: "https://example.org"},
@@ -286,48 +348,22 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 			t.Parallel()
 
 			handler, _, logged := guarded()
-
 			handler.ServeHTTP(httptest.NewRecorder(), tc.call.request())
-
-			if strings.ContainsAny(logged.String(), "\x00\t\r\x1b\x7f\u0080\u009b\u009f") {
-				t.Errorf("log = %q, want no raw control characters", logged.String())
-			}
-			line := loggedLine(t, logged)
-			want := map[string]any{"level": "WARN", "msg": "write refused", "method": http.MethodPost, "path": "/api/graphql"}
-			maps.Copy(want, tc.want)
-			for key, value := range want {
-				if line[key] != value {
-					t.Errorf("log %s = %q, want %q", key, line[key], value)
-				}
-			}
-			delete(line, "time")
-			if len(line) != len(want) {
-				t.Errorf("log = %v, want only the fields %v", line, want)
-			}
+			assertRefusedWriteLog(t, logged, tc.want)
 		})
 	}
 }
 
+// TestCrossOriginGuardEscapesControlsBeforeTheLogHandler verifies escaping before the handler formats the log.
 func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
 	t.Parallel()
 
-	var controls strings.Builder
-	for control := rune(0); control <= 0x9f; control++ {
-		if control <= 0x1f || control >= 0x7f {
-			controls.WriteRune(control)
-		}
-	}
+	controls := controlCharacters()
 	var logged bytes.Buffer
 	seen := make(map[string]bool)
 	logger := slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{
 		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
-			if attr.Key == "host" || attr.Key == "origin" || attr.Key == "fetch_site" {
-				seen[attr.Key] = true
-				if value := attr.Value.String(); strings.ContainsFunc(value, unicode.IsControl) {
-					t.Errorf("handler received %s = %q, want controls escaped", attr.Key, value)
-				}
-			}
-			return attr
+			return assertEscapedLogAttr(t, seen, attr)
 		},
 	}))
 	handler := authkit.CrossOriginGuard(logger)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -335,13 +371,13 @@ func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
 	}))
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, browserCall{
-		host: "app.example.com" + controls.String(), origin: "https://example.org/" + controls.String(),
-		fetchSite: "same-site" + controls.String(),
+		host: "app.example.com" + controls, origin: "https://example.org/" + controls,
+		fetchSite: "same-site" + controls,
 	}.request())
 	if recorder.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
 	}
-	if !seen["host"] || !seen["origin"] || !seen["fetch_site"] {
+	if len(seen) != 3 {
 		t.Errorf("logged fields = %v, want host, origin and fetch_site", seen)
 	}
 }
