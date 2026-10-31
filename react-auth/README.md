@@ -86,6 +86,28 @@ const password = usePasswordField({ length: 24, userInputs: [name, email] })
 <PasswordField password={password} generateFirst labelPosition="top" readOnly={sending} />
 ```
 
+`required` and `customValidity` take the shapes `@wordpress/ui`'s
+`ValidatedInputControl` takes. `required` adds "(Required)" to the
+label. A message shows under the field and its meter, in red with the
+warning icon, once the field is left, an `invalid` event fires or the
+form's `reportValidity()` runs. While it is `invalid` the field has
+`aria-invalid` and the browser holds the form back. When the app sets
+a message after a send, it calls the form's `reportValidity()` in an
+effect that runs after that render, so the message shows at once.
+
+An Add User form leaves `required` out, as WordPress's Add User shows
+no "(required)" by the password it always generates. It catches an
+empty password with `customValidity`, as it does for Email and Name.
+
+```tsx
+<PasswordField
+  password={password}
+  generateFirst
+  labelPosition="top"
+  customValidity={message === undefined ? undefined : { type: 'invalid', message }}
+/>
+```
+
 ## Users page
 
 The app holds the view in its address with godmin's `useListView`, as
@@ -110,8 +132,9 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   size or `sizesFailed`.
 - A row the server marks `editable: false`, and the reader's own row,
   offer no action.
-- `errorMessages` gives words to the error codes only the app's
-  transport answers. The codes authkit answers carry WordPress's words.
+- `errorMessages` gives words to the error codes only the app answers,
+  from its server or its own transport. The codes authkit answers carry
+  WordPress's words.
 - `columns` adds a column after Role as data: a label and, for each
   account id, the text, the words a screen reader hears and an optional
   link element. Pass its id to `usersListDefaults` as well, to show it.
@@ -130,7 +153,9 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   `@gopherium/gottext`, `@wordpress/dataviews`, `@wordpress/components`
   and `@wordpress/date`, and godmin's `Toaster` above the page, whose
   toasts show each name whole. The app loads the DataViews and
-  components stylesheets.
+  components stylesheets, and `@gopherium/react-auth/wpds/style.css`,
+  which clips a long email under the name and sizes `RoleSelect` on a
+  phone.
 - The account step loads zxcvbn, about 400 kB gzipped, as its own chunk
   the first time it renders. Vite reports that chunk as larger than
   500 kB.

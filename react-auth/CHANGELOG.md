@@ -10,6 +10,25 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Added
+
+- `required` and `customValidity` on `PasswordField`, as `ValidatedInputControl` takes them: the message under the field and its meter in red with the warning icon, `aria-invalid`, and the form held back while it is invalid.
+
+### Changed
+
+- `usersListDefaults` leaves Created out of the table and the phone row, as WordPress's users list has no such column. The list still opens newest first, and View options shows it.
+
+### Fixed
+
+- With `labelPosition="top"` `PasswordField` draws no strength meter for an empty password, where its blank box left a band between the field and the message under it.
+- With `labelPosition="top"` the password message and help line sit under the meter at the WPDS field gap the Email message uses, where the message sat 5px lower.
+- `RoleSelect` draws its text at 16px on a phone, as the WPDS inputs beside it do, where it stayed at 13px. It needs `/wpds/style.css`.
+- With `labelPosition="top"` the strength meter and the Caps Lock line take the form's body text size, where they read larger than the field.
+- The `/admin` REST writes keep a server `code` they have no error class for on the plain error, so the app's `errorMessages` for it show.
+- The users list draws the email under the name on one line, clipped with an ellipsis at the column edge and whole in a tooltip, where a long one ran under the Status column. It needs `/wpds/style.css`.
+
 ## [0.16.1] - 2026-10-29
 
 ### Changed
