@@ -39,6 +39,7 @@ export function RoleSelect({ grantable, value, onChange, roleLabels, placeholder
 	const items = placeholder === undefined ? roles : [{ value: null, label: placeholder }, ...roles]
 	return (
 		<SelectControl
+			className="gopherium-role-select"
 			label={__('Role', DOMAIN)}
 			items={items}
 			value={items.find((item) => (item.value ?? '') === value) ?? null}

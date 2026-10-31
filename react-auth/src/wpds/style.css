@@ -81,6 +81,7 @@
 .gopherium-setup__row {
 	display: grid;
 	grid-template-columns: 115px minmax(0, 1fr);
+	row-gap: 4px;
 	column-gap: 20px;
 	padding: 10px 20px 10px 0;
 }
@@ -94,6 +95,10 @@
 
 .gopherium-setup__row input {
 	font-size: var(--wpds-typography-font-size-lg);
+}
+
+.gopherium-setup__password + .gopherium-setup__help {
+	margin-top: var(--wpds-dimension-gap-sm);
 }
 
 .gopherium-setup .gopherium-setup__help {
@@ -146,11 +151,12 @@
 .gopherium-setup__meter {
 	box-sizing: border-box;
 	width: 100%;
-	margin: -1px 0 5px;
+	margin: -1px 0 0;
 	padding: 3px 5px;
 	border: var(--wpds-border-width-xs) solid var(--wpds-color-stroke-surface-neutral);
 	border-radius: var(--wpds-border-radius-sm);
 	color: var(--wpds-color-foreground-content-neutral);
+	font-size: var(--wpds-typography-font-size-md);
 	font-weight: normal;
 	line-height: 1.3;
 	text-align: center;
@@ -181,23 +187,34 @@
 	opacity: 1;
 }
 
+.gopherium-setup__meter.gopherium-setup__meter--empty:not(.gopherium-setup__row *) {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+
 .gopherium-setup__input input {
 	font-family: var(--wpds-typography-font-family-mono);
 }
 
-.gopherium-setup__input--short:not(:focus-within) {
+.gopherium-setup__input--short:not(:focus-within, :has(:invalid[data-validity-visible])) {
 	border-color: var(--wpds-color-stroke-surface-error-strong);
 }
 
-.gopherium-setup__input--bad:not(:focus-within) {
+.gopherium-setup__input--bad:not(:focus-within, :has(:invalid[data-validity-visible])) {
 	border-color: var(--wpds-color-stroke-surface-error);
 }
 
-.gopherium-setup__input--good:not(:focus-within) {
+.gopherium-setup__input--good:not(:focus-within, :has(:invalid[data-validity-visible])) {
 	border-color: var(--wpds-color-stroke-surface-caution);
 }
 
-.gopherium-setup__input--strong:not(:focus-within) {
+.gopherium-setup__input--strong:not(:focus-within, :has(:invalid[data-validity-visible])) {
 	border-color: var(--wpds-color-stroke-surface-success);
 }
 
@@ -207,19 +224,32 @@
 
 .gopherium-setup__caps {
 	position: relative;
-	top: -8px;
+	top: -3px;
 	display: flex;
 	align-items: flex-start;
 	padding: 6px 10px;
 	border: var(--wpds-border-width-xs) solid var(--wpds-color-stroke-surface-caution);
 	background-color: var(--wpds-color-background-surface-caution-weak);
 	color: var(--wpds-color-foreground-content-neutral);
+	font-size: var(--wpds-typography-font-size-md);
 	line-height: 1.3;
 }
 
 .gopherium-setup__row .gopherium-setup__meter,
 .gopherium-setup__row .gopherium-setup__caps {
 	font-size: 14px;
+}
+
+.gopherium-setup__row .gopherium-setup__meter {
+	margin-bottom: 5px;
+}
+
+.gopherium-setup__row .gopherium-setup__caps {
+	top: -8px;
+}
+
+.gopherium-setup__meter--empty:not(.gopherium-setup__row *) + .gopherium-setup__caps {
+	top: -1px;
 }
 
 .gopherium-setup__caps-icon {
@@ -243,6 +273,20 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.gopherium-setup__row > p {
+	grid-column: -2 / -1;
+}
+
+.gopherium-role-select [role="combobox"] {
+	font-size: max(var(--wpds-typography-font-size-md), 16px);
+}
+
+@media (min-width: 600px) {
+	.gopherium-role-select [role="combobox"] {
+		font-size: var(--wpds-typography-font-size-md);
+	}
 }
 
 @media screen and (max-width: 782px) {
