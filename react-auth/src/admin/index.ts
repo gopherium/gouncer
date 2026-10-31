@@ -121,6 +121,18 @@ function typedError(refused: Refused, errors: ErrorClasses = roleErrors): Error 
 }
 
 /**
+ * Returns the plain error naming a refused write's status, with the server's code when it sent one.
+ * @param refused - The code and message the response carries.
+ * @param write - The name the error gives the write.
+ * @param status - The status the server answered.
+ * @returns The error.
+ */
+function plainError(refused: Refused, write: string, status: number): Error {
+	const error = new Error(`${write} failed with status ${status}`)
+	return refused.code === undefined ? error : Object.assign(error, { code: refused.code })
+}
+
+/**
  * Returns the error a refused account write throws.
  * @param response - The refused HTTP response.
  * @param post - The write, with the message for an unreadable body and its name for any other status.
@@ -135,7 +147,7 @@ async function writeError(response: Response, post: AccountPost): Promise<Error>
 	if (response.status === 422) {
 		return new ValidationError(refused.message, refused)
 	}
-	return new Error(`${post.write} failed with status ${response.status}`)
+	return plainError(refused, post.write, response.status)
 }
 
 /**
@@ -245,7 +257,7 @@ async function restSetUserDisabled(id: string, disabled: boolean): Promise<void>
 	}
 	if (!response.ok) {
 		const refused = await refusalOf(response, __('the account could not be updated', DOMAIN))
-		throw typedError(refused, disableErrors) ?? new Error(`updating user failed with status ${response.status}`)
+		throw typedError(refused, disableErrors) ?? plainError(refused, 'updating user', response.status)
 	}
 }
 
@@ -267,7 +279,7 @@ async function restSetUserRole(id: string, role: string): Promise<void> {
 		throw new UnauthorizedError('session expired')
 	}
 	const refused = await refusalOf(response, __('the account could not be updated', DOMAIN))
-	throw typedError(refused, roleChangeErrors) ?? new Error(`updating role failed with status ${response.status}`)
+	throw typedError(refused, roleChangeErrors) ?? plainError(refused, 'updating role', response.status)
 }
 
 /**
