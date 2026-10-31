@@ -237,6 +237,14 @@
 	text-align: start;
 }
 
+.gopherium-user-field__email {
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 @media screen and (max-width: 782px) {
 	.gopherium-setup__row {
 		grid-template-columns: minmax(0, 1fr);
