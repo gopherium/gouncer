@@ -169,7 +169,7 @@ func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardLetsTheSiteAndOtherServersWrite verifies that allowed requests pass through without a refusal log.
+// TestCrossOriginGuardLetsTheSiteAndOtherServersWrite verifies allowed requests pass through without logging.
 func TestCrossOriginGuardLetsTheSiteAndOtherServersWrite(t *testing.T) {
 	t.Parallel()
 
