@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { __ } from '@wordpress/i18n'
-import { Button, CheckboxControl, Field, Input, Stack, Text } from '@wordpress/ui'
-import { useId, useState } from 'react'
-import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
+import { Button, CheckboxControl, ControlWithError, Field, Input, Stack, Text } from '@wordpress/ui'
+import { useId, useRef, useState } from 'react'
+import type { ComponentProps, KeyboardEvent, ReactElement, ReactNode, RefObject } from 'react'
 
 import { DOMAIN } from '../domain.js'
 import { levelOf } from './strength.js'
@@ -13,6 +13,9 @@ import type { PasswordFieldState, Strength } from './usePasswordField.js'
 
 /** Where a label sits as DataForm names it: beside its field as the installer's, or above it as a godmin form's. */
 type LabelPosition = 'side' | 'top'
+
+/** The message about the password, in the shape the WPDS ValidatedInputControl takes it. */
+type CustomValidity = ComponentProps<typeof ControlWithError>['customValidity']
 
 /** The classes of a row and its label, and the element its field root renders, none where the field stacks itself. */
 interface RowLayout {
@@ -63,6 +66,16 @@ function meterWord(strength: Strength): string {
  */
 function withTone(block: string, tone: Tone | undefined): string {
 	return tone === undefined ? block : `${block} ${block}--${tone}`
+}
+
+/**
+ * Returns the classes of the meter box, as WordPress marks its own.
+ * @param strength - What the meter knows of the password.
+ * @returns The box class with the empty mark for an empty field, or with the level's tone once scored.
+ */
+function meterClass(strength: Strength): string {
+	const box = withTone('gopherium-setup__meter', toneOf(strength))
+	return strength === 'empty' ? `${box} gopherium-setup__meter--empty` : box
 }
 
 /**
@@ -125,7 +138,7 @@ function MaskToggle({ masked, onToggle }: { masked: boolean; onToggle: () => voi
  */
 function MeterBox({ id, strength }: { id: string; strength: Strength }) {
 	return (
-		<div id={id} aria-live="polite" className={withTone('gopherium-setup__meter', toneOf(strength))}>
+		<div id={id} aria-live="polite" className={meterClass(strength)}>
 			{meterWord(strength)}
 		</div>
 	)
@@ -150,21 +163,33 @@ function CapsLockLine({ on }: { on: boolean }) {
 }
 
 /**
- * Renders the password row with the meter box, the Caps Lock line and the help line when it has one.
+ * Renders the label and the field column of the password row: the meter box, the Caps Lock line and the help line.
+ * @param label - The label, which ControlWithError marks (Required) when the field is required.
+ * @param required - Whether the field must hold a password, set by ControlWithError.
+ * @param invalid - Whether the message about the password says it is invalid.
+ * @param inputRef - Takes the password input, the element ControlWithError checks.
  * @param password - The password and its setters.
  * @param generateFirst - Whether the Generate password button comes before the field.
  * @param readOnly - Whether the password stays as it is.
  * @param help - The line under the field, if any.
  * @param layout - How the row lays out its label and field.
- * @returns The row element.
+ * @returns The label and the field column.
  */
-function PasswordRow({
+function PasswordCells({
+	label,
+	required,
+	invalid,
+	inputRef,
 	password,
 	generateFirst,
 	readOnly,
 	help,
 	layout,
 }: {
+	label: ReactNode
+	required?: boolean
+	invalid: boolean
+	inputRef: RefObject<HTMLInputElement | null>
 	password: PasswordFieldState
 	generateFirst: boolean
 	readOnly: boolean
@@ -175,17 +200,19 @@ function PasswordRow({
 	const meterId = useId()
 	const helpId = useId()
 	return (
-		<Field.Root className={layout.row} render={layout.root}>
-			<Field.Label className={layout.label}>{__('Password', DOMAIN)}</Field.Label>
+		<>
+			<Field.Label className={layout.label}>{label}</Field.Label>
 			<div>
 				{generateFirst ? <GenerateButton disabled={readOnly} onGenerate={password.generate} /> : null}
 				<div className="gopherium-setup__password">
 					<div className="gopherium-setup__password-field">
 						<Input
+							ref={inputRef}
 							type={password.masked ? 'password' : 'text'}
 							className={withTone('gopherium-setup__input', toneOf(password.strength))}
 							value={password.value}
 							readOnly={readOnly}
+							required={required}
 							onChange={(event) => password.change(event.target.value)}
 							onKeyDown={(event) => {
 								if (isPrintable(event)) {
@@ -194,6 +221,7 @@ function PasswordRow({
 							}}
 							autoComplete="new-password"
 							spellCheck={false}
+							aria-invalid={invalid || undefined}
 							aria-describedby={help === undefined ? meterId : `${meterId} ${helpId}`}
 						/>
 						<MeterBox id={meterId} strength={password.strength} />
@@ -203,7 +231,7 @@ function PasswordRow({
 				</div>
 				{help === undefined ? null : <Text render={<p id={helpId} className="gopherium-setup__help" />}>{help}</Text>}
 			</div>
-		</Field.Root>
+		</>
 	)
 }
 
@@ -259,6 +287,8 @@ function ConfirmRow({
  * @param readOnly - Whether the password and its confirmation stay as they are, such as while the form is sent.
  * @param help - The line under the field, such as the installer's line asking to store the password.
  * @param labelPosition - Each label beside its field as the installer's, the default, or above it as a godmin form's.
+ * @param required - Marks the label (Required) and holds the form back while the field is empty.
+ * @param customValidity - The message under the field, an invalid one holding the form back.
  * @returns The password rows.
  */
 export function PasswordField({
@@ -267,17 +297,38 @@ export function PasswordField({
 	readOnly = false,
 	help,
 	labelPosition = 'side',
+	required,
+	customValidity,
 }: {
 	password: PasswordFieldState
 	generateFirst?: boolean
 	readOnly?: boolean
 	help?: ReactNode
 	labelPosition?: LabelPosition
+	required?: boolean
+	customValidity?: CustomValidity
 }) {
 	const layout = ROW_LAYOUTS[labelPosition]
+	const input = useRef<HTMLInputElement>(null)
 	return (
 		<>
-			<PasswordRow password={password} generateFirst={generateFirst} readOnly={readOnly} help={help} layout={layout} />
+			<ControlWithError
+				required={required}
+				customValidity={customValidity}
+				getValidityTarget={() => input.current}
+				render={<Field.Root className={layout.row} render={layout.root} />}
+			>
+				<PasswordCells
+					label={__('Password', DOMAIN)}
+					invalid={customValidity?.type === 'invalid'}
+					inputRef={input}
+					password={password}
+					generateFirst={generateFirst}
+					readOnly={readOnly}
+					help={help}
+					layout={layout}
+				/>
+			</ControlWithError>
 			{needsConfirmation(password.strength) ? (
 				<ConfirmRow checked={password.confirmed} readOnly={readOnly} onCheckedChange={password.confirm} layout={layout} />
 			) : null}

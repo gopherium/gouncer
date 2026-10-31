@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, isInaccessible, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InputControl } from '@wordpress/ui'
 import type { ReactNode } from 'react'
-import { beforeEach, expect, onTestFinished, test, vi } from 'vitest'
+import { beforeEach, expect, test, vi } from 'vitest'
 
 import { PasswordField, usePasswordField } from '../src/wpds'
 import type { Meter } from '../src/wpds/strength'
+import { withStylesheet } from './stylesheet'
 
 const meter = vi.hoisted(() => ({ load: vi.fn() }))
 
@@ -94,13 +92,6 @@ async function withWeakPassword(field: ReactNode) {
 	return [screen.getByText('Password'), screen.getByText('Confirm Password')]
 }
 
-function withStylesheet() {
-	const sheet = document.createElement('style')
-	sheet.textContent = readFileSync(resolve('src/wpds/style.css'), 'utf8')
-	document.head.append(sheet)
-	onTestFinished(() => sheet.remove())
-}
-
 function textSizes() {
 	const texts = [
 		describedBy(passwordField())[0],
@@ -113,6 +104,19 @@ function textSizes() {
 function checkboxLine() {
 	const checkbox = document.querySelector('.gopherium-setup__checkbox') as HTMLElement
 	return getComputedStyle(checkbox).getPropertyValue('--_wp-ui-checkbox-control-label-line-height').trim()
+}
+
+function meterBox() {
+	return describedBy(passwordField())[0]
+}
+
+function meterRoom() {
+	const { position, width, height, margin, padding, borderTopWidth, overflow, clipPath } = getComputedStyle(meterBox())
+	return { position, width, height, margin, padding, borderTopWidth, overflow, clipPath }
+}
+
+function capsTop() {
+	return getComputedStyle(document.querySelector('.gopherium-setup__caps') as HTMLElement).top
 }
 
 test('stacks each label above its field as a godmin form field does, with labelPosition top', async () => {
@@ -135,7 +139,7 @@ test('stacks each label above its field as a godmin form field does, with labelP
 	expectInOrder(labels[0], generateButton(), passwordField(), labels[1], confirmBox() as HTMLElement)
 })
 
-test('sizes the meter, Caps Lock line and weak password tick as its form does, with labelPosition top', async () => {
+test("sizes the meter and Caps Lock line at the body text as WordPress's meter, with labelPosition top", async () => {
 	withStylesheet()
 	await withWeakPassword(
 		<>
@@ -145,7 +149,8 @@ test('sizes the meter, Caps Lock line and weak password tick as its form does, w
 	)
 
 	const formSize = getComputedStyle(screen.getByLabelText('Email')).fontSize
-	expect({ sizes: textSizes(), line: checkboxLine() }).toEqual({ sizes: [formSize, formSize, formSize], line: '' })
+	const body = 'var(--wpds-typography-font-size-md)'
+	expect({ sizes: textSizes(), line: checkboxLine() }).toEqual({ sizes: [body, body, formSize], line: '' })
 })
 
 test("sizes the meter, Caps Lock line and weak password tick at the installer's 14px by default", async () => {
@@ -156,6 +161,88 @@ test("sizes the meter, Caps Lock line and weak password tick at the installer's 
 		sizes: ['14px', '14px', '14px'],
 		line: expect.stringContaining('14px'),
 	})
+})
+
+test("hides an empty password's meter as WordPress's screen reader text, still read out, until it rates", async () => {
+	withStylesheet()
+	const held = await landMeter({ a: 0, abc123: 2 })
+	render(<Field labelPosition="top" />)
+	await held.land()
+
+	fireEvent.change(passwordField(), { target: { value: '' } })
+
+	expect(meterBox()).toHaveClass('gopherium-setup__meter--empty')
+	expect(isInaccessible(meterBox())).toBe(false)
+	expect(meterRoom()).toEqual({
+		position: 'absolute',
+		width: '1px',
+		height: '1px',
+		margin: '-1px',
+		padding: '0px',
+		borderTopWidth: '0px',
+		overflow: 'hidden',
+		clipPath: 'inset(50%)',
+	})
+	for (const typed of ['a', 'abc123', 'K7#mQ2!vR9@xL4$wP8']) {
+		fireEvent.change(passwordField(), { target: { value: typed } })
+		expect(meterBox(), typed).not.toHaveClass('gopherium-setup__meter--empty')
+		expect(meterRoom().position, typed).toBe('static')
+	}
+})
+
+test.each([
+	{ labelPosition: 'top', position: 'absolute', up: '-1px' },
+	{ labelPosition: 'side', position: 'static', up: '-8px' },
+] as const)(
+	"keeps an empty meter's room only in the installer, the Caps Lock line at $up, with labelPosition $labelPosition",
+	async ({ labelPosition, position, up }) => {
+		withStylesheet()
+		const user = userEvent.setup()
+		render(<Field labelPosition={labelPosition} />)
+		await user.click(passwordField())
+		await user.keyboard('{CapsLock}k')
+
+		await user.clear(passwordField())
+
+		expect(screen.getByText('Caps lock is on.')).toBeInTheDocument()
+		expect(meterBox()).toHaveClass('gopherium-setup__meter--empty')
+		expect({ position: meterRoom().position, up: capsTop() }).toEqual({ position, up })
+	},
+)
+
+test.each([
+	{ labelPosition: 'top', under: '0px', up: '-3px' },
+	{ labelPosition: 'side', under: '5px', up: '-8px' },
+] as const)(
+	'draws the Caps Lock line 3px over the meter as WordPress does, $under under it with labelPosition $labelPosition',
+	async ({ labelPosition, under, up }) => {
+		withStylesheet()
+		const user = userEvent.setup()
+		render(<Field labelPosition={labelPosition} />)
+		await user.click(passwordField())
+
+		await user.keyboard('{CapsLock}k')
+
+		expect(screen.getByText('Caps lock is on.')).toBeInTheDocument()
+		expect(getComputedStyle(meterBox()).display).toBe('block')
+		expect(getComputedStyle(meterBox()).marginBottom).toBe(under)
+		expect(capsTop()).toBe(up)
+	},
+)
+
+test("puts a help line under the meter at the WPDS description gap, where the installer keeps WordPress's 4px", () => {
+	withStylesheet()
+	render(
+		<>
+			<Field labelPosition="top" help="Store it somewhere safe." />
+			<div className="gopherium-setup">
+				<Field help="Keep it where only you can read it." />
+			</div>
+		</>,
+	)
+
+	expect(getComputedStyle(screen.getByText('Store it somewhere safe.')).marginTop).toBe('var(--wpds-dimension-gap-sm)')
+	expect(getComputedStyle(screen.getByText('Keep it where only you can read it.')).marginTop).toBe('4px')
 })
 
 test("keeps the installer's rows without labelPosition, each label beside its field", async () => {

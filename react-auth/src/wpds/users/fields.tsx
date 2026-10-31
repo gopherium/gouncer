@@ -4,7 +4,7 @@ import { InitialsAvatar } from '@gopherium/godmin'
 import { listDate } from '@gopherium/godmin/dates'
 import type { Field } from '@wordpress/dataviews'
 import { __, _x } from '@wordpress/i18n'
-import { Badge, VisuallyHidden } from '@wordpress/ui'
+import { Badge, Tooltip, VisuallyHidden } from '@wordpress/ui'
 import { cloneElement } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -102,11 +102,23 @@ function nameField(): Field<Account> {
 }
 
 /**
- * Returns the email field, the line under the name.
+ * Returns the email field, the line under the name, clipped with an ellipsis at the column edge, whole in a tooltip.
  * @returns The field.
  */
 function emailField(): Field<Account> {
-	return { id: 'email', label: __('Email', DOMAIN), type: 'text', enableGlobalSearch: true, filterBy: false }
+	return {
+		id: 'email',
+		label: __('Email', DOMAIN),
+		type: 'text',
+		enableGlobalSearch: true,
+		filterBy: false,
+		render: ({ item }) => (
+			<Tooltip.Root>
+				<Tooltip.Trigger render={<span className="gopherium-user-field__email">{item.email}</span>} />
+				<Tooltip.Popup>{item.email}</Tooltip.Popup>
+			</Tooltip.Root>
+		),
+	}
 }
 
 /**

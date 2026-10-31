@@ -66,10 +66,10 @@ test('keeps every source file free of a router, so the app holds the view', () =
 	expect(routed).toEqual([])
 })
 
-test('opens on Status, Role and Created beside the name, its email under it and its avatar before it', () => {
+test('opens on Status and Role beside the name, newest first, as WordPress lists users with no Created column', () => {
 	expect(usersListDefaults()).toEqual({
-		fields: ['status', 'role', 'created'],
-		phoneFields: ['status', 'role', 'created'],
+		fields: ['status', 'role'],
+		phoneFields: ['status', 'role'],
 		titleField: 'name',
 		descriptionField: 'email',
 		mediaField: 'avatar',
@@ -81,8 +81,8 @@ test('opens on Status, Role and Created beside the name, its email under it and 
 test('opens on the page size and the data columns the app names, the columns after Role and off the phone row', () => {
 	const defaults = usersListDefaults({ perPage: 20, columns: ['posts'] })
 
-	expect(defaults.fields).toEqual(['status', 'role', 'posts', 'created'])
-	expect(defaults.phoneFields).toEqual(['status', 'role', 'created'])
+	expect(defaults.fields).toEqual(['status', 'role', 'posts'])
+	expect(defaults.phoneFields).toEqual(['status', 'role'])
 	expect(defaults.perPage).toBe(20)
 })
 
@@ -99,5 +99,5 @@ test('hands out a new view each time, so an app changing one never changes the n
 	const first = usersListDefaults()
 	first.fields.push('posts')
 
-	expect(usersListDefaults().fields).toEqual(['status', 'role', 'created'])
+	expect(usersListDefaults().fields).toEqual(['status', 'role'])
 })

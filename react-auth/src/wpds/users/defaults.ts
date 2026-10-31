@@ -17,8 +17,8 @@ export interface UsersListOptions {
  */
 export function usersListDefaults({ perPage, columns = [] }: UsersListOptions = {}): ListDefaults {
 	return {
-		fields: ['status', 'role', ...columns, 'created'],
-		phoneFields: ['status', 'role', 'created'],
+		fields: ['status', 'role', ...columns],
+		phoneFields: ['status', 'role'],
 		titleField: 'name',
 		descriptionField: 'email',
 		mediaField: 'avatar',

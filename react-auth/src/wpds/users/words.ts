@@ -56,7 +56,7 @@ function codeMessages(): Record<string, string> {
 }
 
 /**
- * Returns the code an error carries, as every typed error of the admin calls does.
+ * Returns the code an error carries, as every typed admin error does, and a plain write error when the server sent one.
  * @param error - What a write failed with.
  * @returns The code, none for an error carrying no code.
  */

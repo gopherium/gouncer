@@ -7,11 +7,43 @@ import { HttpResponse, delay, http } from 'msw'
 import { beforeEach, expect, test } from 'vitest'
 
 import { server, usersFailure } from '../src/testing'
+import { withStylesheet } from './stylesheet'
 import { accountOf, barred, colleague, holding, renderUsers, rowOf, shownNames, signedIn } from './users-harness'
 
 const roleLabels = { admin: 'Administrator', member: 'Member' }
 
+const longEmail = 'visiting.correspondent.for.the.regional.weekend.supplement@example.com'
+
 beforeEach(() => holding([signedIn, colleague, barred]))
+
+function clipping(element: HTMLElement) {
+	const style = getComputedStyle(element)
+	return {
+		display: style.display,
+		maxWidth: style.maxWidth,
+		overflow: style.overflow,
+		textOverflow: style.textOverflow,
+		whiteSpace: style.whiteSpace,
+	}
+}
+
+const clippedLine = {
+	display: 'block',
+	maxWidth: '100%',
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+	whiteSpace: 'nowrap',
+}
+
+async function viewOptions() {
+	await screen.findByRole('table')
+	await userEvent.click(screen.getByRole('button', { name: 'View options' }))
+	return within(await waitFor(() => document.querySelector('.dataviews-config__popover') as HTMLElement))
+}
+
+async function showCreated() {
+	await userEvent.click((await viewOptions()).getByRole('button', { name: 'Created' }))
+}
 
 test('keeps the list toolbar while the accounts arrive', async () => {
 	server.use(http.get('/api/users', () => new Promise(() => {})))
@@ -112,6 +144,41 @@ test('shows each account email under its name, in the name column', async () => 
 	expect(screen.queryByRole('columnheader', { name: /Email/ })).not.toBeInTheDocument()
 })
 
+test('draws a long email on one line of its own, clipped with an ellipsis at the name column edge', async () => {
+	withStylesheet()
+	holding([signedIn, accountOf('fd', 'Maria Perez', { email: longEmail })])
+	renderUsers()
+
+	const row = await rowOf('Maria Perez')
+	const email = row.getByText(longEmail)
+	expect(email.parentElement).toHaveClass('dataviews-view-table__primary-column-content')
+	expect(clipping(email)).toEqual(clippedLine)
+})
+
+test('shows the whole email in a tooltip while the pointer rests on it, as the media file name does', async () => {
+	holding([signedIn, accountOf('fd', 'Maria Perez', { email: longEmail })])
+	renderUsers()
+
+	const email = (await rowOf('Maria Perez')).getByText(longEmail)
+	await userEvent.hover(email)
+
+	const tip = await screen.findByText(longEmail, { ignore: '.gopherium-user-field__email' }, { timeout: 2000 })
+	expect(email.closest('tr')).not.toContainElement(tip)
+	expect(email).toHaveClass('gopherium-user-field__email')
+})
+
+test('clips a long email the same way in the phone list', async () => {
+	withStylesheet()
+	setViewport({ matches: true })
+	holding([signedIn, accountOf('fd', 'Maria Perez', { email: longEmail })])
+	renderUsers({ perPage: 20 })
+
+	const item = (await screen.findByRole('button', { name: 'Maria Perez' })).closest('[role="row"]') as HTMLElement
+	const email = within(item).getByText(longEmail)
+	expect(email.parentElement).toHaveClass('dataviews-view-list__field')
+	expect(clipping(email)).toEqual(clippedLine)
+})
+
 test('marks every name with its account, so a dialog finds the row again', async () => {
 	renderUsers()
 
@@ -146,17 +213,29 @@ test('lets a reader hide the avatars through the view options, where they read a
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).queryByText('A')).not.toBeInTheDocument())
 })
 
-test('dates every account in the abbreviated date and time WordPress lists show', async () => {
+test('dates every account in the abbreviated date and time WordPress lists show, once Created is shown', async () => {
 	renderUsers()
+	await showCreated()
 
 	expect((await rowOf('Ana Lopez')).getByText('Jul 8, 2026 10:00 am')).toBeInTheDocument()
 })
 
-test('sorts the accounts by when they were created, newest first, when the address names no order', async () => {
+test('sorts the accounts newest first with no Created column, as WordPress lists users without one', async () => {
 	renderUsers()
 
 	expect(await shownNames()).toEqual([barred.name, colleague.name, signedIn.name])
-	expect(screen.getByRole('columnheader', { name: /Created/ })).toHaveAttribute('aria-sort', 'descending')
+	expect(screen.queryByRole('columnheader', { name: /Created/ })).not.toBeInTheDocument()
+})
+
+test('offers Created under View options, unticked, and shows it sorted newest first once picked', async () => {
+	renderUsers()
+
+	const created = (await viewOptions()).getByRole('button', { name: 'Created' })
+	expect(created.querySelector('svg')).toBeNull()
+	await userEvent.click(created)
+
+	expect(await screen.findByRole('columnheader', { name: /Created/ })).toHaveAttribute('aria-sort', 'descending')
+	expect(await shownNames()).toEqual([barred.name, colleague.name, signedIn.name])
 })
 
 test('sorts the accounts by email when the address says so, as WordPress sorts its Email column', async () => {
