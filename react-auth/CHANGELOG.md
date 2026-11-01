@@ -10,6 +10,16 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** `/testing` moves to msw 3: the optional `msw` peer is `^3.0.0`, where it was `^2.15.0`, and the optional `vitest` peer is `^5.0.4`, where it was `^4.1.10 || ^5.0.0`.
+- **Breaking.** `/testing` loads by `import` only, since `require` fails on its top level await.
+- **Breaking.** `installTestEnvironment` puts Node's `File` and `FormData` on the global, so a `fetch` upload reaches its msw handler with its name and bytes, also through a library that kept the `File` class at import.
+- **Breaking.** Under that swap `new FormData(form)`, which a React form action calls, and `FileReader` on a `File` throw, `XMLHttpRequest` sends a form or a `File` as placeholder text, and a `File` does not mix with a `Blob`.
+- `installTestEnvironment` waits two real timer turns after a test, so a request left in flight can meet that test's handlers.
+
 ## [0.17.0] - 2026-10-31
 
 ### Added

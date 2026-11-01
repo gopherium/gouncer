@@ -156,6 +156,12 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   components stylesheets, and `@gopherium/react-auth/wpds/style.css`,
   which clips a long email under the name and sizes `RoleSelect` on a
   phone.
+- `/testing` loads by `import` only. `installTestEnvironment` puts
+  Node's `File` and `FormData` on the global, so under jsdom
+  `new FormData(form)`, which a React form action calls, and
+  `FileReader` on a `File` throw a `TypeError`, `XMLHttpRequest` sends
+  a form or a `File` as placeholder text, and a `File` does not mix
+  with a `Blob`.
 - The account step loads zxcvbn, about 400 kB gzipped, as its own chunk
   the first time it renders. Vite reports that chunk as larger than
   500 kB.
