@@ -2,14 +2,14 @@
 
 import { expect, test, vi } from 'vitest'
 
-import { installTestEnvironment, server } from '../src/testing'
-
+vi.useFakeTimers()
+vi.resetModules()
+const { installTestEnvironment, server } = await import('../src/testing')
 vi.spyOn(server, 'listen').mockImplementation(() => {})
 vi.spyOn(server, 'close').mockImplementation(() => {})
-vi.useFakeTimers()
 installTestEnvironment()
 vi.useRealTimers()
 
-test('ends a test when the install ran under fake timers', () => {
+test('ends a test when the harness loaded and installed under fake timers', () => {
 	expect(vi.isFakeTimers()).toBe(false)
 })

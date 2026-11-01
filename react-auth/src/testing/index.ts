@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { File as NodeFile } from 'node:buffer'
+import { setTimeout as realTimeout } from 'node:timers'
 
 import '@testing-library/jest-dom/vitest'
 import type { QueryClient } from '@tanstack/react-query'
@@ -43,9 +44,6 @@ export const server = setupServer()
 
 /** NodeFormData is the FormData class Node's fetch sends a file from. */
 const { constructor: NodeFormData } = await new Response(new URLSearchParams()).formData()
-
-/** realTimeout is the timer a test's fake clock leaves alone. */
-const { setTimeout: realTimeout } = globalThis
 
 /** isNodeFile reports whether a value is one of Node's files. */
 const isNodeFile = Function.prototype[Symbol.hasInstance].bind(NodeFile)
