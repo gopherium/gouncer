@@ -13,7 +13,6 @@ minimumReleaseAgeExclude:
   - vite@8.1.5
   - tldts@7.4.9
   - tldts-core@7.4.9
-  - obug@2.1.4
 
 allowBuilds:
   esbuild: false

@@ -43,7 +43,7 @@ export const server = setupServer()
  * Installs the msw server lifecycle and DOM cleanup as vitest hooks.
  */
 export function installTestEnvironment() {
-	beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+	beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 	afterEach(() => {
 		cleanup()
 		server.resetHandlers()
