@@ -57,6 +57,16 @@ test("draws the Add User words in the app's link element as WordPress's compact 
 	expect(add.closest('header')).not.toBeNull()
 })
 
+test("repeats the Add User link at its default size in an empty list", async () => {
+	holding([])
+	renderUsers({ addLink: <a href="/users/new" /> })
+
+	const heading = await screen.findByRole('heading', { level: 2, name: 'No users yet' })
+	const add = within(heading.closest('.godmin-empty') as HTMLElement).getByRole('link', { name: 'Add User' })
+	expect(add).toHaveAttribute('href', '/users/new')
+	expect(add).not.toHaveClass(...buttonClasses('solid', 'compact').slice(-1))
+})
+
 test('tells the design system the Add User button is a link, so it keeps link semantics', async () => {
 	const warned = vi.spyOn(console, 'error').mockImplementation(() => {})
 	onTestFinished(() => warned.mockRestore())
@@ -85,7 +95,7 @@ test('titles the page at the level the app names, the empty state one level unde
 	renderUsers({ headingLevel: 2 })
 
 	expect(await screen.findByRole('heading', { level: 2, name: 'Users' })).toBeInTheDocument()
-	expect(await screen.findByRole('heading', { level: 3, name: 'No users yet.' })).toBeInTheDocument()
+	expect(await screen.findByRole('heading', { level: 3, name: 'No users yet' })).toBeInTheDocument()
 })
 
 test('declares no avatar at all while the site shows none, so View options offers none', async () => {

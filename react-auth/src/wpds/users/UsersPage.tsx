@@ -3,6 +3,7 @@
 import {
 	ErrorNotice,
 	ListEmpty,
+	ListNoResults,
 	Page,
 	focusedTrigger,
 	openOnTap,
@@ -17,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews'
 import type { Action, View } from '@wordpress/dataviews'
-import { __, _x, sprintf } from '@wordpress/i18n'
+import { __, _x } from '@wordpress/i18n'
 import { people } from '@wordpress/icons'
 import { ButtonLink } from '@wordpress/ui'
 import { useCallback, useMemo, useState } from 'react'
@@ -96,15 +97,26 @@ function addUserLabel(): string {
 
 /**
  * Renders what the list shows when no account is on it.
- * @param props - Whether a search or a filter narrowed the list.
- * @returns The empty state, telling how to add an account when nothing narrowed the list.
+ * @param props - Whether a search or a filter narrowed the list, and the link element the Add User words go in.
+ * @returns The empty state, offering the link when nothing narrowed the list.
  */
-function UsersEmpty({ narrowed }: { narrowed: boolean }) {
+function UsersEmpty({ narrowed, addLink }: Pick<UsersPageProps, 'addLink'> & { narrowed: boolean }) {
 	if (narrowed) {
-		return <ListEmpty icon={people} title={__('No users found.', DOMAIN)} />
+		return <ListNoResults />
 	}
-	const hint = sprintf(__('Add one with %(button)s.', DOMAIN), { button: addUserLabel() })
-	return <ListEmpty icon={people} title={__('No users yet.', DOMAIN)} hint={hint} />
+	return (
+		<ListEmpty
+			icon={people}
+			title={__('No users yet', DOMAIN)}
+			actions={
+				addLink && (
+					<ButtonLink variant="solid" render={addLink}>
+						{addUserLabel()}
+					</ButtonLink>
+				)
+			}
+		/>
+	)
 }
 
 /**
@@ -147,7 +159,7 @@ function UsersList({ users, actions, reader, openRole, ...props }: ListProps) {
 			isLoading={users.isPending || sizing}
 			searchLabel={__('Search users…', DOMAIN)}
 			config={props.pageSizes === undefined ? undefined : { perPageSizes: props.pageSizes }}
-			empty={<UsersEmpty narrowed={viewNarrows(list.view)} />}
+			empty={<UsersEmpty narrowed={viewNarrows(list.view)} addLink={props.addLink} />}
 		/>
 	)
 }

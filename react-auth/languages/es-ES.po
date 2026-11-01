@@ -50,10 +50,6 @@ msgstr "Enlace de activación"
 msgid "Add User"
 msgstr "Añadir usuario"
 
-#, fuzzy
-msgid "Add one with %(button)s."
-msgstr "Añade uno con %(button)s."
-
 msgid "Avatar"
 msgstr "Avatar"
 
@@ -184,12 +180,9 @@ msgstr "Nombre"
 msgid "No mail server is configured. Deliver the activation link by hand."
 msgstr "No hay servidor de correo configurado. Entrega el enlace de activación a mano."
 
-msgid "No users found."
-msgstr "No se encontraron usuarios."
-
 #, fuzzy
-msgid "No users yet."
-msgstr "Todavía no hay usuarios."
+msgid "No users yet"
+msgstr "Todavía no hay usuarios"
 
 msgid "Password"
 msgstr "Contraseña"
