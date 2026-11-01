@@ -253,7 +253,7 @@ test('says plainly that a role could not be changed when the server names no rea
 	expect(await toast('The role could not be changed.')).toBeInTheDocument()
 })
 
-test('counts the accounts a bulk role change could not change, in one toast', async () => {
+test('counts the role changes that failed in one toast and marks the list for the one that worked', async () => {
 	holding([signedIn, colleague, accountOf('fd', 'Maria Perez'), accountOf('fc', 'Grace Hopper')])
 	server.use(
 		http.put('/api/users/:id/role', ({ params }) =>
@@ -267,10 +267,12 @@ test('counts the accounts a bulk role change could not change, in one toast', as
 	await select('Ada Lovelace', 'Maria Perez', 'Grace Hopper')
 	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
 	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
 
 	expect(await toast('The roles of 2 users could not be changed.')).toBeInTheDocument()
 	expect(document.querySelectorAll('.godmin-toast')).toHaveLength(1)
+	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
 })
 
 test('keeps the role a failed change picked for the next time the dialog opens on that account', async () => {
