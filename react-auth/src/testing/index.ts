@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { File as NodeFile } from 'node:buffer'
+import { setTimeout as realTimeout } from 'node:timers'
+
 import '@testing-library/jest-dom/vitest'
 import type { QueryClient } from '@tanstack/react-query'
 import { cleanup } from '@testing-library/react'
@@ -39,13 +42,31 @@ export {
 
 export const server = setupServer()
 
+/** NodeFormData is the FormData class Node's fetch sends a file from. */
+const { constructor: NodeFormData } = await new Response(new URLSearchParams()).formData()
+
+/** isNodeFile reports whether a value is one of Node's files. */
+const isNodeFile = Function.prototype[Symbol.hasInstance].bind(NodeFile)
+
 /**
- * Installs the msw server lifecycle and DOM cleanup as vitest hooks.
+ * Waits one event loop turn on the real clock.
+ * @returns A promise that settles after the turn.
+ */
+function realTurn() {
+	return new Promise((resolve) => realTimeout(resolve))
+}
+
+/**
+ * Installs Node's file classes, plus the msw server lifecycle and DOM cleanup as vitest hooks.
  */
 export function installTestEnvironment() {
-	beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-	afterEach(() => {
+	Object.defineProperty(File, Symbol.hasInstance, { value: isNodeFile })
+	Object.assign(globalThis, { File: NodeFile, FormData: NodeFormData })
+	beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+	afterEach(async () => {
 		cleanup()
+		await realTurn()
+		await realTurn()
 		server.resetHandlers()
 	})
 	afterAll(() => server.close())
