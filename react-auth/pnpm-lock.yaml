@@ -20,8 +20,8 @@ importers:
         version: 4.4.1
     devDependencies:
       '@gopherium/godmin':
-        specifier: 0.29.0
-        version: 0.29.0(1314f4ba3c11abca8cd5a8ab6d23fb41)
+        specifier: 0.30.0
+        version: 0.30.0(1314f4ba3c11abca8cd5a8ab6d23fb41)
       '@gopherium/gottext':
         specifier: 0.7.0
         version: 0.7.0(@wordpress/i18n@6.30.0)(gettext-extractor@4.0.6)(react@19.2.8)
@@ -465,8 +465,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@gopherium/godmin@0.29.0':
-    resolution: {integrity: sha512-sTYSUDW/0r8uJxok1dPNZn2tki47k1W7NYIjOziYV0UPtBvPrvDHXZHAhqeQfU6yBnHc4kKWN3Zovbktuuhyow==}
+  '@gopherium/godmin@0.30.0':
+    resolution: {integrity: sha512-QNWG6WVUrCT8I/DMZeT4yrQev01N5URaFAjnouNhnXZzAmoh/qiJopIjGzRaVcSQXzX7eN0Wtk/dz4l20Ipizg==}
     peerDependencies:
       '@tanstack/react-router': ^1.170.44
       '@testing-library/react': ^16.3.2
@@ -3047,7 +3047,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@gopherium/godmin@0.29.0(1314f4ba3c11abca8cd5a8ab6d23fb41)':
+  '@gopherium/godmin@0.30.0(1314f4ba3c11abca8cd5a8ab6d23fb41)':
     dependencies:
       '@wordpress/a11y': 4.57.0
       '@wordpress/i18n': 6.30.0

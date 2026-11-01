@@ -52,7 +52,7 @@
     "zxcvbn": "4.4.1"
   },
   "peerDependencies": {
-    "@gopherium/godmin": ">=0.28.0 <0.30.0",
+    "@gopherium/godmin": ">=0.30.0 <0.31.0",
     "@gopherium/gottext": ">=0.6.0 <0.8.0",
     "@tanstack/react-query": "^5.101.2",
     "@testing-library/jest-dom": "^6.9.1 || ^7.0.0",
@@ -107,7 +107,7 @@
     }
   },
   "devDependencies": {
-    "@gopherium/godmin": "0.29.0",
+    "@gopherium/godmin": "0.30.0",
     "@gopherium/gottext": "0.7.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.44",

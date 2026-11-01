@@ -149,7 +149,7 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   development, proxy `/api` to your backend so the `__Host-` session
   cookie is first-party.
 - `/wpds` needs the `@wordpress/ui` and `@wordpress/icons` peers.
-- `/wpds/users` also needs `@gopherium/godmin` 0.28 or 0.29,
+- `/wpds/users` also needs `@gopherium/godmin` 0.30,
   `@gopherium/gottext`, `@wordpress/dataviews`, `@wordpress/components`
   and `@wordpress/date`, and godmin's `Toaster` above the page, whose
   toasts show each name whole. The app loads the DataViews and
