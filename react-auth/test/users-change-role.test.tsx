@@ -204,6 +204,32 @@ test('says in a toast why the role could not be changed, in the words the error 
 	expect(screen.queryByText(/Role changed for/)).not.toBeInTheDocument()
 })
 
+test('shows the toast as the role is written and marks the list until the accounts come back', async () => {
+	writesRole()
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role…')
+	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
+	await send()
+
+	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
+	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
+})
+
+test('marks nothing when every role write failed, while the accounts are read again', async () => {
+	server.use(roleRefused('role_unknown'))
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role…')
+	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
+	await send()
+
+	await toast('Sorry, you are not allowed to give users that role.')
+	expect(document.querySelector('.dataviews-footer')).not.toHaveAttribute('inert')
+})
+
 test("says in WordPress's words that the reader may not give the role it picked", async () => {
 	server.use(roleRefused('role_unknown'))
 	renderUsers({ roleLabels })

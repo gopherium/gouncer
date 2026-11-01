@@ -70,6 +70,8 @@ interface ListProps extends UsersPageProps {
 	reader: User | null
 	/** Opens Change role on the accounts, given the trigger it opened from. */
 	openRole: (accounts: Account[], trigger: Trigger) => void
+	/** Whether a write reloads the list. */
+	refreshing: boolean
 }
 
 /** The accounts the list holds before the first read answers. */
@@ -124,7 +126,7 @@ function UsersEmpty({ narrowed, addLink }: Pick<UsersPageProps, 'addLink'> & { n
  * @param props - The account query, the actions, the reader, what opens Change role and what the app hands the page.
  * @returns The list, opening Change role from a name or a phone tap on an account the reader may change.
  */
-function UsersList({ users, actions, reader, openRole, ...props }: ListProps) {
+function UsersList({ users, actions, reader, openRole, refreshing, ...props }: ListProps) {
 	const { list } = props
 	const accounts = users.data ?? NO_ACCOUNTS
 	const showAvatars = props.showAvatars ?? true
@@ -156,7 +158,7 @@ function UsersList({ users, actions, reader, openRole, ...props }: ListProps) {
 			isItemClickable={changeable}
 			onClickItem={(account) => openRole([account], focusedTrigger())}
 			actions={actions}
-			isLoading={users.isPending || sizing}
+			isLoading={users.isPending || sizing || refreshing}
 			searchLabel={__('Search users…', DOMAIN)}
 			config={props.pageSizes === undefined ? undefined : { perPageSizes: props.pageSizes }}
 			empty={<UsersEmpty narrowed={viewNarrows(list.view)} addLink={props.addLink} />}
@@ -173,7 +175,7 @@ export function UsersPage(props: UsersPageProps) {
 	const users = useQuery({ queryKey: usersQueryKey, queryFn: ({ signal }) => fetchUsers(signal) })
 	const reader = useSession().data ?? null
 	const client = useQueryClient()
-	const { run, region } = useListRun('users', props.list.onChangeSelection)
+	const { run, region, refreshing } = useListRun('users', props.list.onChangeSelection)
 	const reload = useCallback(() => client.invalidateQueries({ queryKey: usersQueryKey }), [client])
 	const switches = useBulkRun<Account>(run, reload)
 	const unsaved = useUnsavedText()
@@ -206,11 +208,18 @@ export function UsersPage(props: UsersPageProps) {
 			{users.isError ? (
 				<ErrorNotice>{__('Users could not be loaded.', DOMAIN)}</ErrorNotice>
 			) : (
-				<UsersList users={users} actions={actions} reader={reader} openRole={openRole} {...props} />
+				<UsersList
+					users={users}
+					actions={actions}
+					reader={reader}
+					openRole={openRole}
+					refreshing={refreshing}
+					{...props}
+				/>
 			)}
 			<OpenRoleDialog
 				opened={opened}
-				tools={{ grantable, roleLabels, errorMessages, unsaved, reload }}
+				tools={{ grantable, roleLabels, errorMessages, unsaved, reload, onRefresh: run.onRefresh }}
 				onClose={() => setOpened(undefined)}
 				onClearSelection={() => props.list.onChangeSelection([])}
 				onBack={focusBack}
