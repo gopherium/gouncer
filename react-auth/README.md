@@ -155,7 +155,8 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   toasts show each name whole. The app loads the DataViews and
   components stylesheets, and `@gopherium/react-auth/wpds/style.css`,
   which clips a long email under the name and sizes `RoleSelect` on a
-  phone.
+  phone. To translate the words of a search that finds nobody, it also
+  loads godmin's `listChromeCatalogFor` into `LIST_CHROME_DOMAIN`.
 - `/testing` loads by `import` only. `installTestEnvironment` puts
   Node's `File` and `FormData` on the global, so under jsdom
   `new FormData(form)`, which a React form action calls, and
