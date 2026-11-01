@@ -324,6 +324,19 @@ test('puts the focus on the list once a bulk disable ends with the reader still 
 	await waitFor(() => expect(screen.getByRole('region', { name: 'Users' })).toHaveFocus())
 })
 
+test('marks the list reloading after a bulk run until the accounts come back', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez')])
+	writesDisabled()
+	renderUsers()
+
+	await select('Ada Lovelace', 'Maria Perez')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Disable' }))
+
+	await toast('2 users disabled.')
+	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
+})
+
 test('reads the list again once after a bulk run, whatever the count', async () => {
 	const reads = vi.fn()
 	holding([signedIn, colleague, accountOf('fd', 'Maria Perez')])

@@ -149,13 +149,14 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   development, proxy `/api` to your backend so the `__Host-` session
   cookie is first-party.
 - `/wpds` needs the `@wordpress/ui` and `@wordpress/icons` peers.
-- `/wpds/users` also needs `@gopherium/godmin` 0.28 or 0.29,
+- `/wpds/users` also needs `@gopherium/godmin` 0.30,
   `@gopherium/gottext`, `@wordpress/dataviews`, `@wordpress/components`
   and `@wordpress/date`, and godmin's `Toaster` above the page, whose
   toasts show each name whole. The app loads the DataViews and
   components stylesheets, and `@gopherium/react-auth/wpds/style.css`,
   which clips a long email under the name and sizes `RoleSelect` on a
-  phone.
+  phone. To translate the words of a search that finds nobody, it also
+  loads godmin's `listChromeCatalogFor` into `LIST_CHROME_DOMAIN`.
 - `/testing` loads by `import` only. `installTestEnvironment` puts
   Node's `File` and `FormData` on the global, so under jsdom
   `new FormData(form)`, which a React form action calls, and

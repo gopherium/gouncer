@@ -33,7 +33,6 @@ const oursFuzzyInTheList: [context: string, msgid: string][] = [
 	['', '%s user could not be enabled.'],
 	['', '%s user disabled.'],
 	['', '%s user enabled.'],
-	['', 'Add one with %(button)s.'],
 	['', 'Change role'],
 	['', 'Change role to…'],
 	['', 'Change role…'],
@@ -43,7 +42,7 @@ const oursFuzzyInTheList: [context: string, msgid: string][] = [
 	['', 'Created'],
 	['', 'Invitation sent to "%(name)s".'],
 	['', 'Manage who can sign in and what they can do.'],
-	['', 'No users yet.'],
+	['', 'No users yet'],
 	['', 'Resend invitation'],
 	['', 'Resend invitation…'],
 	['', 'Role'],
@@ -71,7 +70,6 @@ const wordpressReviewedInTheList: [context: string, msgid: string][] = [
 	['', 'Generate password'],
 	['', 'Invalid user ID.'],
 	['', 'Name'],
-	['', 'No users found.'],
 	['', 'Sorry, you are not allowed to edit this user.'],
 	['', 'Sorry, you are not allowed to edit users.'],
 	['', 'Status'],
@@ -106,7 +104,6 @@ const frenchWordpressReviewed: [context: string, msgid: string][] = [
 	['', 'Loading…'],
 	['', 'Lost your password?'],
 	['', 'Name'],
-	['', 'No users found.'],
 	['', 'Password'],
 	['', 'Role'],
 	['', 'Show'],
@@ -253,7 +250,7 @@ test('takes Comptes in French as WordPress names users', async () => {
 
 	expect(held?.['admin section\u0004Users']).toEqual(['Comptes'])
 	expect(held?.['Add User']).toEqual(['Ajouter un compte'])
-	expect(held?.['No users found.']).toEqual(['Aucun compte trouvé.'])
+	expect(held?.['No users yet']).toEqual(['Aucun compte pour l’instant'])
 })
 
 test('reads the users list failure the way both admins already say it in Spanish', async () => {

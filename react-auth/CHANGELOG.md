@@ -10,6 +10,14 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** `/wpds/users` moves to godmin 0.30: the optional `@gopherium/godmin` peer is `>=0.30.0 <0.31.0`, where it was `>=0.28.0 <0.30.0`.
+- `UsersPage` shows "No users yet" with the Add User link in an empty list, and godmin's "No results found" when a search or a filter finds nobody, which needs godmin's `listChromeCatalogFor` loaded to show translated.
+- Change role shows its toast as the writes end, and the list stays marked reloading until the accounts come back, as a bulk run does.
+
 ## [0.18.0] - 2026-11-01
 
 ### Changed

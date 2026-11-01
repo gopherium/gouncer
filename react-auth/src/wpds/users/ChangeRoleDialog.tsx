@@ -26,6 +26,8 @@ export interface RoleTools {
 	unsaved: UnsavedText
 	/** Reads the list again. */
 	reload: () => Promise<unknown>
+	/** Marks the list reloading and returns what ends the mark. */
+	onRefresh: () => () => void
 }
 
 /** The Change role dialog the page holds open, on the accounts it acts on and the trigger it opened from. */
@@ -75,24 +77,25 @@ function startingRole(accounts: readonly Account[], tools: RoleTools): string {
 }
 
 /**
- * Writes the role to each account, reads the list again and shows one toast, keeping the pick when a write failed.
+ * Writes the role to each account, shows one toast and reads the list again, keeping the pick when a write failed.
  * @param accounts - The accounts the dialog acts on.
  * @param role - The role picked.
  * @param tools - What the dialog needs from the page.
  * @param toaster - Shows the toast.
- * @returns What settles once the toast shows.
+ * @returns What settles once the list is read again.
  */
 async function changeRoles(accounts: Account[], role: string, tools: RoleTools, toaster: ToasterHandle): Promise<void> {
 	const key = keyOf(accounts)
 	tools.unsaved.delete(key)
 	const stillLatest = markLatest(tools.unsaved, key)
 	const outcome = await runEach(accounts, (account) => setUserRole(account.id, role))
-	await tools.reload()
 	const notes = bulkNotes(accounts, outcome, roleWords(tools.errorMessages))
 	toaster.show(notes.notice ?? (notes.toast as string))
 	if (outcome.failures.length > 0 && stillLatest()) {
 		tools.unsaved.set(key, role)
 	}
+	const ended = outcome.done > 0 ? tools.onRefresh() : undefined
+	await tools.reload().finally(ended)
 }
 
 /**

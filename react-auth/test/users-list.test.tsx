@@ -69,19 +69,19 @@ test('draws the accounts inside a list region named Users, out to the canvas edg
 	expect(within(region).getByRole('searchbox', { name: 'Search users…' })).toBeInTheDocument()
 })
 
-test('says the list is empty, and how to fill it, when no account exists', async () => {
+test('says the list is empty, with no add button, when no account exists and the app hands no add link', async () => {
 	holding([])
 	renderUsers()
 
-	expect(await screen.findByRole('heading', { level: 2, name: 'No users yet.' })).toBeInTheDocument()
-	expect(screen.getByText('Add one with Add User.').closest('.godmin-empty')).not.toBeNull()
+	const heading = await screen.findByRole('heading', { level: 2, name: 'No users yet' })
+	expect(within(heading.closest('.godmin-empty') as HTMLElement).queryByRole('link')).not.toBeInTheDocument()
 })
 
 test('says nobody matched when a search finds no account', async () => {
 	renderUsers({ at: '/users?search=nobody' })
 
-	expect(await screen.findByText('No users found.')).toBeInTheDocument()
-	expect(screen.queryByText('No users yet.')).not.toBeInTheDocument()
+	expect(await screen.findByText('No results found')).toBeInTheDocument()
+	expect(screen.queryByText('No users yet')).not.toBeInTheDocument()
 })
 
 test('says the accounts could not be loaded in place of the list', async () => {

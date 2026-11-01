@@ -204,6 +204,32 @@ test('says in a toast why the role could not be changed, in the words the error 
 	expect(screen.queryByText(/Role changed for/)).not.toBeInTheDocument()
 })
 
+test('shows the toast as the role is written and marks the list until the accounts come back', async () => {
+	writesRole()
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role…')
+	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
+	await send()
+
+	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
+	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
+})
+
+test('marks nothing when every role write failed, while the accounts are read again', async () => {
+	server.use(roleRefused('role_unknown'))
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role…')
+	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
+	await send()
+
+	await toast('Sorry, you are not allowed to give users that role.')
+	expect(document.querySelector('.dataviews-footer')).not.toHaveAttribute('inert')
+})
+
 test("says in WordPress's words that the reader may not give the role it picked", async () => {
 	server.use(roleRefused('role_unknown'))
 	renderUsers({ roleLabels })
@@ -227,7 +253,7 @@ test('says plainly that a role could not be changed when the server names no rea
 	expect(await toast('The role could not be changed.')).toBeInTheDocument()
 })
 
-test('counts the accounts a bulk role change could not change, in one toast', async () => {
+test('counts the role changes that failed in one toast and marks the list for the one that worked', async () => {
 	holding([signedIn, colleague, accountOf('fd', 'Maria Perez'), accountOf('fc', 'Grace Hopper')])
 	server.use(
 		http.put('/api/users/:id/role', ({ params }) =>
@@ -241,10 +267,12 @@ test('counts the accounts a bulk role change could not change, in one toast', as
 	await select('Ada Lovelace', 'Maria Perez', 'Grace Hopper')
 	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
 	await pick('Administrator')
+	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
 
 	expect(await toast('The roles of 2 users could not be changed.')).toBeInTheDocument()
 	expect(document.querySelectorAll('.godmin-toast')).toHaveLength(1)
+	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
 })
 
 test('keeps the role a failed change picked for the next time the dialog opens on that account', async () => {

@@ -39,9 +39,6 @@ msgstr ""
 msgid "Add User"
 msgstr ""
 
-msgid "Add one with %(button)s."
-msgstr ""
-
 msgid "Avatar"
 msgstr ""
 
@@ -160,10 +157,7 @@ msgstr ""
 msgid "No mail server is configured. Deliver the activation link by hand."
 msgstr ""
 
-msgid "No users found."
-msgstr ""
-
-msgid "No users yet."
+msgid "No users yet"
 msgstr ""
 
 msgid "Password"

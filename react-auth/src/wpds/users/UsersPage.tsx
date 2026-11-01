@@ -3,6 +3,7 @@
 import {
 	ErrorNotice,
 	ListEmpty,
+	ListNoResults,
 	Page,
 	focusedTrigger,
 	openOnTap,
@@ -17,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews'
 import type { Action, View } from '@wordpress/dataviews'
-import { __, _x, sprintf } from '@wordpress/i18n'
+import { __, _x } from '@wordpress/i18n'
 import { people } from '@wordpress/icons'
 import { ButtonLink } from '@wordpress/ui'
 import { useCallback, useMemo, useState } from 'react'
@@ -69,6 +70,8 @@ interface ListProps extends UsersPageProps {
 	reader: User | null
 	/** Opens Change role on the accounts, given the trigger it opened from. */
 	openRole: (accounts: Account[], trigger: Trigger) => void
+	/** Whether a write reloads the list. */
+	refreshing: boolean
 }
 
 /** The accounts the list holds before the first read answers. */
@@ -96,15 +99,26 @@ function addUserLabel(): string {
 
 /**
  * Renders what the list shows when no account is on it.
- * @param props - Whether a search or a filter narrowed the list.
- * @returns The empty state, telling how to add an account when nothing narrowed the list.
+ * @param props - Whether a search or a filter narrowed the list, and the link element the Add User words go in.
+ * @returns The empty state, offering the link when nothing narrowed the list.
  */
-function UsersEmpty({ narrowed }: { narrowed: boolean }) {
+function UsersEmpty({ narrowed, addLink }: Pick<UsersPageProps, 'addLink'> & { narrowed: boolean }) {
 	if (narrowed) {
-		return <ListEmpty icon={people} title={__('No users found.', DOMAIN)} />
+		return <ListNoResults />
 	}
-	const hint = sprintf(__('Add one with %(button)s.', DOMAIN), { button: addUserLabel() })
-	return <ListEmpty icon={people} title={__('No users yet.', DOMAIN)} hint={hint} />
+	return (
+		<ListEmpty
+			icon={people}
+			title={__('No users yet', DOMAIN)}
+			actions={
+				addLink && (
+					<ButtonLink variant="solid" render={addLink}>
+						{addUserLabel()}
+					</ButtonLink>
+				)
+			}
+		/>
+	)
 }
 
 /**
@@ -112,7 +126,7 @@ function UsersEmpty({ narrowed }: { narrowed: boolean }) {
  * @param props - The account query, the actions, the reader, what opens Change role and what the app hands the page.
  * @returns The list, opening Change role from a name or a phone tap on an account the reader may change.
  */
-function UsersList({ users, actions, reader, openRole, ...props }: ListProps) {
+function UsersList({ users, actions, reader, openRole, refreshing, ...props }: ListProps) {
 	const { list } = props
 	const accounts = users.data ?? NO_ACCOUNTS
 	const showAvatars = props.showAvatars ?? true
@@ -144,10 +158,10 @@ function UsersList({ users, actions, reader, openRole, ...props }: ListProps) {
 			isItemClickable={changeable}
 			onClickItem={(account) => openRole([account], focusedTrigger())}
 			actions={actions}
-			isLoading={users.isPending || sizing}
+			isLoading={users.isPending || sizing || refreshing}
 			searchLabel={__('Search users…', DOMAIN)}
 			config={props.pageSizes === undefined ? undefined : { perPageSizes: props.pageSizes }}
-			empty={<UsersEmpty narrowed={viewNarrows(list.view)} />}
+			empty={<UsersEmpty narrowed={viewNarrows(list.view)} addLink={props.addLink} />}
 		/>
 	)
 }
@@ -161,7 +175,7 @@ export function UsersPage(props: UsersPageProps) {
 	const users = useQuery({ queryKey: usersQueryKey, queryFn: ({ signal }) => fetchUsers(signal) })
 	const reader = useSession().data ?? null
 	const client = useQueryClient()
-	const { run, region } = useListRun('users', props.list.onChangeSelection)
+	const { run, region, refreshing } = useListRun('users', props.list.onChangeSelection)
 	const reload = useCallback(() => client.invalidateQueries({ queryKey: usersQueryKey }), [client])
 	const switches = useBulkRun<Account>(run, reload)
 	const unsaved = useUnsavedText()
@@ -194,11 +208,18 @@ export function UsersPage(props: UsersPageProps) {
 			{users.isError ? (
 				<ErrorNotice>{__('Users could not be loaded.', DOMAIN)}</ErrorNotice>
 			) : (
-				<UsersList users={users} actions={actions} reader={reader} openRole={openRole} {...props} />
+				<UsersList
+					users={users}
+					actions={actions}
+					reader={reader}
+					openRole={openRole}
+					refreshing={refreshing}
+					{...props}
+				/>
 			)}
 			<OpenRoleDialog
 				opened={opened}
-				tools={{ grantable, roleLabels, errorMessages, unsaved, reload }}
+				tools={{ grantable, roleLabels, errorMessages, unsaved, reload, onRefresh: run.onRefresh }}
 				onClose={() => setOpened(undefined)}
 				onClearSelection={() => props.list.onChangeSelection([])}
 				onBack={focusBack}
