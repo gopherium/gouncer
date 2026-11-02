@@ -68,6 +68,15 @@ func TestNewInvitedUserRejectsInvalidIdentity(t *testing.T) {
 		"email with C1 control U+009B": {
 			"a\u009b8mb@example.com", "Maria", gouncer.ErrInvalidEmail,
 		},
+		"email with an invalid UTF-8 byte": {
+			"a\x9bb@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
+		"email with U+0130": {
+			"A\U00000130@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
+		"email with Kelvin sign U+212A": {
+			"\U0000212Aelvin@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
 		"empty name":    {"maria@example.com", "   ", gouncer.ErrEmptyName},
 		"name too long": {"maria@example.com", strings.Repeat("m", 257), gouncer.ErrNameTooLong},
 		"name of C0 controls only": {
