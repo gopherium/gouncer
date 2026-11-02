@@ -118,7 +118,7 @@ func assertEscapedLogAttr(t *testing.T, seen map[string]bool, attr slog.Attr) sl
 	return attr
 }
 
-// TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin verifies that cross-origin writes are logged and blocked.
+// TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin checks that cross-origin writes are logged and blocked.
 func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	t.Parallel()
 
@@ -169,7 +169,7 @@ func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardLetsTheSiteAndOtherServersWrite verifies allowed requests pass through without logging.
+// TestCrossOriginGuardLetsTheSiteAndOtherServersWrite checks allowed requests pass through without logging.
 func TestCrossOriginGuardLetsTheSiteAndOtherServersWrite(t *testing.T) {
 	t.Parallel()
 
@@ -222,7 +222,7 @@ func TestCrossOriginGuardLetsTheSiteAndOtherServersWrite(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardAnswersAnUncachedJSONError verifies the status, JSON error, and cache headers of refused writes.
+// TestCrossOriginGuardAnswersAnUncachedJSONError checks the status, JSON error, and cache headers of refused writes.
 func TestCrossOriginGuardAnswersAnUncachedJSONError(t *testing.T) {
 	t.Parallel()
 
@@ -254,7 +254,7 @@ func TestCrossOriginGuardAnswersAnUncachedJSONError(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardLogsTheRefusedWrite verifies the refusal fields for ordinary requests.
+// TestCrossOriginGuardLogsTheRefusedWrite checks the logged fields for ordinary requests.
 func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 	t.Parallel()
 
@@ -293,8 +293,8 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardLogsEscapedRefusalFields verifies path encoding and safe header values in JSON logs.
-func TestCrossOriginGuardLogsEscapedRefusalFields(t *testing.T) {
+// TestCrossOriginGuardEscapesTheLoggedFields checks path encoding and safe request values in JSON logs.
+func TestCrossOriginGuardEscapesTheLoggedFields(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -357,7 +357,7 @@ func TestCrossOriginGuardLogsEscapedRefusalFields(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardEscapesControlsBeforeTheLogHandler verifies escaping before the handler formats the log.
+// TestCrossOriginGuardEscapesControlsBeforeTheLogHandler checks escaping before the handler formats the log.
 func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
 	t.Parallel()
 
@@ -385,7 +385,7 @@ func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
 	}
 }
 
-// TestCrossOriginGuardLogsToTheDefaultLoggerWhenGivenNone verifies the fallback to slog.Default when the logger is nil.
+// TestCrossOriginGuardLogsToTheDefaultLoggerWhenGivenNone checks the fallback to slog.Default when the logger is nil.
 func TestCrossOriginGuardLogsToTheDefaultLoggerWhenGivenNone(t *testing.T) {
 	previous := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(previous) })
