@@ -13,10 +13,10 @@ const numeric = { numeric: true }
 const designSystemPeers = ['@wordpress/i18n', '@wordpress/icons', '@wordpress/theme', '@wordpress/ui']
 
 test('declares the design system window this build is tested against', () => {
-	expect(manifest.peerDependencies['@wordpress/ui']).toBe('>=0.24.0 <0.25.0')
-	expect(manifest.peerDependencies['@wordpress/theme']).toBe('>=2.3.0 <3.0.0')
-	expect(manifest.peerDependencies['@wordpress/i18n']).toBe('>=6.30.0 <7.0.0')
-	expect(manifest.peerDependencies['@wordpress/icons']).toBe('>=18.0.0 <19.0.0')
+	expect(manifest.peerDependencies['@wordpress/ui']).toBe('>=0.25.0 <0.26.0')
+	expect(manifest.peerDependencies['@wordpress/theme']).toBe('>=3.0.0 <4.0.0')
+	expect(manifest.peerDependencies['@wordpress/i18n']).toBe('>=7.0.0 <8.0.0')
+	expect(manifest.peerDependencies['@wordpress/icons']).toBe('>=19.0.0 <20.0.0')
 })
 
 test.each(designSystemPeers)('pins %s inside its peer window', (name) => {
