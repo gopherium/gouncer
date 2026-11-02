@@ -13,7 +13,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/gopherium/gouncer/authkit"
 )
@@ -39,7 +38,8 @@ type browserCall struct {
 
 // request builds the HTTP request call describes.
 func (c browserCall) request() *http.Request {
-	request := httptest.NewRequest(cmp.Or(c.method, http.MethodPost), cmp.Or(c.path, "/api/graphql"), nil)
+	request := httptest.NewRequest(http.MethodPost, cmp.Or(c.path, "/api/graphql"), nil)
+	request.Method = cmp.Or(c.method, http.MethodPost)
 	request.Host = cmp.Or(c.host, siteHost)
 	request.RemoteAddr = cmp.Or(c.remote, request.RemoteAddr)
 	headers := map[string]string{
@@ -78,11 +78,16 @@ func loggedLine(t *testing.T, logged *bytes.Buffer) map[string]any {
 	return line
 }
 
-// assertRefusedWriteLog checks safe JSON output and exactly the expected refusal fields, ignoring the timestamp.
+// printableASCII reports whether value holds only printable ASCII.
+func printableASCII(value string) bool {
+	return !strings.ContainsFunc(value, func(r rune) bool { return r < ' ' || r > '~' })
+}
+
+// assertRefusedWriteLog checks a printable ASCII line with exactly the expected fields, ignoring the timestamp.
 func assertRefusedWriteLog(t *testing.T, logged *bytes.Buffer, fields map[string]any) {
 	t.Helper()
-	if value := strings.TrimSuffix(logged.String(), "\n"); strings.ContainsFunc(value, unicode.IsControl) {
-		t.Errorf("log = %q, want no raw control characters", logged.String())
+	if value := strings.TrimSuffix(logged.String(), "\n"); !printableASCII(value) {
+		t.Errorf("log = %q, want printable ASCII only", logged.String())
 	}
 	line := loggedLine(t, logged)
 	delete(line, "time")
@@ -105,14 +110,14 @@ func controlCharacters() string {
 	return controls.String()
 }
 
-// assertEscapedLogAttr checks request headers before serialization and records which fields the handler received.
+// assertEscapedLogAttr checks request values before serialization and records which fields the handler received.
 func assertEscapedLogAttr(t *testing.T, seen map[string]bool, attr slog.Attr) slog.Attr {
 	t.Helper()
 	switch attr.Key {
-	case "host", "origin", "fetch_site":
+	case "method", "host", "origin", "fetch_site":
 		seen[attr.Key] = true
-		if value := attr.Value.String(); strings.ContainsFunc(value, unicode.IsControl) {
-			t.Errorf("handler received %s = %q, want controls escaped", attr.Key, value)
+		if value := attr.Value.String(); !printableASCII(value) {
+			t.Errorf("handler received %s = %q, want printable ASCII only", attr.Key, value)
 		}
 	}
 	return attr
@@ -340,10 +345,60 @@ func TestCrossOriginGuardEscapesTheLoggedFields(t *testing.T) {
 				"origin": `https://example.org/\x00\t\n\r\x1b\x7f\u0080\u009f`, "fetch_site": "cross-site"},
 		},
 		{
-			name: "printable characters are unchanged",
-			call: browserCall{host: "例子.example", fetchSite: "cross-site", origin: `https://例子.example/"\literal`},
-			want: map[string]any{"reason": "fetch-site", "host": "例子.example", "origin": `https://例子.example/"\literal`,
-				"fetch_site": "cross-site"},
+			name: "control in method",
+			call: browserCall{method: "P\U0000009BST", fetchSite: "cross-site", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "method": "P\\u009bST", "host": siteHost,
+				"origin": "https://example.org", "fetch_site": "cross-site"},
+		},
+		{
+			name: "bytes that are not UTF-8",
+			call: browserCall{method: "P\x9bST", host: "app\x9b.example", fetchSite: "cross\x9bsite",
+				origin: "https://example.org/\x9b"},
+			want: map[string]any{"reason": "fetch-site", "method": `P\x9bST`, "host": `app\x9b.example`,
+				"origin": `https://example.org/\x9b`, "fetch_site": `cross\x9bsite`},
+		},
+		{
+			name: "byte that is not UTF-8 beside a control",
+			call: browserCall{origin: "https://example.org/\x9b\U0000009B"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\x9b\\u009b",
+				"fetch_site": ""},
+		},
+		{
+			name: "invisible characters",
+			call: browserCall{origin: "https://example.org/\U0000202E\U0000200B\U00002028"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\u202e\\u200b\\u2028",
+				"fetch_site": ""},
+		},
+		{
+			name: "text that looks like an escape",
+			call: browserCall{origin: "https://example.org/\"\\u009b"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\\"\\\\u009b",
+				"fetch_site": ""},
+		},
+		{
+			name: "raw control in path and a query",
+			call: browserCall{path: "/\U0000009B31m?token=value", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/%C2%9B31m", "fetch_site": ""},
+		},
+		{
+			name: "spaces that are not ASCII",
+			call: browserCall{origin: "https://example.org/\U000000A0\U00003000"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\u00a0\\u3000",
+				"fetch_site": ""},
+		},
+		{
+			name: "quote at both ends",
+			call: browserCall{origin: "\"https://example.org\""},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "\\\"https://example.org\\\"",
+				"fetch_site": ""},
+		},
+		{
+			name: "letters that are not ASCII",
+			call: browserCall{host: "\U00004F8B\U00005B50.example", fetchSite: "cross-site",
+				origin: "https://\U00004F8B\U00005B50.example/"},
+			want: map[string]any{"reason": "fetch-site", "host": "\\u4f8b\\u5b50.example",
+				"origin": "https://\\u4f8b\\u5b50.example/", "fetch_site": "cross-site"},
 		},
 	}
 	for _, tc := range cases {
@@ -374,14 +429,14 @@ func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
 	}))
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, browserCall{
-		host: "app.example.com" + controls, origin: "https://example.org/" + controls,
-		fetchSite: "same-site" + controls,
+		method: http.MethodPost + controls, host: "app.example.com" + controls,
+		origin: "https://example.org/" + controls, fetchSite: "same-site" + controls,
 	}.request())
 	if recorder.Code != http.StatusForbidden {
 		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
 	}
-	if len(seen) != 3 {
-		t.Errorf("logged fields = %v, want host, origin and fetch_site", seen)
+	if len(seen) != 4 {
+		t.Errorf("logged fields = %v, want method, host, origin and fetch_site", seen)
 	}
 }
 
