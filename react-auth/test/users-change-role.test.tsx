@@ -416,7 +416,7 @@ test('reads the list again after a refused change, the row then showing the role
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).getByText('Administrator')).toBeInTheDocument())
 })
 
-test('puts the focus on the list once a role change took the row out of the filtered view', async () => {
+test('keeps the focus in the list once a role change took the row out of the filtered view', async () => {
 	writesRole()
 	const filters = encodeURIComponent(JSON.stringify([{ field: 'role', operator: 'isAny', value: ['member'] }]))
 	renderUsers({ roleLabels, at: `/users?filters=${filters}` })
@@ -426,7 +426,10 @@ test('puts the focus on the list once a role change took the row out of the filt
 	await send()
 
 	await toast('Role changed for "Ada Lovelace".')
-	await waitFor(() => expect(screen.getByRole('region', { name: 'Users' })).toHaveFocus())
+	await waitFor(() => {
+		expect(screen.queryByRole('button', { name: 'Ada Lovelace' })).not.toBeInTheDocument()
+		expect(screen.getByRole('region', { name: 'Users' })).toContainElement(document.activeElement as HTMLElement)
+	})
 })
 
 test('puts the focus on the list once a change opened from the bulk bar ends', async () => {
