@@ -40,7 +40,7 @@ export function AuthPage({
 				{links.length > 0 ? (
 					<div className="gopherium-login__links">
 						{links.map((link, index) => (
-							<Fragment key={link.href}>
+							<Fragment key={`${link.href} ${link.label}`}>
 								{index > 0 ? LINK_SEPARATOR : null}
 								<Link href={link.href} rel={link.rel ? `${LINK_REL} ${link.rel}` : LINK_REL}>
 									{link.label}

@@ -135,6 +135,27 @@ test.each(screens)('%s draws no links block with no links', (_, screenWith) => {
 	expect(linksBlock()).toBeNull()
 })
 
+test('keeps two links to one address apart', () => {
+	const complaints = vi.spyOn(console, 'error')
+	const address = 'https://example.com/legal'
+	renderScreen(
+		<LoginScreen
+			brand="Testbed"
+			onLogin={vi.fn()}
+			links={[
+				{ label: 'Terms of service', href: address },
+				{ label: 'Privacy policy', href: address },
+			]}
+		/>,
+	)
+
+	expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+		'Terms of service',
+		'Privacy policy',
+	])
+	expect(complaints).not.toHaveBeenCalled()
+})
+
 test('keeps the links under the lost password way and after a refused sign in', async () => {
 	server.use(loginInvalid())
 	renderScreen(
