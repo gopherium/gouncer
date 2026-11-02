@@ -7,6 +7,8 @@ import { useState } from 'react'
 
 import { RateLimitedError, requestPasswordReset } from '../api.js'
 import { DOMAIN } from '../domain.js'
+import { AuthPage } from './AuthPage.js'
+import type { AuthLink } from './AuthPage.js'
 import { Outcome } from './Outcome.js'
 
 /**
@@ -26,14 +28,17 @@ function requestErrorMessage(error: Error): string {
  * whatever the address.
  * @param brand - The product name shown above the form.
  * @param onBack - Called when the user heads back to the login.
+ * @param links - The links under the form, none when left out.
  * @returns The request reset screen element.
  */
 export function RequestResetScreen({
 	brand,
 	onBack,
+	links,
 }: {
 	brand: string
 	onBack?: () => void
+	links?: readonly AuthLink[]
 }) {
 	const [email, setEmail] = useState('')
 	const attempt = useMutation({
@@ -41,7 +46,7 @@ export function RequestResetScreen({
 	})
 
 	return (
-		<div className="gopherium-login">
+		<AuthPage links={links}>
 			<Card.Root className="gopherium-login__card">
 				<Card.Content>
 					<Stack direction="column" gap="lg">
@@ -90,6 +95,6 @@ export function RequestResetScreen({
 					</Stack>
 				</Card.Content>
 			</Card.Root>
-		</div>
+		</AuthPage>
 	)
 }

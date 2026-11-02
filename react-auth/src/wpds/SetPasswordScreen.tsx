@@ -13,6 +13,8 @@ import {
 } from '../api.js'
 import type { User } from '../api.js'
 import { DOMAIN } from '../domain.js'
+import { AuthPage } from './AuthPage.js'
+import type { AuthLink } from './AuthPage.js'
 
 /**
  * Maps an activation failure to the message shown to the user.
@@ -38,16 +40,19 @@ function setPasswordErrorMessage(error: Error): string {
  * @param brand - The product name shown above the form.
  * @param token - The invitation link's secret.
  * @param onAccepted - Called with the user after a successful activation.
+ * @param links - The links under the form, none when left out.
  * @returns The set password screen element.
  */
 export function SetPasswordScreen({
 	brand,
 	token,
 	onAccepted,
+	links,
 }: {
 	brand: string
 	token: string
 	onAccepted: (user: User) => void | Promise<void>
+	links?: readonly AuthLink[]
 }) {
 	const [password, setPassword] = useState('')
 	const [activated, setActivated] = useState<User | null>(null)
@@ -69,7 +74,7 @@ export function SetPasswordScreen({
 
 	if (activated !== null && handoffFailed) {
 		return (
-			<div className="gopherium-login">
+			<AuthPage links={links}>
 				<Card.Root className="gopherium-login__card">
 					<Card.Content>
 						<Stack direction="column" gap="lg">
@@ -88,11 +93,11 @@ export function SetPasswordScreen({
 						</Stack>
 					</Card.Content>
 				</Card.Root>
-			</div>
+			</AuthPage>
 		)
 	}
 	return (
-		<div className="gopherium-login">
+		<AuthPage links={links}>
 			<Card.Root className="gopherium-login__card">
 				<Card.Content>
 					<form
@@ -131,6 +136,6 @@ export function SetPasswordScreen({
 					</form>
 				</Card.Content>
 			</Card.Root>
-		</div>
+		</AuthPage>
 	)
 }

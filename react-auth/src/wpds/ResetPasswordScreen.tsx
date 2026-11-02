@@ -12,6 +12,8 @@ import {
 	resetPassword,
 } from '../api.js'
 import { DOMAIN } from '../domain.js'
+import { AuthPage } from './AuthPage.js'
+import type { AuthLink } from './AuthPage.js'
 import { Outcome } from './Outcome.js'
 
 /**
@@ -38,16 +40,19 @@ function resetErrorMessage(error: Error): string {
  * @param brand - The product name shown above the form.
  * @param token - The reset link's secret.
  * @param onDone - Called when the user heads to the login afterward.
+ * @param links - The links under the form, none when left out.
  * @returns The reset password screen element.
  */
 export function ResetPasswordScreen({
 	brand,
 	token,
 	onDone,
+	links,
 }: {
 	brand: string
 	token: string
 	onDone?: () => void
+	links?: readonly AuthLink[]
 }) {
 	const [password, setPassword] = useState('')
 	const attempt = useMutation({
@@ -55,7 +60,7 @@ export function ResetPasswordScreen({
 	})
 
 	return (
-		<div className="gopherium-login">
+		<AuthPage links={links}>
 			<Card.Root className="gopherium-login__card">
 				<Card.Content>
 					<Stack direction="column" gap="lg">
@@ -104,6 +109,6 @@ export function ResetPasswordScreen({
 					</Stack>
 				</Card.Content>
 			</Card.Root>
-		</div>
+		</AuthPage>
 	)
 }
