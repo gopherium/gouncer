@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export { AccountPanel } from './AccountPanel.js'
+export type { AuthLink } from './AuthPage.js'
 export { LoginScreen } from './LoginScreen.js'
 export { usersMenuItem } from './nav.js'
 export { PasswordField } from './PasswordField.js'

@@ -12,6 +12,10 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 
 ## [Unreleased]
 
+### Added
+
+- `links` on `LoginScreen`, `RequestResetScreen`, `ResetPasswordScreen` and `SetPasswordScreen`, centred under the form in every state as WordPress draws its privacy policy link, with `AuthLink` as the type. Every link carries `noopener noreferrer`, since the reset and set password addresses hold a live token. It needs `/wpds/style.css`.
+
 ### Changed
 
 - **Breaking.** The `@wordpress` peers move to the packages of 20 October: components 43, dataviews 21, date 6, i18n 7, icons 19, theme 3 and ui 0.25. They need Node 22.13.0 or newer.

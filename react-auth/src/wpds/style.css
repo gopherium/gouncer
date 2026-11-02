@@ -45,6 +45,14 @@
 	text-decoration-color: currentColor;
 }
 
+.gopherium-login__links {
+	width: 100%;
+	margin: 3em 0 2em;
+	font-size: var(--wpds-typography-font-size-md);
+	line-height: 1.4;
+	text-align: center;
+}
+
 .gopherium-setup .gopherium-setup__heading {
 	margin: 0 0 0.67em;
 	padding-bottom: 7px;
