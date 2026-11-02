@@ -10,6 +10,15 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking.** The `@wordpress` peers move to the packages of 20 October: components 43, dataviews 21, date 6, i18n 7, icons 19, theme 3 and ui 0.25. They need Node 22.13.0 or newer.
+- **Breaking.** `/wpds/users` moves to godmin 0.31: the optional `@gopherium/godmin` peer is `>=0.31.0 <0.32.0`, where it was `>=0.30.0 <0.31.0`.
+- **Breaking.** The optional `@gopherium/gottext` peer is `>=0.8.0 <0.9.0`, where it was `>=0.6.0 <0.8.0`.
+- `UsersPage` sits 8px higher, since godmin 0.31 draws the page title row 32px tall in place of 40px.
+
 ## [0.19.0] - 2026-11-01
 
 ### Changed
