@@ -15,6 +15,7 @@ at v0.x, minor releases may contain breaking changes.
 ### Fixed
 
 - `NewUser` and `NewInvitedUser` refuse a control character in an address.
+- `NewUser` and `NewInvitedUser` refuse an address that is not valid UTF-8, holds U+FFFD or holds a letter that lowercases to ASCII.
 - `NewUser` and `NewInvitedUser` drop C0 controls from a name and fold its spaces, tabs and line breaks.
 - `NewUser` and `NewInvitedUser` refuse a name that is not valid UTF-8 with `ErrEmptyName`.
 
