@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -90,7 +91,11 @@ func (u *User) SetPassword(password string) error {
 
 // newIdentity returns an unconfirmed [User] with a normalized email, a cleaned name and no password.
 func newIdentity(email, name string) (User, error) {
-	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	trimmedEmail := strings.TrimSpace(email)
+	if !isValidEmail(trimmedEmail) || strings.ContainsFunc(trimmedEmail, lowersToASCII) {
+		return User{}, ErrInvalidEmail
+	}
+	normalizedEmail := strings.ToLower(trimmedEmail)
 	if !isValidEmail(normalizedEmail) {
 		return User{}, ErrInvalidEmail
 	}
@@ -113,15 +118,20 @@ func newIdentity(email, name string) (User, error) {
 	}, nil
 }
 
+// lowersToASCII reports whether r lies outside ASCII and lowercases into it, as U+0130 and U+212A do.
+func lowersToASCII(r rune) bool {
+	return r > unicode.MaxASCII && unicode.ToLower(r) <= unicode.MaxASCII
+}
+
 // maxEmailLength is the RFC 5321 address-length limit.
 const maxEmailLength = 254
 
-// isValidEmail reports whether email is a single plain address without a
-// display name or a control character.
+// isValidEmail reports whether email is a single plain address without a display name, a control character or U+FFFD.
 func isValidEmail(email string) bool {
 	if len(email) > maxEmailLength {
 		return false
 	}
 	parsed, err := mail.ParseAddress(email)
-	return err == nil && parsed.Address == email && !strings.ContainsFunc(email, unicode.IsControl)
+	return err == nil && parsed.Address == email &&
+		!strings.ContainsFunc(email, unicode.IsControl) && !strings.ContainsRune(email, utf8.RuneError)
 }

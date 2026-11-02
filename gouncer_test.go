@@ -65,8 +65,32 @@ func TestNewUserRejectsInvalidInput(t *testing.T) {
 		"email with C1 control U+009B": {
 			"a\u009b8mb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
+		"email with an invalid UTF-8 byte": {
+			"a\x9bb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with U+FFFD": {
+			"a\U0000FFFDb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with U+0130": {
+			"A\U00000130@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email with Kelvin sign U+212A": {
+			"\U0000212Aelvin@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"domain with U+0130": {
+			"ada@exam\U00000130ple.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"domain with Kelvin sign U+212A": {
+			"ada@\U0000212Aelvin.example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
 		"email too long": {
 			strings.Repeat("a", 250) + "@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email too long once lowercased": {
+			strings.Repeat("\U0000023A", 121) + "@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
+		"email too long as typed": {
+			"\U00001E9E" + strings.Repeat("a", 240) + "@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
 		"empty name":     {"ada@example.com", "   ", "correct horse battery", gouncer.ErrEmptyName},
 		"name too long":  {"ada@example.com", strings.Repeat("a", 257), "correct horse battery", gouncer.ErrNameTooLong},
@@ -190,9 +214,11 @@ func TestNewUserAcceptsTrimmedAndAccentedAddresses(t *testing.T) {
 		want  string
 	}{
 		"accented local part": {"mar\U000000eda@example.com", "mar\U000000eda@example.com"},
+		"capital accent":      {"MAR\U000000cdA@example.com", "mar\U000000eda@example.com"},
 		"trailing newline":    {"maria@example.com\n", "maria@example.com"},
 		"leading tab":         {"\tmaria@example.com", "maria@example.com"},
 		"trailing next line":  {"maria@example.com\u0085", "maria@example.com"},
+		"longest address":     {strings.Repeat("a", 242) + "@example.com", strings.Repeat("a", 242) + "@example.com"},
 	}
 
 	for testName, tc := range tests {
