@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -125,12 +126,12 @@ func lowersToASCII(r rune) bool {
 // maxEmailLength is the RFC 5321 address-length limit.
 const maxEmailLength = 254
 
-// isValidEmail reports whether email is a single plain address without a
-// display name or a control character.
+// isValidEmail reports whether email is a single plain address without a display name, a control character or U+FFFD.
 func isValidEmail(email string) bool {
 	if len(email) > maxEmailLength {
 		return false
 	}
 	parsed, err := mail.ParseAddress(email)
-	return err == nil && parsed.Address == email && !strings.ContainsFunc(email, unicode.IsControl)
+	return err == nil && parsed.Address == email &&
+		!strings.ContainsFunc(email, unicode.IsControl) && !strings.ContainsRune(email, utf8.RuneError)
 }

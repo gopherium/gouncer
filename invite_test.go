@@ -71,6 +71,9 @@ func TestNewInvitedUserRejectsInvalidIdentity(t *testing.T) {
 		"email with an invalid UTF-8 byte": {
 			"a\x9bb@example.com", "Maria", gouncer.ErrInvalidEmail,
 		},
+		"email with U+FFFD": {
+			"a\U0000FFFDb@example.com", "Maria", gouncer.ErrInvalidEmail,
+		},
 		"email with U+0130": {
 			"A\U00000130@example.com", "Maria", gouncer.ErrInvalidEmail,
 		},

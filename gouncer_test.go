@@ -68,6 +68,9 @@ func TestNewUserRejectsInvalidInput(t *testing.T) {
 		"email with an invalid UTF-8 byte": {
 			"a\x9bb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
+		"email with U+FFFD": {
+			"a\U0000FFFDb@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
+		},
 		"email with U+0130": {
 			"A\U00000130@example.com", "Ada", "correct horse battery", gouncer.ErrInvalidEmail,
 		},
