@@ -40,6 +40,24 @@ const client = createAuthQueryClient()
 </QueryClientProvider>
 ```
 
+## Links under the form
+
+`LoginScreen`, `RequestResetScreen`, `ResetPasswordScreen` and
+`SetPasswordScreen` take `links`, drawn centred under the form in every
+state. The labels arrive translated, and no links draws nothing. Every
+link carries `noopener noreferrer`, plus the `rel` you give it.
+
+```tsx
+<LoginScreen
+  brand="MyApp"
+  onLogin={onLogin}
+  links={[
+    { label: 'Terms of service', href: 'https://example.com/terms', rel: 'terms-of-service' },
+    { label: 'Privacy policy', href: 'https://example.com/privacy', rel: 'privacy-policy' },
+  ]}
+/>
+```
+
 ## Setup wizard rows
 
 `SetupAccountStep` shows the wizard's own rows in `before`, above
