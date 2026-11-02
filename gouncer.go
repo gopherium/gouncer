@@ -117,8 +117,7 @@ func newIdentity(email, name string) (User, error) {
 	}, nil
 }
 
-// lowersToASCII reports whether r is outside ASCII but lowercases to an
-// ASCII character, such as U+0130 or the Kelvin sign U+212A.
+// lowersToASCII reports whether r lies outside ASCII and lowercases into it, as U+0130 and U+212A do.
 func lowersToASCII(r rune) bool {
 	return r > unicode.MaxASCII && unicode.ToLower(r) <= unicode.MaxASCII
 }
