@@ -23,6 +23,9 @@ var _ pgxPool = pgx.Tx(nil)
 
 const uniqueViolationCode = "23505"
 
+// maxEmailLength is the longest address, in bytes, an account can hold.
+const maxEmailLength = 254
+
 // pgxPool is the subset of [*pgxpool.Pool] the store depends on: the query
 // methods sqlc requires plus transaction control.
 type pgxPool interface {
@@ -77,6 +80,9 @@ func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
 // UserByEmail returns the user owning the email, or [gouncer.ErrUserNotFound]
 // if none exists.
 func (s *UserStore) UserByEmail(ctx context.Context, email string) (gouncer.User, error) {
+	if len(email) > maxEmailLength {
+		return gouncer.User{}, gouncer.ErrUserNotFound
+	}
 	row, err := s.queries.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return gouncer.User{}, gouncer.ErrUserNotFound

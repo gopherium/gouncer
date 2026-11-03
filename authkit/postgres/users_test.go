@@ -5,6 +5,7 @@ package postgres_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -63,6 +64,34 @@ func TestUserStoreMissingUser(t *testing.T) {
 
 	if !errors.Is(err, gouncer.ErrUserNotFound) {
 		t.Errorf("UserByEmail() error = %v, want %v", err, gouncer.ErrUserNotFound)
+	}
+}
+
+func TestUserStoreFindsTheLongestAddressGouncerAccepts(t *testing.T) {
+	t.Parallel()
+
+	const domain = "@example.com"
+	longest := strings.Repeat("a", 254-len(domain)) + domain
+	store := postgres.NewUserStore(newTestPool(t))
+	held, err := gouncer.NewUser(longest, "Ada Lovelace", "correct horse battery")
+	if err != nil {
+		t.Fatalf("gouncer.NewUser() error = %v, want nil", err)
+	}
+	if err := store.CreateUser(t.Context(), held); err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+
+	got, err := store.UserByEmail(t.Context(), longest)
+
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v, want nil", err)
+	}
+	if got.ID != held.ID {
+		t.Errorf("UserByEmail() ID = %v, want %v", got.ID, held.ID)
+	}
+	_, err = gouncer.NewUser("a"+longest, "Ada Lovelace", "correct horse battery")
+	if !errors.Is(err, gouncer.ErrInvalidEmail) {
+		t.Errorf("gouncer.NewUser() one byte longer error = %v, want %v", err, gouncer.ErrInvalidEmail)
 	}
 }
 
