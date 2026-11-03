@@ -10,8 +10,6 @@ import (
 
 	"github.com/gopherium/gouncer"
 	"github.com/gopherium/gouncer/authkit"
-
-	"github.com/gopherium/gouncer/authkit/postgres/internal/db"
 )
 
 // UserStore implements authkit.SetupStore.
@@ -56,17 +54,7 @@ func (s *UserStore) CreateFirstUser(ctx context.Context, u gouncer.User) error {
 	if held {
 		return authkit.ErrSetupDone
 	}
-	err = queries.CreateUser(ctx, db.CreateUserParams{
-		ID:           u.ID,
-		Email:        u.Email,
-		Name:         u.Name,
-		PasswordHash: u.PasswordHash,
-		Disabled:     u.Disabled,
-		Confirmed:    u.Confirmed,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-	})
-	if err != nil {
+	if err := insertUser(ctx, queries, u); err != nil {
 		return fmt.Errorf("postgres: create first user: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {

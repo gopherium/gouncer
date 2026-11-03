@@ -55,9 +55,25 @@ func (s *UserStore) Within(tx pgx.Tx) *UserStore {
 }
 
 // CreateUser stores a new user, or [gouncer.ErrEmailTaken] when the email is
-// already in use.
+// already in use, or [gouncer.ErrInvalidEmail] when no account can hold it.
 func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
-	err := s.queries.CreateUser(ctx, db.CreateUserParams{
+	err := insertUser(ctx, s.queries, u)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
+		return gouncer.ErrEmailTaken
+	}
+	if err != nil {
+		return fmt.Errorf("postgres: create user: %w", err)
+	}
+	return nil
+}
+
+// insertUser stores u, or answers [gouncer.ErrInvalidEmail] when no account can hold its email.
+func insertUser(ctx context.Context, queries *db.Queries, u gouncer.User) error {
+	if len(u.Email) > maxEmailLength {
+		return gouncer.ErrInvalidEmail
+	}
+	return queries.CreateUser(ctx, db.CreateUserParams{
 		ID:           u.ID,
 		Email:        u.Email,
 		Name:         u.Name,
@@ -67,14 +83,6 @@ func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
 		Role:         u.Role,
 		CreatedAt:    u.CreatedAt,
 	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
-		return gouncer.ErrEmailTaken
-	}
-	if err != nil {
-		return fmt.Errorf("postgres: create user: %w", err)
-	}
-	return nil
 }
 
 // UserByEmail returns the user owning the email, or [gouncer.ErrUserNotFound]
