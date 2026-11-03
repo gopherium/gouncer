@@ -7,6 +7,12 @@ minor releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+
+- `CrossOriginGuard` logs the path percent-encoded and writes the method, host, origin and fetch site as printable ASCII, so a refused write cannot put a control character in the log.
+
 ## [0.24.0] - 2026-10-25
 
 ### Added

@@ -5,6 +5,7 @@ package authkit
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 )
 
 // CrossOriginGuard returns root middleware refusing cross-origin browser writes, logging to logger or slog.Default.
@@ -26,10 +27,17 @@ func refuseCrossOrigin(w http.ResponseWriter, r *http.Request, logger *slog.Logg
 	if fetchSite != "" {
 		reason = "fetch-site"
 	}
-	logger.WarnContext(r.Context(), "write refused", "reason", reason, "method", r.Method, "path", r.URL.Path,
-		"host", r.Host, "origin", r.Header.Get("Origin"), "fetch_site", fetchSite)
+	logger.WarnContext(r.Context(), "write refused", "reason", reason, "method", escapeForLog(r.Method),
+		"path", r.URL.EscapedPath(), "host", escapeForLog(r.Host), "origin", escapeForLog(r.Header.Get("Origin")),
+		"fetch_site", escapeForLog(fetchSite))
 	w.Header().Set("Cache-Control", "no-store")
 	RespondError(w, http.StatusForbidden, ErrorResponse{
 		Message: "cross-origin request refused", Code: "request_cross_origin",
 	})
+}
+
+// escapeForLog returns value as printable ASCII, in Go string escapes.
+func escapeForLog(value string) string {
+	quoted := strconv.QuoteToASCII(value)
+	return quoted[1 : len(quoted)-1]
 }

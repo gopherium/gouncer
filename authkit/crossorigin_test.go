@@ -11,6 +11,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gopherium/gouncer/authkit"
@@ -25,6 +26,7 @@ const proxyPeer = "10.0.0.2:1234"
 // browserCall describes one request as it reaches the guard.
 type browserCall struct {
 	method         string
+	path           string
 	host           string
 	remote         string
 	fetchSite      string
@@ -36,7 +38,8 @@ type browserCall struct {
 
 // request builds the HTTP request call describes.
 func (c browserCall) request() *http.Request {
-	request := httptest.NewRequest(cmp.Or(c.method, http.MethodPost), "/api/graphql", nil)
+	request := httptest.NewRequest(http.MethodPost, cmp.Or(c.path, "/api/graphql"), nil)
+	request.Method = cmp.Or(c.method, http.MethodPost)
 	request.Host = cmp.Or(c.host, siteHost)
 	request.RemoteAddr = cmp.Or(c.remote, request.RemoteAddr)
 	headers := map[string]string{
@@ -75,6 +78,73 @@ func loggedLine(t *testing.T, logged *bytes.Buffer) map[string]any {
 	return line
 }
 
+// printableASCII reports whether value holds only printable ASCII.
+func printableASCII(value string) bool {
+	return !strings.ContainsFunc(value, func(r rune) bool { return r < ' ' || r > '~' })
+}
+
+// assertRefusedWriteLog checks a printable ASCII line with exactly the expected fields, ignoring the timestamp.
+func assertRefusedWriteLog(t *testing.T, logged *bytes.Buffer, fields map[string]any) {
+	t.Helper()
+	if value := strings.TrimSuffix(logged.String(), "\n"); !printableASCII(value) {
+		t.Errorf("log = %q, want printable ASCII only", logged.String())
+	}
+	line := loggedLine(t, logged)
+	delete(line, "time")
+	want := map[string]any{"level": "WARN", "msg": "write refused", "method": http.MethodPost, "path": "/api/graphql"}
+	maps.Copy(want, fields)
+	if !maps.Equal(line, want) {
+		t.Errorf("log = %#v, want exactly the fields %#v", line, want)
+	}
+}
+
+// controlCharacters returns all C0 and C1 control characters, including DEL.
+func controlCharacters() string {
+	var controls strings.Builder
+	for control := rune(0); control <= 0x1f; control++ {
+		controls.WriteRune(control)
+	}
+	for control := rune(0x7f); control <= 0x9f; control++ {
+		controls.WriteRune(control)
+	}
+	return controls.String()
+}
+
+// assertEscapedLogAttr checks request values before serialization and records which fields the handler received.
+func assertEscapedLogAttr(t *testing.T, seen map[string]bool, attr slog.Attr) slog.Attr {
+	t.Helper()
+	switch attr.Key {
+	case "method", "host", "origin", "fetch_site":
+		seen[attr.Key] = true
+		if value := attr.Value.String(); !printableASCII(value) {
+			t.Errorf("handler received %s = %q, want printable ASCII only", attr.Key, value)
+		}
+	}
+	return attr
+}
+
+// loggedFields is one request and the fields its log line must hold.
+type loggedFields struct {
+	name string
+	call browserCall
+	want map[string]any
+}
+
+// assertLoggedFields checks the log line of each case in a parallel subtest.
+func assertLoggedFields(t *testing.T, cases []loggedFields) {
+	t.Helper()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			handler, _, logged := guarded()
+			handler.ServeHTTP(httptest.NewRecorder(), tc.call.request())
+			assertRefusedWriteLog(t, logged, tc.want)
+		})
+	}
+}
+
+// TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin checks that cross-origin writes are logged and blocked.
 func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	t.Parallel()
 
@@ -125,6 +195,7 @@ func TestCrossOriginGuardRefusesBrowserWritesFromAnotherOrigin(t *testing.T) {
 	}
 }
 
+// TestCrossOriginGuardLetsTheSiteAndOtherServersWrite checks allowed requests pass through without logging.
 func TestCrossOriginGuardLetsTheSiteAndOtherServersWrite(t *testing.T) {
 	t.Parallel()
 
@@ -177,6 +248,7 @@ func TestCrossOriginGuardLetsTheSiteAndOtherServersWrite(t *testing.T) {
 	}
 }
 
+// TestCrossOriginGuardAnswersAnUncachedJSONError checks the status, JSON error, and cache headers of refused writes.
 func TestCrossOriginGuardAnswersAnUncachedJSONError(t *testing.T) {
 	t.Parallel()
 
@@ -208,14 +280,11 @@ func TestCrossOriginGuardAnswersAnUncachedJSONError(t *testing.T) {
 	}
 }
 
+// TestCrossOriginGuardLogsTheRefusedWrite checks the logged fields for ordinary requests.
 func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name string
-		call browserCall
-		want map[string]any
-	}{
+	assertLoggedFields(t, []loggedFields{
 		{
 			name: "fetch-site",
 			call: browserCall{
@@ -234,31 +303,147 @@ func TestCrossOriginGuardLogsTheRefusedWrite(t *testing.T) {
 				"fetch_site": "",
 			},
 		},
+	})
+}
+
+// TestCrossOriginGuardEscapesTheLoggedFields checks path encoding and escaped controls in JSON logs.
+func TestCrossOriginGuardEscapesTheLoggedFields(t *testing.T) {
+	t.Parallel()
+
+	assertLoggedFields(t, []loggedFields{
+		{
+			name: "encoded control in path",
+			call: browserCall{path: "/%C2%9B31m", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/%C2%9B31m", "fetch_site": ""},
+		},
+		{
+			name: "preserved path escaping",
+			call: browserCall{path: "/api%2fgraphql", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/api%2fgraphql", "fetch_site": ""},
+		},
+		{
+			name: "raw control in path and a query",
+			call: browserCall{path: "/\U0000009B31m?token=value", origin: "https://example.org"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org",
+				"path": "/%C2%9B31m", "fetch_site": ""},
+		},
+		{
+			name: "control in origin",
+			call: browserCall{origin: "https://example.org/\u009b31m"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": `https://example.org/\u009b31m`,
+				"fetch_site": ""},
+		},
+		{
+			name: "control in fetch site",
+			call: browserCall{fetchSite: "same-site\u009b31m", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "host": siteHost, "origin": "https://example.org",
+				"fetch_site": `same-site\u009b31m`},
+		},
+		{
+			name: "control in host",
+			call: browserCall{host: "app.example.com\u009b31m", fetchSite: "cross-site", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "host": `app.example.com\u009b31m`, "origin": "https://example.org",
+				"fetch_site": "cross-site"},
+		},
+		{
+			name: "other controls in host and origin",
+			call: browserCall{host: "app\x00\t\n\r\x1b\x7f\u0080\u009f", fetchSite: "cross-site",
+				origin: "https://example.org/\x00\t\n\r\x1b\x7f\u0080\u009f"},
+			want: map[string]any{"reason": "fetch-site", "host": `app\x00\t\n\r\x1b\x7f\u0080\u009f`,
+				"origin": `https://example.org/\x00\t\n\r\x1b\x7f\u0080\u009f`, "fetch_site": "cross-site"},
+		},
+		{
+			name: "control in method",
+			call: browserCall{method: "P\U0000009BST", fetchSite: "cross-site", origin: "https://example.org"},
+			want: map[string]any{"reason": "fetch-site", "method": "P\\u009bST", "host": siteHost,
+				"origin": "https://example.org", "fetch_site": "cross-site"},
+		},
+	})
+}
+
+// TestCrossOriginGuardEscapesMoreThanControls checks bad bytes, invisible characters, letters and quotes in JSON logs.
+func TestCrossOriginGuardEscapesMoreThanControls(t *testing.T) {
+	t.Parallel()
+
+	assertLoggedFields(t, []loggedFields{
+		{
+			name: "bytes that are not UTF-8",
+			call: browserCall{method: "P\x9bST", host: "app\x9b.example", fetchSite: "cross\x9bsite",
+				origin: "https://example.org/\x9b"},
+			want: map[string]any{"reason": "fetch-site", "method": `P\x9bST`, "host": `app\x9b.example`,
+				"origin": `https://example.org/\x9b`, "fetch_site": `cross\x9bsite`},
+		},
+		{
+			name: "byte that is not UTF-8 beside a control",
+			call: browserCall{origin: "https://example.org/\x9b\U0000009B"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\x9b\\u009b",
+				"fetch_site": ""},
+		},
+		{
+			name: "invisible characters",
+			call: browserCall{origin: "https://example.org/\U0000202E\U0000200B\U00002028"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\u202e\\u200b\\u2028",
+				"fetch_site": ""},
+		},
+		{
+			name: "text that looks like an escape",
+			call: browserCall{origin: "https://example.org/\"\\u009b"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\\"\\\\u009b",
+				"fetch_site": ""},
+		},
+		{
+			name: "spaces that are not ASCII",
+			call: browserCall{origin: "https://example.org/\U000000A0\U00003000"},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "https://example.org/\\u00a0\\u3000",
+				"fetch_site": ""},
+		},
+		{
+			name: "quote at both ends",
+			call: browserCall{origin: "\"https://example.org\""},
+			want: map[string]any{"reason": "origin", "host": siteHost, "origin": "\\\"https://example.org\\\"",
+				"fetch_site": ""},
+		},
+		{
+			name: "letters that are not ASCII",
+			call: browserCall{host: "\U00004F8B\U00005B50.example", fetchSite: "cross-site",
+				origin: "https://\U00004F8B\U00005B50.example/"},
+			want: map[string]any{"reason": "fetch-site", "host": "\\u4f8b\\u5b50.example",
+				"origin": "https://\\u4f8b\\u5b50.example/", "fetch_site": "cross-site"},
+		},
+	})
+}
+
+// TestCrossOriginGuardEscapesControlsBeforeTheLogHandler checks escaping before the handler formats the log.
+func TestCrossOriginGuardEscapesControlsBeforeTheLogHandler(t *testing.T) {
+	t.Parallel()
+
+	controls := controlCharacters()
+	var logged bytes.Buffer
+	seen := make(map[string]bool)
+	logger := slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+			return assertEscapedLogAttr(t, seen, attr)
+		},
+	}))
+	handler := authkit.CrossOriginGuard(logger)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("refused request reached the handler")
+	}))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, browserCall{
+		method: http.MethodPost + controls, host: "app.example.com" + controls,
+		origin: "https://example.org/" + controls, fetchSite: "same-site" + controls,
+	}.request())
+	if recorder.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", recorder.Code, http.StatusForbidden)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			handler, _, logged := guarded()
-
-			handler.ServeHTTP(httptest.NewRecorder(), tc.call.request())
-
-			line := loggedLine(t, logged)
-			want := map[string]any{"level": "WARN", "msg": "write refused", "method": http.MethodPost, "path": "/api/graphql"}
-			maps.Copy(want, tc.want)
-			for key, value := range want {
-				if line[key] != value {
-					t.Errorf("log %s = %v, want %v", key, line[key], value)
-				}
-			}
-			delete(line, "time")
-			if len(line) != len(want) {
-				t.Errorf("log = %v, want only the fields %v", line, want)
-			}
-		})
+	if len(seen) != 4 {
+		t.Errorf("logged fields = %v, want method, host, origin and fetch_site", seen)
 	}
 }
 
+// TestCrossOriginGuardLogsToTheDefaultLoggerWhenGivenNone checks the fallback to slog.Default when the logger is nil.
 func TestCrossOriginGuardLogsToTheDefaultLoggerWhenGivenNone(t *testing.T) {
 	previous := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(previous) })
