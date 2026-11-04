@@ -17,7 +17,7 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 ### Fixed
 
 - `UserByEmail` answers `gouncer.ErrUserNotFound` for an address longer than an account can hold, without a read.
-- `CreateUser` and `CreateFirstUser` answer `gouncer.ErrInvalidEmail` for that address and store nothing.
+- `CreateUser` answers `gouncer.ErrInvalidEmail` for that address and stores nothing, and so does `CreateFirstUser` on an empty store.
 
 ## [0.15.0] - 2026-10-18
 
