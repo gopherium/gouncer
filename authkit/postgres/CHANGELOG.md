@@ -14,6 +14,11 @@ Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
 - The module needs Go 1.27.3.
 
+### Fixed
+
+- `UserByEmail` answers `gouncer.ErrUserNotFound` for an address longer than an account can hold, without a read.
+- `CreateUser` answers `gouncer.ErrInvalidEmail` for that address and stores nothing, and so does `CreateFirstUser` on an empty store.
+
 ## [0.15.0] - 2026-10-18
 
 ### Added

@@ -23,6 +23,9 @@ var _ pgxPool = pgx.Tx(nil)
 
 const uniqueViolationCode = "23505"
 
+// maxEmailLength is the longest address, in bytes, an account can hold.
+const maxEmailLength = 254
+
 // pgxPool is the subset of [*pgxpool.Pool] the store depends on: the query
 // methods sqlc requires plus transaction control.
 type pgxPool interface {
@@ -52,18 +55,9 @@ func (s *UserStore) Within(tx pgx.Tx) *UserStore {
 }
 
 // CreateUser stores a new user, or [gouncer.ErrEmailTaken] when the email is
-// already in use.
+// already in use, or [gouncer.ErrInvalidEmail] when no account can hold it.
 func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
-	err := s.queries.CreateUser(ctx, db.CreateUserParams{
-		ID:           u.ID,
-		Email:        u.Email,
-		Name:         u.Name,
-		PasswordHash: u.PasswordHash,
-		Disabled:     u.Disabled,
-		Confirmed:    u.Confirmed,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-	})
+	err := insertUser(ctx, s.queries, u)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
 		return gouncer.ErrEmailTaken
@@ -74,9 +68,29 @@ func (s *UserStore) CreateUser(ctx context.Context, u gouncer.User) error {
 	return nil
 }
 
+// insertUser stores u, or answers [gouncer.ErrInvalidEmail] when no account can hold its email.
+func insertUser(ctx context.Context, queries *db.Queries, u gouncer.User) error {
+	if len(u.Email) > maxEmailLength {
+		return gouncer.ErrInvalidEmail
+	}
+	return queries.CreateUser(ctx, db.CreateUserParams{
+		ID:           u.ID,
+		Email:        u.Email,
+		Name:         u.Name,
+		PasswordHash: u.PasswordHash,
+		Disabled:     u.Disabled,
+		Confirmed:    u.Confirmed,
+		Role:         u.Role,
+		CreatedAt:    u.CreatedAt,
+	})
+}
+
 // UserByEmail returns the user owning the email, or [gouncer.ErrUserNotFound]
 // if none exists.
 func (s *UserStore) UserByEmail(ctx context.Context, email string) (gouncer.User, error) {
+	if len(email) > maxEmailLength {
+		return gouncer.User{}, gouncer.ErrUserNotFound
+	}
 	row, err := s.queries.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return gouncer.User{}, gouncer.ErrUserNotFound
