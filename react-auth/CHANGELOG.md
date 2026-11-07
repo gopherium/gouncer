@@ -10,6 +10,12 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Fixed
+
+- The package declares its side effects, so a bundler drops the users list when an app imports only `RoleSelect` or `errorMessageOf` from `/wpds/users`, while `/wpds/style.css` stays a side effect.
+
 ## [0.20.0] - 2026-11-02
 
 ### Added
