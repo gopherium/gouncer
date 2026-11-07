@@ -2,7 +2,7 @@
 
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 import { build } from 'vite'
 import type { Rolldown } from 'vite'
@@ -53,7 +53,7 @@ async function bundle(source: string, files: Record<string, string> = {}) {
 			rolldownOptions: {
 				input: entry,
 				preserveEntrySignatures: 'exports-only',
-				external: (id) => /^[\w@]/.test(id),
+				external: (id) => !isAbsolute(id) && /^[\w@]/.test(id),
 			},
 		},
 	})) as Rolldown.RolldownOutput
