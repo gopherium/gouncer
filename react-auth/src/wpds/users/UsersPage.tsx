@@ -8,9 +8,9 @@ import {
 	focusedTrigger,
 	openOnTap,
 	useBulkRun,
+	useDialogRun,
 	useFocusBack,
 	useListRun,
-	useUnsavedText,
 	viewNarrows,
 } from '@gopherium/godmin'
 import type { ListView, Trigger } from '@gopherium/godmin'
@@ -34,6 +34,8 @@ import { OpenRoleDialog } from './ChangeRoleDialog.js'
 import type { OpenedRole } from './ChangeRoleDialog.js'
 import { usersFields } from './fields.js'
 import type { UsersColumn } from './fields.js'
+import { ResendDialog } from './ResendDialog.js'
+import type { OpenedResend } from './ResendDialog.js'
 import type { ErrorMessages, RoleLabels } from './words.js'
 
 /** What an app hands the users page: the view it holds, its settings and its own words, all as data. */
@@ -178,14 +180,15 @@ export function UsersPage(props: UsersPageProps) {
 	const { run, region, refreshing } = useListRun('users', props.list.onChangeSelection)
 	const reload = useCallback(() => client.invalidateQueries({ queryKey: usersQueryKey }), [client])
 	const switches = useBulkRun<Account>(run, reload)
-	const unsaved = useUnsavedText()
-	const links = useUnsavedText()
+	const write = useDialogRun<Account>(run, reload)
 	const focusBack = useFocusBack(users.isFetching, region)
 	const [opened, setOpened] = useState<OpenedRole>()
 	const openRole = useCallback((accounts: Account[], trigger: Trigger) => setOpened({ accounts, trigger }), [])
+	const [resending, setResending] = useState<OpenedResend>()
+	const openResend = useCallback((account: Account, trigger: Trigger) => setResending({ account, trigger }), [])
 	const errorMessages = props.errorMessages ?? NO_MESSAGES
 	const roleLabels = props.roleLabels ?? NO_LABELS
-	const actions = useUsersActions({ reader, switches, links, errorMessages, openRole })
+	const actions = useUsersActions({ reader, switches, errorMessages, openRole, openResend })
 	const grantable = reader?.grantable ?? NO_ROLES
 	const title = _x('Users', 'admin section', DOMAIN)
 	return (
@@ -219,11 +222,21 @@ export function UsersPage(props: UsersPageProps) {
 			)}
 			<OpenRoleDialog
 				opened={opened}
-				tools={{ grantable, roleLabels, errorMessages, unsaved, reload, onRefresh: run.onRefresh }}
+				tools={{ grantable, roleLabels, errorMessages, write }}
 				onClose={() => setOpened(undefined)}
 				onClearSelection={() => props.list.onChangeSelection([])}
 				onBack={focusBack}
 			/>
+			{resending === undefined ? null : (
+				<ResendDialog
+					account={resending.account}
+					errorMessages={errorMessages}
+					onClose={() => {
+						setResending(undefined)
+						focusBack(resending.account.id, resending.trigger)
+					}}
+				/>
+			)}
 		</Page>
 	)
 }

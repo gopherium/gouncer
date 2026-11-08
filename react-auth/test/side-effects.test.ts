@@ -61,12 +61,15 @@ async function bundle(source: string, files: Record<string, string> = {}) {
 	return { chunk, resolved, workspace }
 }
 
-test('bundles none of the users list for an entry taking only RoleSelect and errorMessageOf', async () => {
-	const { chunk, resolved } = await bundle(`export { RoleSelect, errorMessageOf } from ${JSON.stringify(usersEntry)}`)
+test('bundles none of the users list for an entry taking only RoleSelect and the words of a failed write', async () => {
+	const { chunk, resolved } = await bundle(
+		`export { RoleSelect, addUserErrorMessageOf, errorMessageOf } from ${JSON.stringify(usersEntry)}`,
+	)
 	const taken = chunk.moduleIds.map((id) => relative(resolve(), id))
 
 	expect(chunk.code).toContain('gopherium-role-select')
 	expect(chunk.code).toContain('Sorry, you are not allowed to edit this user.')
+	expect(chunk.code).toContain('Sorry, you are not allowed to create users.')
 	expect(taken).not.toContain('src/wpds/users/UsersPage.tsx')
 	expect(chunk.imports).not.toContain('@wordpress/dataviews')
 	expect(resolved.get(usersEntry)).toMatchObject({ packageJsonPath: manifest, moduleSideEffects: false })

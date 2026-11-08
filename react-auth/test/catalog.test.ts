@@ -70,6 +70,7 @@ const wordpressReviewedInTheList: [context: string, msgid: string][] = [
 	['', 'Generate password'],
 	['', 'Invalid user ID.'],
 	['', 'Name'],
+	['', 'Sorry, you are not allowed to create users.'],
 	['', 'Sorry, you are not allowed to edit this user.'],
 	['', 'Sorry, you are not allowed to edit users.'],
 	['', 'Status'],
@@ -109,6 +110,7 @@ const frenchWordpressReviewed: [context: string, msgid: string][] = [
 	['', 'Show'],
 	['', 'Show password'],
 	['', 'Sorry, that is not a valid email address. Email addresses look like <code>username@example.com</code>.'],
+	['', 'Sorry, you are not allowed to create users.'],
 	['', 'Sorry, you are not allowed to edit this user.'],
 	['', 'Sorry, you are not allowed to edit users.'],
 	['', 'Sorry, you are not allowed to give users that role.'],
@@ -175,6 +177,15 @@ test('carries the Spanish WordPress uses for a lost password', async () => {
 	const held = await catalogFor('es-ES')
 
 	expect(held?.['Lost your password?']).toEqual(['¿Has olvidado tu contraseña?'])
+})
+
+test("carries WordPress's Spanish and French for an Add User the reader may no longer send", async () => {
+	const refused = 'Sorry, you are not allowed to create users.'
+
+	expect((await catalogFor('es-ES'))?.[refused]).toEqual(['Lo siento, no tienes permisos para crear usuarios.'])
+	expect((await catalogFor('fr-FR'))?.[refused]).toEqual([
+		'Désolé, vous n’avez pas l’autorisation de créer des comptes.',
+	])
 })
 
 test("carries WordPress's Spanish for Continue", async () => {

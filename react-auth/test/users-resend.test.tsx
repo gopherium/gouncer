@@ -56,17 +56,17 @@ test('lists the actions that open a dialog first, with an ellipsis, and the one 
 	expect(await menuOf('Maria Perez')).toEqual(['Change role…', 'Resend invitation…', 'Disable'])
 })
 
-test('opens the resend at the medium width under its title, with Cancel as an accent text button', async () => {
+test('opens the resend under its title, the question as its help sentence, an outline neutral Cancel', async () => {
 	renderUsers()
 
 	const modal = await openResend()
 
-	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toHaveClass('has-size-medium')
+	const question = 'Send a new invitation to "Maria Perez" (maria@example.com)? The link sent before stops working.'
 	expect(modal.getByRole('heading', { name: 'Resend invitation' })).toBeInTheDocument()
-	expect(
-		modal.getByText('Send a new invitation to "Maria Perez" (maria@example.com)? The link sent before stops working.'),
-	).toBeInTheDocument()
-	expect([...modal.getByRole('button', { name: 'Cancel' }).classList]).toEqual(buttonClasses('minimal'))
+	expect(screen.getByRole('dialog', { name: 'Resend invitation', description: question })).toBeVisible()
+	expect([...modal.getByRole('button', { name: 'Cancel' }).classList]).toEqual(
+		buttonClasses('outline', undefined, 'neutral'),
+	)
 	expect(modal.getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
 })
 
@@ -131,8 +131,11 @@ test('shows the activation link in the dialog when no mail server delivered the 
 
 	const line = 'No mail server is configured. Deliver the activation link by hand.'
 	expect(await modal.findByText(line)).toBeInTheDocument()
+	expect(screen.getByRole('dialog', { name: 'Resend invitation', description: line })).toBeVisible()
 	expect(modal.getByLabelText('Activation link')).toHaveValue('/activate?token=t-9')
 	expect(modal.getByLabelText('Activation link')).toHaveAttribute('readonly')
+	await waitFor(() => expect(modal.getByLabelText('Activation link')).toHaveFocus())
+	expect(modal.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
 	expect(screen.queryByText(/Invitation sent/)).not.toBeInTheDocument()
 	await userEvent.click(modal.getByRole('button', { name: 'Done' }))
 	await closed()
@@ -155,7 +158,7 @@ test('closes the resend without sending when the reader cancels', async () => {
 	expect(sent).not.toHaveBeenCalled()
 })
 
-test('keeps the resend busy with Cancel greyed until the write ends, then toasts and closes', async () => {
+test('keeps the resend open while it sends, Cancel, the close icon and Escape doing nothing, then closes', async () => {
 	const answer = held()
 	server.use(
 		http.post('/api/users/invite/resend', async () => {
@@ -169,56 +172,14 @@ test('keeps the resend busy with Cancel greyed until the write ends, then toasts
 	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
 
 	await waitFor(() => expect(modal.getByRole('button', { name: 'Cancel' })).toHaveAttribute('aria-disabled', 'true'))
-	expect(screen.getByRole('dialog')).toBeInTheDocument()
+	expect(modal.getByRole('button', { name: 'Close' })).toHaveAttribute('aria-disabled', 'true')
+	await userEvent.click(modal.getByRole('button', { name: 'Cancel' }))
+	await userEvent.click(modal.getByRole('button', { name: 'Close' }))
+	await userEvent.keyboard('{Escape}')
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
 	answer.release()
 	expect(await toast('Invitation sent to "Maria Perez".')).toBeInTheDocument()
 	await closed()
-})
-
-test('closes only itself once its write ends, never a resend opened on the row since', async () => {
-	const first = held()
-	server.use(
-		http.post('/api/users/invite/resend', async () => {
-			await first.gate
-			return HttpResponse.json({ delivered: true })
-		}),
-	)
-	renderUsers()
-	const modal = await openResend()
-	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
-	await userEvent.click(modal.getByRole('button', { name: 'Close' }))
-	await closed()
-	server.use(resendDelivered())
-	await openResend()
-
-	first.release()
-
-	await toast('Invitation sent to "Maria Perez".')
-	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeInTheDocument()
-})
-
-test('shows the activation link when the resend opens again after it closed before the server answered', async () => {
-	const answer = held()
-	server.use(
-		http.post('/api/users/invite/resend', async () => {
-			await answer.gate
-			return HttpResponse.json({ delivered: false, activation_link: '/activate?token=t-9' })
-		}),
-	)
-	const { client } = renderUsers()
-	const modal = await openResend()
-	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
-	await userEvent.click(modal.getByRole('button', { name: 'Close' }))
-	await closed()
-
-	answer.release()
-	await waitFor(() => expect(client.isMutating()).toBe(0))
-
-	const again = await openResend()
-	expect(again.getByLabelText('Activation link')).toHaveValue('/activate?token=t-9')
-	await userEvent.click(again.getByRole('button', { name: 'Done' }))
-	await closed()
-	expect((await openResend()).getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
 })
 
 test('opens on the question again once a resend that showed its activation link closed', async () => {
@@ -234,35 +195,6 @@ test('opens on the question again once a resend that showed its activation link 
 	expect((await openResend()).getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
 })
 
-test('never keeps the activation link of a resend a later one replaced', async () => {
-	const first = held()
-	const answers = ['/activate?token=t-1', '/activate?token=t-2']
-	server.use(
-		http.post('/api/users/invite/resend', async () => {
-			const link = answers.shift()
-			if (link === '/activate?token=t-1') {
-				await first.gate
-			}
-			return HttpResponse.json({ delivered: false, activation_link: link })
-		}),
-	)
-	const { client } = renderUsers()
-	const modal = await openResend()
-	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
-	await userEvent.click(modal.getByRole('button', { name: 'Close' }))
-	await closed()
-	const second = await openResend()
-	await userEvent.click(second.getByRole('button', { name: 'Resend invitation' }))
-	expect(await second.findByLabelText('Activation link')).toHaveValue('/activate?token=t-2')
-	await userEvent.click(second.getByRole('button', { name: 'Done' }))
-	await closed()
-
-	first.release()
-	await waitFor(() => expect(client.isMutating()).toBe(0))
-
-	expect((await openResend()).getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
-})
-
 test('signs the reader out when the session ended before the resend', async () => {
 	server.use(http.post('/api/users/invite/resend', () => HttpResponse.json({ error: 'no session' }, { status: 401 })))
 	const { client } = renderUsers()
@@ -273,19 +205,21 @@ test('signs the reader out when the session ended before the resend', async () =
 	await waitFor(() => expect(client.getQueryData(sessionQueryKey)).toBeNull())
 })
 
-test("says in a toast why a resend failed, in WordPress's words for the error code, the confirm closed", async () => {
+test("says inside the open dialog why a resend failed, in WordPress's words for the error code", async () => {
 	server.use(resendRefused('user_not_editable'))
 	renderUsers()
 	const modal = await openResend()
 
 	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
 
-	expect(await toast('Sorry, you are not allowed to edit this user.')).toBeInTheDocument()
+	const words = 'Sorry, you are not allowed to edit this user.'
+	expect(await modal.findByText(words)).toBeInTheDocument()
+	expect(screen.queryByText(words, { selector: '.godmin-toast' })).not.toBeInTheDocument()
 	expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-	await closed()
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
 })
 
-test('says plainly in a toast that a resend failed when the server names no reason', async () => {
+test('says plainly inside the open dialog that a resend failed when the server names no reason', async () => {
 	server.use(
 		http.post('/api/users/invite/resend', () => HttpResponse.json({ error: 'the relay refused' }, { status: 500 })),
 	)
@@ -294,7 +228,23 @@ test('says plainly in a toast that a resend failed when the server names no reas
 
 	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
 
-	expect(await toast('The invitation could not be sent.')).toBeInTheDocument()
+	const words = 'The invitation could not be sent.'
+	expect(await modal.findByText(words)).toBeInTheDocument()
+	expect(screen.queryByText(words, { selector: '.godmin-toast' })).not.toBeInTheDocument()
 	expect(screen.queryByText('the relay refused')).not.toBeInTheDocument()
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
+})
+
+test('sends again on a second press after a refused resend, and closes with the toast once it went out', async () => {
+	server.use(resendRefused('user_not_editable'))
+	renderUsers()
+	const modal = await openResend()
+	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
+	await modal.findByText('Sorry, you are not allowed to edit this user.')
+
+	server.use(resendDelivered())
+	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
+
+	expect(await toast('Invitation sent to "Maria Perez".')).toBeInTheDocument()
 	await closed()
 })
