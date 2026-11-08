@@ -10,6 +10,20 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Added
+
+- `addUserErrorMessageOf` from `/wpds/users` gives the words a failed Add User shows, WordPress's "Sorry, you are not allowed to create users." for a reader who may no longer manage users.
+
+### Changed
+
+- **Breaking.** `/wpds/users` moves to godmin 0.32: the optional `@gopherium/godmin` peer is `>=0.32.0 <0.33.0`, where it was `>=0.31.0 <0.32.0`.
+- Change role and Resend invitation draw godmin's form dialog: a card at every width with a close icon and a neutral Cancel.
+- Change role stays open with a spinner until its write ends. One refused account keeps it open and says why inside, and several close with one toast.
+- Resend invitation stays open while it sends and says a failure inside. With no mail server it shows the activation link in the same dialog, with the focus on the link.
+- Neither dialog closes while its write runs, so a refused role or an activation link is no longer kept for the next open.
+
 ## [0.20.1] - 2026-11-08
 
 ### Fixed

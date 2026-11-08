@@ -21,9 +21,11 @@ Session authentication for React apps backed by gouncer's authkit.
 - `@gopherium/react-auth/wpds/users` is the Users page on WordPress
   DataViews: `UsersPage`, `usersListDefaults`, the view it opens on as
   data for godmin's `useListView`, `RoleSelect`, the role menu with the
-  fewest capabilities first, `roleLabelOf`, and `errorMessageOf`, the
-  words the list toasts a failed account write in. It is its own entry,
-  so an app that only signs people in never resolves its peers.
+  fewest capabilities first, `roleLabelOf`, `errorMessageOf`, the words
+  a failed account write shows, in a toast or inside the dialog that
+  stays open, and `addUserErrorMessageOf`, the words a failed Add User
+  shows. It is its own entry, so an app that only signs people in never
+  resolves its peers.
 - `@gopherium/react-auth/testing` is the msw harness: `server`,
   `installTestEnvironment`, `seedSession`, `defaultUser`, and canned
   handlers for the auth endpoints.
@@ -167,14 +169,15 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   development, proxy `/api` to your backend so the `__Host-` session
   cookie is first-party.
 - `/wpds` needs the `@wordpress/ui` and `@wordpress/icons` peers.
-- `/wpds/users` also needs `@gopherium/godmin` 0.31,
+- `/wpds/users` also needs `@gopherium/godmin` 0.32,
   `@gopherium/gottext`, `@wordpress/dataviews`, `@wordpress/components`
   and `@wordpress/date`, and godmin's `Toaster` above the page, whose
   toasts show each name whole. The app loads the DataViews and
   components stylesheets, and `@gopherium/react-auth/wpds/style.css`,
   which clips a long email under the name and sizes `RoleSelect` on a
-  phone. To translate the words of a search that finds nobody, it also
-  loads godmin's `listChromeCatalogFor` into `LIST_CHROME_DOMAIN`.
+  phone. To translate the words of a search that finds nobody and the
+  Close icon of a dialog, it also loads godmin's `listChromeCatalogFor`
+  into `LIST_CHROME_DOMAIN`.
 - `/testing` loads by `import` only. `installTestEnvironment` puts
   Node's `File` and `FormData` on the global, so under jsdom
   `new FormData(form)`, which a React form action calls, and
