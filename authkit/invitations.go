@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -305,12 +306,14 @@ func remoteHost(r *http.Request) string {
 	if err != nil {
 		host = r.RemoteAddr
 	}
-	ip := net.ParseIP(host)
-	if ip == nil {
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
 		return host
 	}
-	if v4 := ip.To4(); v4 != nil {
-		return v4.String()
+	ip = ip.Unmap().WithZone("")
+	if ip.Is4() {
+		return ip.String()
 	}
-	return ip.Mask(net.CIDRMask(64, 128)).String()
+	network, _ := ip.Prefix(64)
+	return network.Addr().String()
 }
