@@ -57,6 +57,7 @@ func TestInviteRouteSetsTheTokenAsTheOnlyTokenOfTheAddressQuery(t *testing.T) {
 	if parsed.Query().Get("token") == "stale" {
 		t.Errorf("link = %q, want the fresh token in place of the stale one", link)
 	}
+	wantActivates(t, routes.public, parsed.Query().Get("token"))
 	if parsed.Query().Get("page") != "activate" {
 		t.Errorf("link = %q, want the address's own query kept", link)
 	}
@@ -193,12 +194,15 @@ func wantHeldAddressUntouched(
 	store := testkit.NewStore()
 	routes := invitationServer(t, store, actor, sendingThrough(sender))
 	hold(t, store)
-	before := stateOf(storedMaria(t, store))
+	before := storedMaria(t, store)
 
 	wantDelivered(t, inviteAs(t, routes.admin, "Someone Else", "member"))
 
 	wantNothingSent(t, sender)
-	wantMariaState(t, store, before)
+	wantMariaState(t, store, stateOf(before))
+	if storedMaria(t, store).PasswordHash != before.PasswordHash {
+		t.Error("the held account's password hash changed")
+	}
 }
 
 func TestInviteRouteAnswersAFailedDeliveryAndKeepsTheInvitation(t *testing.T) {
