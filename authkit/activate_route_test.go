@@ -143,7 +143,7 @@ func TestActivateRouteCountsTheClientTheKeyNames(t *testing.T) {
 	}
 }
 
-func TestActivateRouteKeysEachClientAddressAsRatelimitDoes(t *testing.T) {
+func TestActivateRouteKeysEachClientAddress(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -153,7 +153,8 @@ func TestActivateRouteKeysEachClientAddressAsRatelimitDoes(t *testing.T) {
 		{name: "an address with no port", remoteAddr: "192.0.2.9", key: "192.0.2.9"},
 		{name: "an IPv4-mapped address", remoteAddr: "[::ffff:c000:209]:4321", key: "192.0.2.9"},
 		{name: "an IPv6 address", remoteAddr: "[2001:db8:1:2::1a]:4321", key: "2001:db8:1:2::"},
-		{name: "a scoped IPv6 address", remoteAddr: "[fe80::1a%eth0]:4321", key: "fe80::"},
+		{name: "a scoped IPv6 address", remoteAddr: "[fe80::1a%eth0]:4321", key: "fe80::%eth0"},
+		{name: "a scoped IPv6 address on another link", remoteAddr: "[fe80::1a%eth1]:4321", key: "fe80::%eth1"},
 		{name: "an address that names no IP", remoteAddr: "client.example:4321", key: "client.example"},
 	}
 	for _, tc := range cases {

@@ -300,7 +300,7 @@ func (v *Invitations) signIn(ctx context.Context, w http.ResponseWriter, id uuid
 	Respond(w, http.StatusOK, identity)
 }
 
-// remoteHost returns the IP of the request's remote address, an IPv4 one whole and an IPv6 one cut to its /64.
+// remoteHost returns the remote address's IP, an IPv4 one whole and an IPv6 one cut to its /64 on its link.
 func remoteHost(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -310,10 +310,10 @@ func remoteHost(r *http.Request) string {
 	if err != nil {
 		return host
 	}
-	ip = ip.Unmap().WithZone("")
+	ip = ip.Unmap()
 	if ip.Is4() {
 		return ip.String()
 	}
 	network, _ := ip.Prefix(64)
-	return network.Addr().String()
+	return network.Addr().WithZone(ip.Zone()).String()
 }
