@@ -254,6 +254,9 @@ msgstr "Un problème est survenu."
 msgid "Sorry, that is not a valid email address. Email addresses look like <code>username@example.com</code>."
 msgstr "Désolé, ce n’est pas une adresse e-mail valide. Les adresses de messagerie ressemblent à cela : <code>identifiant@example.com</code>."
 
+msgid "Sorry, you are not allowed to create users."
+msgstr "Désolé, vous n’avez pas l’autorisation de créer des comptes."
+
 msgid "Sorry, you are not allowed to edit this user."
 msgstr "Désolé, vous n’avez pas l’autorisation de modifier ce compte."
 

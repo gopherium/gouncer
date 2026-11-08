@@ -85,6 +85,20 @@ export function errorMessageOf(error: unknown, errorMessages: ErrorMessages, fal
 }
 
 /**
+ * Returns the words a failed Add User reads as, WordPress's create sentence for a reader who may not manage users.
+ * @param error - What the create or the invitation failed with.
+ * @param errorMessages - The words the app gives the codes only it answers.
+ * @param fallback - The words for an error with no code either side words.
+ * @returns The words, read for every other code as a failed account write reads.
+ */
+export function addUserErrorMessageOf(error: unknown, errorMessages: ErrorMessages, fallback: string): string {
+	if (codeOf(error) === 'role_insufficient') {
+		return __('Sorry, you are not allowed to create users.', DOMAIN)
+	}
+	return errorMessageOf(error, errorMessages, fallback)
+}
+
+/**
  * Returns the toast confirming the accounts one Enable or Disable changed.
  * @param disabled - Whether the accounts were disabled rather than enabled.
  * @param done - How many accounts changed.

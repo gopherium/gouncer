@@ -211,6 +211,9 @@ msgstr ""
 msgid "Sorry, that is not a valid email address. Email addresses look like <code>username@example.com</code>."
 msgstr ""
 
+msgid "Sorry, you are not allowed to create users."
+msgstr ""
+
 msgid "Sorry, you are not allowed to edit this user."
 msgstr ""
 
