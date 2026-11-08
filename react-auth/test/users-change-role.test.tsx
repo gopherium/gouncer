@@ -13,6 +13,7 @@ import {
 	barred,
 	bulkBar,
 	colleague,
+	heldAccounts,
 	holding,
 	longName,
 	renderUsers,
@@ -391,15 +392,30 @@ test('puts the focus back on the actions menu Change role opened from once the r
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).getByRole('button', { name: 'Actions' })).toHaveFocus())
 })
 
-test('puts the focus back on the name Change role opened from once the role changed', async () => {
+test('puts the focus back on the name Change role opened from, once the list read the accounts again', async () => {
+	let reread: () => void = () => {}
+	const reading = new Promise<void>((done) => {
+		reread = done
+	})
 	writesRole()
 	renderUsers({ roleLabels })
 
 	await userEvent.click((await nameButton('Ada Lovelace')) as HTMLElement)
 	await pick('Administrator')
+	server.use(
+		http.get('/api/users', async () => {
+			await reading
+			return HttpResponse.json(heldAccounts())
+		}),
+	)
 	await send()
 
 	await toast('Role changed for "Ada Lovelace".')
+	await waitFor(() => expect(document.querySelector('.dataviews-view-table')).toHaveAttribute('inert'))
+	await closed()
+	expect(screen.getByRole('region', { name: 'Users' })).toHaveFocus()
+	reread()
+	await waitFor(() => expect(document.querySelector('.dataviews-view-table')).not.toHaveAttribute('inert'))
 	await waitFor(async () => expect(await nameButton('Ada Lovelace')).toHaveFocus())
 })
 
