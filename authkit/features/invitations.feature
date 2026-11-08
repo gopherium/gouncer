@@ -2,10 +2,11 @@ Feature: Inviting a person to activate an account
   An administrator adds a person by email, name and role. The account waits
   unconfirmed and the person gets a link to choose a password. The link
   goes out by mail, or comes back to the administrator when the app sends
-  no mail. The answer never tells whether the address already held an
-  account. A resend ends the link sent before. Opening a live link sets the
-  password, confirms the account and signs the person in. A client that
-  keeps trying dead links is slowed down.
+  no mail. While mail goes out, the answer never tells whether the address
+  already held an account. A resend ends the link sent before, and hands
+  out no link once the account moved beyond the reader's reach. Opening a
+  live link sets the password, confirms the account and signs the person
+  in. A client that keeps trying dead links is slowed down.
 
   Scenario: An invitation mails the activation link
     Given the app sends mail

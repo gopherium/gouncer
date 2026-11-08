@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -94,10 +95,15 @@ var roles = roleTable{
 // roleOf returns the role a reader named in a scenario holds.
 var roleOf = map[string]string{"administrator": "admin", "moderator": "moderator"}
 
-// deliveryBody is the delivery report an invite or a resend answers.
-type deliveryBody struct {
-	Delivered      *bool   `json:"delivered"`
-	ActivationLink *string `json:"activation_link"`
+// standing is what a scenario compares of an account.
+type standing struct {
+	name, role, passwordHash string
+	confirmed, disabled      bool
+}
+
+// standingOf returns what a scenario compares of the account.
+func standingOf(u gouncer.User) standing {
+	return standing{name: u.Name, role: u.Role, passwordHash: u.PasswordHash, confirmed: u.Confirmed, disabled: u.Disabled}
 }
 
 // errorBody is the error shape a client reads.
@@ -235,25 +241,44 @@ func (w *invitationsWorld) resends(email string) error {
 
 // noteLink records the token of the link the last answer or the sender's last mail carries.
 func (w *invitationsWorld) noteLink() error {
-	link := ""
-	if body, ok := decode[deliveryBody](w.answer); ok && body.ActivationLink != nil {
-		link = *body.ActivationLink
-	}
-	if sent := w.sentMails(); link == "" && len(sent) > 0 && w.answer.Code == http.StatusOK {
-		link = sent[len(sent)-1].link
+	link := w.answeredLink()
+	if link == "" {
+		link = w.mailedLink()
 	}
 	if link == "" {
 		return nil
 	}
+	return w.remember(link)
+}
+
+// answeredLink returns the link the last answer handed back, empty when it handed none.
+func (w *invitationsWorld) answeredLink() string {
+	body, _ := decode[map[string]any](w.answer)
+	link, _ := body["activation_link"].(string)
+	return link
+}
+
+// mailedLink returns the link of the sender's last mail after a successful answer, empty otherwise.
+func (w *invitationsWorld) mailedLink() string {
+	if w.answer.Code != http.StatusOK {
+		return ""
+	}
+	sent := w.sentMails()
+	if len(sent) == 0 {
+		return ""
+	}
+	return sent[len(sent)-1].link
+}
+
+// remember records the link's token once.
+func (w *invitationsWorld) remember(link string) error {
 	parsed, err := url.Parse(link)
 	if err != nil {
 		return err
 	}
-	token := parsed.Query().Get("token")
-	if slices.Contains(w.tokens, token) {
-		return nil
+	if token := parsed.Query().Get("token"); !slices.Contains(w.tokens, token) {
+		w.tokens = append(w.tokens, token)
 	}
-	w.tokens = append(w.tokens, token)
 	return nil
 }
 
@@ -317,21 +342,35 @@ func refusedWith(recorder *httptest.ResponseRecorder, status int, code string) e
 	return nil
 }
 
-// saysDelivered fails unless the answer reports the link delivered and carries none.
-func (w *invitationsWorld) saysDelivered() error {
-	body, ok := decode[deliveryBody](w.answer)
-	if w.answer.Code != http.StatusOK || !ok || body.Delivered == nil || !*body.Delivered || body.ActivationLink != nil {
-		return fmt.Errorf("answer = %d %s, want delivered and no link", w.answer.Code, w.answer.Body)
+// answeredOK fails unless the response answers 200.
+func answeredOK(recorder *httptest.ResponseRecorder) error {
+	if recorder.Code != http.StatusOK {
+		return fmt.Errorf("answer = %d %s, want 200", recorder.Code, recorder.Body)
 	}
 	return nil
 }
 
-// carriesLink fails unless the answer hands back a link to the activation address.
+// saysDelivered fails unless the answer reports the link delivered and carries none.
+func (w *invitationsWorld) saysDelivered() error {
+	if err := answeredOK(w.answer); err != nil {
+		return err
+	}
+	if body, _ := decode[map[string]any](w.answer); !maps.Equal(body, map[string]any{"delivered": true}) {
+		return fmt.Errorf("answer = %s, want delivered and no link", w.answer.Body)
+	}
+	return nil
+}
+
+// carriesLink fails unless the answer hands back an undelivered link to the activation address.
 func (w *invitationsWorld) carriesLink() error {
-	body, ok := decode[deliveryBody](w.answer)
-	if w.answer.Code != http.StatusOK || !ok || body.Delivered == nil || *body.Delivered ||
-		body.ActivationLink == nil || !strings.HasPrefix(*body.ActivationLink, activationURL+"?token=") {
-		return fmt.Errorf("answer = %d %s, want an undelivered link to %s", w.answer.Code, w.answer.Body, activationURL)
+	if err := answeredOK(w.answer); err != nil {
+		return err
+	}
+	if body, _ := decode[map[string]any](w.answer); body["delivered"] != false {
+		return fmt.Errorf("answer = %s, want delivered false", w.answer.Body)
+	}
+	if link := w.answeredLink(); !strings.HasPrefix(link, activationURL+"?token=") {
+		return fmt.Errorf("link = %q, want a link to %s", link, activationURL)
 	}
 	return nil
 }
@@ -369,7 +408,9 @@ func (w *invitationsWorld) waitsForActivation(email, role string) error {
 	if err != nil {
 		return err
 	}
-	if account.Confirmed || account.PasswordHash != "" || account.Role != role {
+	want := standingOf(account)
+	want.role, want.passwordHash, want.confirmed = role, "", false
+	if standingOf(account) != want {
 		return fmt.Errorf("stored = %+v, want an unconfirmed %s with no password", account, role)
 	}
 	return nil
@@ -394,8 +435,7 @@ func (w *invitationsWorld) unchanged(email string) error {
 	if err != nil {
 		return err
 	}
-	if account.Name != w.held.Name || account.Role != w.held.Role || account.Confirmed != w.held.Confirmed ||
-		account.Disabled != w.held.Disabled || account.PasswordHash != w.held.PasswordHash {
+	if standingOf(account) != standingOf(w.held) {
 		return fmt.Errorf("stored = %+v, want it unchanged from %+v", account, w.held)
 	}
 	return nil
