@@ -158,7 +158,7 @@ test('closes the resend without sending when the reader cancels', async () => {
 	expect(sent).not.toHaveBeenCalled()
 })
 
-test('keeps the resend busy with Cancel and the close icon greyed until the write ends, then closes', async () => {
+test('keeps the resend open while it sends, Cancel, the close icon and Escape doing nothing, then closes', async () => {
 	const answer = held()
 	server.use(
 		http.post('/api/users/invite/resend', async () => {
@@ -173,7 +173,10 @@ test('keeps the resend busy with Cancel and the close icon greyed until the writ
 
 	await waitFor(() => expect(modal.getByRole('button', { name: 'Cancel' })).toHaveAttribute('aria-disabled', 'true'))
 	expect(modal.getByRole('button', { name: 'Close' })).toHaveAttribute('aria-disabled', 'true')
-	expect(screen.getByRole('dialog')).toBeInTheDocument()
+	await userEvent.click(modal.getByRole('button', { name: 'Cancel' }))
+	await userEvent.click(modal.getByRole('button', { name: 'Close' }))
+	await userEvent.keyboard('{Escape}')
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
 	answer.release()
 	expect(await toast('Invitation sent to "Maria Perez".')).toBeInTheDocument()
 	await closed()
