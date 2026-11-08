@@ -120,7 +120,8 @@ describe('the Users page on the REST default', () => {
 		await userEvent.click(await screen.findByRole('option', { name: 'Administrator' }))
 		await userEvent.click(dialog.getByRole('button', { name: 'Change role' }))
 
-		expect(await toast('You need the manage users capability.')).toBeInTheDocument()
+		expect(await dialog.findByText('You need the manage users capability.')).toBeInTheDocument()
+		expect(screen.queryByText('You need the manage users capability.', { selector: '.godmin-toast' })).toBeNull()
 		expect(screen.queryByText('The role could not be changed.')).not.toBeInTheDocument()
 	})
 })

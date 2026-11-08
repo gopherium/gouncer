@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { focusedTrigger } from '@gopherium/godmin'
-import type { BulkRun, Trigger, UnsavedText } from '@gopherium/godmin'
+import type { BulkRun, Trigger } from '@gopherium/godmin'
 import type { Action } from '@wordpress/dataviews'
 import { __ } from '@wordpress/i18n'
 import { check, notAllowed, pencil } from '@wordpress/icons'
@@ -11,7 +11,6 @@ import type { Account } from '../../account.js'
 import { setUserDisabled } from '../../admin/index.js'
 import type { User } from '../../api.js'
 import { DOMAIN } from '../../domain.js'
-import { ResendModal } from './ResendModal.js'
 import { switchWords } from './words.js'
 import type { ErrorMessages } from './words.js'
 
@@ -21,12 +20,12 @@ export interface ActionTools {
 	reader: User | null
 	/** Runs an Enable or a Disable over the picked accounts, reads the list again and shows one toast. */
 	switches: BulkRun<Account>
-	/** The activation links resends answered, by account id, kept until a dialog showing one closes. */
-	links: UnsavedText
 	/** The words the app gives the error codes only it answers. */
 	errorMessages: ErrorMessages
 	/** Opens Change role on the accounts, given the trigger it opened from. */
 	openRole: (accounts: Account[], trigger: Trigger) => void
+	/** Opens Resend invitation on the account, given the trigger it opened from. */
+	openResend: (account: Account, trigger: Trigger) => void
 }
 
 /**
@@ -51,11 +50,11 @@ export function mayChangeRole(reader: User | null, account: Account): boolean {
 
 /**
  * Returns the row and bulk actions of the users list, none on the reader's own row nor on one it may not edit.
- * @param tools - The reader, the run, the app's error words and what opens Change role.
+ * @param tools - The reader, the run, the app's error words and what opens Change role and Resend invitation.
  * @returns Change role, Resend invitation, Enable and Disable, in the order the bulk bar draws them, none signed out.
  */
 export function useUsersActions(tools: ActionTools): Action<Account>[] {
-	const { reader, switches, links, errorMessages, openRole } = tools
+	const { reader, switches, errorMessages, openRole, openResend } = tools
 	return useMemo(() => {
 		if (reader === null) {
 			return []
@@ -75,10 +74,8 @@ export function useUsersActions(tools: ActionTools): Action<Account>[] {
 			{
 				id: 'resend-invitation',
 				label: __('Resend invitation…', DOMAIN),
-				modalHeader: __('Resend invitation', DOMAIN),
-				modalFocusOnMount: 'firstContentElement',
 				isEligible: (account) => mayEdit(reader, account) && !account.confirmed && !account.disabled,
-				RenderModal: (props) => <ResendModal {...props} links={links} errorMessages={errorMessages} />,
+				callback: ([account]) => openResend(account, focusedTrigger()),
 			},
 			{
 				id: 'enable',
@@ -99,5 +96,5 @@ export function useUsersActions(tools: ActionTools): Action<Account>[] {
 			},
 		]
 		return actions
-	}, [reader, switches, links, errorMessages, openRole])
+	}, [reader, switches, errorMessages, openRole, openResend])
 }

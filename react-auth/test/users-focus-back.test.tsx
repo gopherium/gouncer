@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { setViewport } from '@gopherium/godmin/testing'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
 
@@ -44,7 +44,7 @@ test.each([
 	await open()
 	await cancel()
 
-	expect(focus.back).toHaveBeenLastCalledWith(colleague.id, door)
+	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(colleague.id, door))
 })
 
 test('hands back the phone row Change role opened from once it closes', async () => {
@@ -54,7 +54,7 @@ test('hands back the phone row Change role opened from once it closes', async ()
 	await userEvent.click(await screen.findByRole('button', { name: 'Ada Lovelace' }))
 	await cancel()
 
-	expect(focus.back).toHaveBeenLastCalledWith(colleague.id, 'row')
+	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(colleague.id, 'row'))
 })
 
 test('hands back the bulk bar Change role opened from once it closes, the list then taking the focus', async () => {
@@ -64,5 +64,16 @@ test('hands back the bulk bar Change role opened from once it closes, the list t
 	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
 	await cancel()
 
-	expect(focus.back).toHaveBeenLastCalledWith(expect.any(String), 'bulk')
+	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(expect.any(String), 'bulk'))
+})
+
+test('hands back the actions menu Resend invitation opened from once it closes', async () => {
+	const invited = accountOf('fd', 'Maria Perez', { confirmed: false })
+	holding([signedIn, invited])
+	renderUsers()
+
+	await act('Maria Perez', 'Resend invitation…')
+	await cancel()
+
+	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(invited.id, 'actions'))
 })

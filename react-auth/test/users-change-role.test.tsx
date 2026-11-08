@@ -44,6 +44,11 @@ async function closed() {
 	await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
 
+async function saidInside(words: string) {
+	expect(await (await dialog()).findByText(words)).toBeInTheDocument()
+	expect(screen.queryByText(words, { selector: '.godmin-toast' })).not.toBeInTheDocument()
+}
+
 async function nameButton(name: string) {
 	const buttons = (await rowOf(name)).queryAllByRole('button', { name })
 	return buttons.find((button) => button.classList.contains('dataviews-title-field'))
@@ -81,7 +86,8 @@ test('asks the role of the one account by its name, starting on the role it hold
 	await act('Ada Lovelace', 'Change role…')
 
 	const opened = await dialog()
-	expect(opened.getByText('Choose the role of Ada Lovelace.')).toBeInTheDocument()
+	const description = 'Choose the role of Ada Lovelace.'
+	expect(screen.getByRole('dialog', { name: 'Change role', description })).toBeVisible()
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
 })
 
@@ -117,14 +123,13 @@ test('lifts the role choices into the overlay slot that stacks above the dialog'
 	expect(choice.closest('[data-wp-compat-overlay-slot]')).not.toBeNull()
 })
 
-test("opens as godmin's form dialog at 560px, Cancel in godmin's tone before Change role", async () => {
+test("opens as godmin's form dialog, an outline neutral Cancel before Change role", async () => {
 	renderUsers({ roleLabels })
 
 	await act('Ada Lovelace', 'Change role…')
 
-	expect(await screen.findByRole('dialog', { name: 'Change role' })).toHaveClass('has-size-medium')
 	const cancel = (await dialog()).getByRole('button', { name: 'Cancel' })
-	expect([...cancel.classList]).toEqual(buttonClasses('minimal'))
+	expect([...cancel.classList]).toEqual(buttonClasses('outline', undefined, 'neutral'))
 	expect(cancel.compareDocumentPosition((await dialog()).getByRole('button', { name: 'Change role' })) & 4).toBeTruthy()
 })
 
@@ -138,7 +143,7 @@ test('starts on an account whose role the reader may not give on Change role to�
 	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
 })
 
-test('closes the moment Change role is pressed, before the write answers, as a WordPress row edit does', async () => {
+test('stays open while the role is written, Change role, Cancel and the close icon greyed', async () => {
 	server.use(http.put('/api/users/:id/role', () => new Promise(() => {})))
 	renderUsers({ roleLabels })
 
@@ -146,7 +151,13 @@ test('closes the moment Change role is pressed, before the write answers, as a W
 	await pick('Administrator')
 	await send()
 
-	await closed()
+	const opened = await dialog()
+	await waitFor(() =>
+		expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true'),
+	)
+	expect(opened.getByRole('button', { name: 'Cancel' })).toHaveAttribute('aria-disabled', 'true')
+	expect(opened.getByRole('button', { name: 'Close' })).toHaveAttribute('aria-disabled', 'true')
+	expect(screen.getByRole('dialog', { name: 'Change role' })).toBeVisible()
 })
 
 test('closes without writing when the reader cancels', async () => {
@@ -192,7 +203,7 @@ test('starts several accounts on Change role to…, with Change role dimmed unti
 	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
 })
 
-test('says in a toast why the role could not be changed, in the words the error code names', async () => {
+test('says inside the open dialog why the role could not be changed, in the words the error code names', async () => {
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
 
@@ -200,7 +211,7 @@ test('says in a toast why the role could not be changed, in the words the error 
 	await pick('Administrator')
 	await send()
 
-	expect(await toast('The role of that account just changed. Reload the page and try again.')).toBeInTheDocument()
+	await saidInside('The role of that account just changed. Reload the page and try again.')
 	expect(screen.queryByText(/Role changed for/)).not.toBeInTheDocument()
 })
 
@@ -226,7 +237,7 @@ test('marks nothing when every role write failed, while the accounts are read ag
 	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
 
-	await toast('Sorry, you are not allowed to give users that role.')
+	await (await dialog()).findByText('Sorry, you are not allowed to give users that role.')
 	expect(document.querySelector('.dataviews-footer')).not.toHaveAttribute('inert')
 })
 
@@ -238,7 +249,7 @@ test("says in WordPress's words that the reader may not give the role it picked"
 	await pick('Administrator')
 	await send()
 
-	expect(await toast('Sorry, you are not allowed to give users that role.')).toBeInTheDocument()
+	await saidInside('Sorry, you are not allowed to give users that role.')
 	expect(screen.queryByText('unknown role')).not.toBeInTheDocument()
 })
 
@@ -250,7 +261,7 @@ test('says plainly that a role could not be changed when the server names no rea
 	await pick('Administrator')
 	await send()
 
-	expect(await toast('The role could not be changed.')).toBeInTheDocument()
+	await saidInside('The role could not be changed.')
 })
 
 test('counts the role changes that failed in one toast and marks the list for the one that worked', async () => {
@@ -275,59 +286,52 @@ test('counts the role changes that failed in one toast and marks the list for th
 	await waitFor(() => expect(document.querySelector('.dataviews-footer')).toHaveAttribute('inert'))
 })
 
-test('keeps the role a failed change picked for the next time the dialog opens on that account', async () => {
+test('stays on the picked role after a refused change, and a second press closes it with the toast', async () => {
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
 
 	await act('Ada Lovelace', 'Change role…')
 	await pick('Administrator')
 	await send()
-	await toast('The role of that account just changed. Reload the page and try again.')
-	await act('Ada Lovelace', 'Change role…')
+	await saidInside('The role of that account just changed. Reload the page and try again.')
 
 	expect((await dialog()).getByRole('combobox', { name: 'Role' })).toHaveTextContent('Administrator')
+	const writes = writesRole()
+	await send()
+
+	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
+	expect(writes).toEqual([{ id: colleague.id, role: 'admin' }])
+	await closed()
 })
 
-test('opens again on the role the account holds once a change went through', async () => {
+test('opens again on the role the account holds once a refused change was cancelled', async () => {
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
 	await act('Ada Lovelace', 'Change role…')
 	await pick('Administrator')
 	await send()
-	await toast('The role of that account just changed. Reload the page and try again.')
-	writesRole()
-	await act('Ada Lovelace', 'Change role…')
-	await pick('Member')
-	await send()
-	await toast('Role changed for "Ada Lovelace".')
+	await saidInside('The role of that account just changed. Reload the page and try again.')
+	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
+	await closed()
 
 	await act('Ada Lovelace', 'Change role…')
 
 	expect((await dialog()).getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
 })
 
-test('keeps no pick for a write a later one to the same account overtook', async () => {
-	let answer: (response: Response) => void = () => {}
-	server.use(
-		http.put('/api/users/:id/role', () => new Promise<Response>((resolve) => {
-			answer = resolve
-		})),
-	)
+test('keeps the tick of one account a refused change from the bulk bar was for, once the reader cancels', async () => {
+	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
-	await act('Ada Lovelace', 'Change role…')
+
+	await select('Ada Lovelace')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
 	await pick('Administrator')
 	await send()
-	const first = answer
-	writesRole()
-	await act('Ada Lovelace', 'Change role…')
-	await send()
-	await toast('Role changed for "Ada Lovelace".')
+	await saidInside('The role of that account just changed. Reload the page and try again.')
+	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
+	await closed()
 
-	first(HttpResponse.json({ error: 'role changed', code: 'role_changed' }, { status: 409 }))
-	await toast('The role of that account just changed. Reload the page and try again.')
-	await act('Ada Lovelace', 'Change role…')
-
-	expect((await dialog()).getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
+	expect((await rowOf('Ada Lovelace')).getByRole('checkbox', { name: 'Ada Lovelace' })).toBeChecked()
 })
 
 test('opens Change role from a click on the name of an account the reader may change', async () => {
@@ -412,7 +416,9 @@ test('reads the list again after a refused change, the row then showing the role
 	await pick('Administrator')
 	await send()
 
-	await toast('The role of that account just changed. Reload the page and try again.')
+	await saidInside('The role of that account just changed. Reload the page and try again.')
+	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
+	await closed()
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).getByText('Administrator')).toBeInTheDocument())
 })
 
