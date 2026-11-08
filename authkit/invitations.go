@@ -5,6 +5,7 @@ package authkit
 import (
 	"context"
 	"errors"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -55,15 +56,19 @@ type Invitations struct {
 	sessions      *Handlers
 	admin         *AdminHandlers
 	sender        InviteSender
-	activationURL string
+	activationURL url.URL
 	limiter       LinkLimiter
 	clientKey     func(*http.Request) string
 }
 
-// NewInvitations returns the invitation routes cfg describes, panicking when cfg names no ActivationURL.
+// NewInvitations returns the invitation routes cfg describes, panicking on a missing or unparsable ActivationURL.
 func NewInvitations(cfg InvitationsConfig) *Invitations {
 	if cfg.ActivationURL == "" {
 		panic("authkit: InvitationsConfig.ActivationURL is required")
+	}
+	activationURL, err := url.Parse(cfg.ActivationURL)
+	if err != nil {
+		panic("authkit: InvitationsConfig.ActivationURL does not parse: " + err.Error())
 	}
 	clientKey := cfg.ClientKey
 	if clientKey == nil {
@@ -74,7 +79,7 @@ func NewInvitations(cfg InvitationsConfig) *Invitations {
 		sessions:      cfg.Sessions,
 		admin:         cfg.Admin,
 		sender:        cfg.Sender,
-		activationURL: cfg.ActivationURL,
+		activationURL: *activationURL,
 		limiter:       cfg.Limiter,
 		clientKey:     clientKey,
 	}
@@ -167,7 +172,17 @@ func (v *Invitations) renew(r *http.Request, email string) (gouncer.User, gounce
 	if err != nil {
 		return gouncer.User{}, gouncer.Token{}, false, err
 	}
+	kept, err := v.stillReachable(r, held)
+	if err != nil || !kept {
+		return gouncer.User{}, gouncer.Token{}, false, err
+	}
 	return held, token, true, nil
+}
+
+// stillReachable reports whether the account still holds the role it was judged by and the actor may still edit it.
+func (v *Invitations) stillReachable(r *http.Request, judged gouncer.User) (bool, error) {
+	now, open, err := v.reachable(r, judged.Email)
+	return open && now.Role == judged.Role, err
 }
 
 // reachable returns the account behind email and whether the actor may edit it.
@@ -199,13 +214,13 @@ func (v *Invitations) deliver(ctx context.Context, w http.ResponseWriter, to gou
 	Respond(w, http.StatusOK, delivered)
 }
 
-// link returns the activation address carrying the token.
+// link returns the activation address with the token as the only token value of its query.
 func (v *Invitations) link(token string) string {
-	separator := "?"
-	if strings.Contains(v.activationURL, "?") {
-		separator = "&"
-	}
-	return v.activationURL + separator + "token=" + url.QueryEscape(token)
+	address := v.activationURL
+	query := address.Query()
+	query.Set("token", token)
+	address.RawQuery = query.Encode()
+	return address.String()
 }
 
 // Activate spends an activation link, setting the password, confirming the account and starting its session.
@@ -248,7 +263,7 @@ func (v *Invitations) refuseOverBudget(w http.ResponseWriter, key string) bool {
 	if allowed {
 		return false
 	}
-	w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retryAfter.Seconds()))))
 	RespondError(w, http.StatusTooManyRequests, ErrorResponse{
 		Message: "too many attempts, try again later", Code: "link_rate_limited",
 	})
@@ -284,15 +299,18 @@ func (v *Invitations) signIn(ctx context.Context, w http.ResponseWriter, id uuid
 	Respond(w, http.StatusOK, identity)
 }
 
-// remoteHost returns the host of the request's remote address, an IPv6 one cut to its /64 network as ratelimit keys it.
+// remoteHost returns the IP of the request's remote address, an IPv4 one whole and an IPv6 one cut to its /64.
 func remoteHost(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
 	}
 	ip := net.ParseIP(host)
-	if ip == nil || strings.Contains(host, ".") {
+	if ip == nil {
 		return host
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4.String()
 	}
 	return ip.Mask(net.CIDRMask(64, 128)).String()
 }
