@@ -73,7 +73,9 @@ func invitationServer(
 	t.Helper()
 	addAdaAs(t, store, actorRole)
 	h := authkit.New(authkit.Config{Store: store, Privileged: invitationPrivileged})
-	cfg.Invites = authkit.NewInvites(authkit.InvitesConfig{Store: store, Roles: ladder()})
+	if cfg.Invites == nil {
+		cfg.Invites = authkit.NewInvites(authkit.InvitesConfig{Store: store, Roles: ladder()})
+	}
 	cfg.Sessions = h
 	if cfg.Admin == nil {
 		cfg.Admin = authkit.NewAdmin(authkit.AdminConfig{Store: store, Privileged: invitationPrivileged, Roles: ladder()})
@@ -238,6 +240,17 @@ func addPendingMariaAs(t *testing.T, store *testkit.Store, role string) gouncer.
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 	return maria
+}
+
+// pendingMariaLink stores an invitation for Maria holding the role and returns its link's token.
+func pendingMariaLink(t *testing.T, store *testkit.Store, role string) string {
+	t.Helper()
+	invites := authkit.NewInvites(authkit.InvitesConfig{Store: store, Roles: ladder()})
+	token, err := invites.Invite(t.Context(), "maria@example.com", "Maria Perez", role)
+	if err != nil {
+		t.Fatalf("Invite() error = %v", err)
+	}
+	return token.Token
 }
 
 // addDisabledPendingMaria stores a disabled invitation for Maria holding the member role.

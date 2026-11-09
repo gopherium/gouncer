@@ -13,6 +13,7 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 
 - `Invitations` from `NewInvitations` serves the invite, resend and activate calls `@gopherium/react-auth` posts to `/api/users/invite`, `/api/users/invite/resend` and `/api/auth/activate`.
 - Invite and resend answer `{"delivered": true}` for an address with no invitation to renew, so while the sender delivers, the answer tells nothing about the address.
+- A resend that fails before its new link is kept leaves the link sent before working.
 - `InviteSender` delivers each activation link. With none set, a new or renewed invitation answers its link instead.
 - `LinkLimiter` caps the dead links one client spends on activate, and `ratelimit.Limiter` fits it. An IPv6 client counts by its /64 network, as at login.
 - `NewInvitations` panics when `InvitationsConfig.ActivationURL` is empty.

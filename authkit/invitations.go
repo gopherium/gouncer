@@ -19,6 +19,9 @@ import (
 	"github.com/gopherium/gouncer"
 )
 
+// errLeftReach reports an account that left the actor's reach while its link was renewed.
+var errLeftReach = errors.New("authkit: account left reach")
+
 // InviteSender delivers the link that activates an invited account.
 type InviteSender interface {
 	// SendInvite delivers link to the address to, greeting name.
@@ -166,18 +169,29 @@ func (v *Invitations) renew(r *http.Request, email string) (gouncer.User, gounce
 	if err != nil || !open {
 		return gouncer.User{}, gouncer.Token{}, false, err
 	}
-	token, err := v.invites.ResendInvite(r.Context(), held.Email)
-	if errors.Is(err, gouncer.ErrUserNotFound) || errors.Is(err, ErrAlreadyActivated) {
+	token, err := v.invites.stageInvite(r.Context(), held)
+	if err == nil {
+		err = v.settle(r, held, token)
+	}
+	if errors.Is(err, gouncer.ErrUserNotFound) || errors.Is(err, ErrAlreadyActivated) || errors.Is(err, errLeftReach) {
 		return gouncer.User{}, gouncer.Token{}, false, nil
 	}
 	if err != nil {
 		return gouncer.User{}, gouncer.Token{}, false, err
 	}
-	kept, err := v.stillReachable(r, held)
-	if err != nil || !kept {
-		return gouncer.User{}, gouncer.Token{}, false, err
-	}
 	return held, token, true, nil
+}
+
+// settle keeps the staged link alone once the account still stands within the actor's reach.
+func (v *Invitations) settle(r *http.Request, held gouncer.User, staged gouncer.Token) error {
+	kept, err := v.stillReachable(r, held)
+	if err != nil {
+		return err
+	}
+	if !kept {
+		return errLeftReach
+	}
+	return v.invites.settleInvite(r.Context(), staged)
 }
 
 // stillReachable reports whether the account still holds the role it was judged by and the actor may still edit it.

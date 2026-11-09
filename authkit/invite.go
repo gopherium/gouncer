@@ -5,6 +5,7 @@ package authkit
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -18,6 +19,9 @@ const (
 	DefaultInviteTTL = 7 * 24 * time.Hour
 	DefaultResetTTL  = time.Hour
 )
+
+// anyStanding admits a staged invite token however many tokens already stand for its account.
+const anyStanding = math.MaxInt
 
 // ErrAlreadyActivated reports a resend aimed at an account that already holds a password.
 var ErrAlreadyActivated = errors.New("authkit: account already activated")
@@ -126,13 +130,35 @@ func (i *Invites) ResendInvite(ctx context.Context, email string) (gouncer.Token
 	if err != nil {
 		return gouncer.Token{}, err
 	}
-	if u.Disabled {
-		return gouncer.Token{}, gouncer.ErrUserNotFound
-	}
-	if u.Confirmed || u.PasswordHash != "" {
-		return gouncer.Token{}, ErrAlreadyActivated
+	if err := awaitingActivation(u); err != nil {
+		return gouncer.Token{}, err
 	}
 	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.store.ReplaceToken)
+}
+
+// stageInvite stores a fresh invite token for the pending account beside the ones it already holds.
+func (i *Invites) stageInvite(ctx context.Context, u gouncer.User) (gouncer.Token, error) {
+	if err := awaitingActivation(u); err != nil {
+		return gouncer.Token{}, err
+	}
+	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.createWithin(anyStanding))
+}
+
+// settleInvite keeps the staged token alone among its account's invite tokens.
+func (i *Invites) settleInvite(ctx context.Context, staged gouncer.Token) error {
+	staged.Token = ""
+	return i.store.ReplaceToken(ctx, staged)
+}
+
+// awaitingActivation answers gouncer.ErrUserNotFound for a disabled account, ErrAlreadyActivated for an active one.
+func awaitingActivation(u gouncer.User) error {
+	if u.Disabled {
+		return gouncer.ErrUserNotFound
+	}
+	if u.Confirmed || u.PasswordHash != "" {
+		return ErrAlreadyActivated
+	}
+	return nil
 }
 
 // RedeemInvite spends an invite token, storing the password, confirming

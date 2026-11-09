@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gopherium/gouncer"
@@ -19,6 +20,8 @@ var (
 	_ authkit.LinkLimiter  = failingLimiter{}
 	_ authkit.LinkLimiter  = refusingLimiter{}
 	_ authkit.AdminStore   = promotingReads{}
+	_ authkit.AdminStore   = failingLaterReads{}
+	_ authkit.InviteStore  = activatingStage{}
 )
 
 // errRelayDown is the failure a sender answers when its relay refuses the mail.
@@ -135,4 +138,34 @@ func (s promotingReads) UserByEmail(ctx context.Context, email string) (gouncer.
 		s.Users[read.ID] = promoted
 	}
 	return read, err
+}
+
+// failingLaterReads answers reads while it has some left, then fails each one, as a store whose connection drops.
+type failingLaterReads struct {
+	*testkit.Store
+	left *atomic.Int32
+}
+
+// UserByEmail fails once the reads ran out, else reads the account.
+func (s failingLaterReads) UserByEmail(ctx context.Context, email string) (gouncer.User, error) {
+	if s.left.Add(-1) < 0 {
+		return gouncer.User{}, errLookupFailed
+	}
+	return s.Store.UserByEmail(ctx, email)
+}
+
+// activatingStage confirms each account once a link is stored beside its others, as its holder activating meanwhile.
+type activatingStage struct {
+	*testkit.Store
+}
+
+// CreateToken stores the link, then confirms the account it names.
+func (s activatingStage) CreateToken(ctx context.Context, t gouncer.Token, live int) error {
+	if err := s.Store.CreateToken(ctx, t, live); err != nil {
+		return err
+	}
+	confirmed := s.Users[t.UserID]
+	confirmed.Confirmed = true
+	s.Users[t.UserID] = confirmed
+	return nil
 }
