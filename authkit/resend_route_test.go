@@ -56,6 +56,8 @@ func TestResendRouteAnswersDeliveredForAnAddressWithNoInvitationToRenew(t *testi
 		{name: "an active account", actor: "admin", email: "ada@example.com", hold: holdNothing},
 		{name: "a disabled invitation", actor: "admin", email: "maria@example.com", hold: addDisabledPendingMaria},
 		{name: "an invitation beyond reach", actor: "moderator", email: "maria@example.com", hold: addPendingAdminMaria},
+		{name: "an unconfirmed account holding a password", actor: "admin", email: "maria@example.com",
+			hold: addUnconfirmedMariaWithPassword},
 	}
 	for _, tc := range cases {
 		for _, sender := range []*recordingSender{{}, nil} {

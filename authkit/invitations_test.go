@@ -271,5 +271,15 @@ func addPendingAdminMaria(t *testing.T, store *testkit.Store) {
 	addPendingMariaAs(t, store, "admin")
 }
 
+// addUnconfirmedMariaWithPassword stores an unconfirmed account for Maria holding the member role and a password.
+func addUnconfirmedMariaWithPassword(t *testing.T, store *testkit.Store) {
+	t.Helper()
+	maria := addPendingMariaAs(t, store, "member")
+	if err := maria.SetPassword(testPassword); err != nil {
+		t.Fatalf("SetPassword() error = %v", err)
+	}
+	store.Users[maria.ID] = maria
+}
+
 // holdNothing leaves the store as it is.
 func holdNothing(*testing.T, *testkit.Store) {}
