@@ -37,7 +37,7 @@ independent building blocks. You adopt only what you need.
 
 Ready-made batteries live in this repository as separately versioned modules:
 
-- [`authkit`](authkit/) serves gouncer sessions over HTTP and refuses cross-origin browser writes.
+- [`authkit`](authkit/) serves gouncer sessions and invitations over HTTP and refuses cross-origin browser writes.
 - [`authkit/postgres`](authkit/postgres/) persists users and sessions in a PostgreSQL schema of its own.
 - [`authkit/sqlite`](authkit/sqlite/) persists users and sessions in SQLite tables on an application's one handle.
 - [`authkit/ratelimit`](authkit/ratelimit/) limits failed login attempts per client IP.
