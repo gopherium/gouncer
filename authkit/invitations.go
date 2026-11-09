@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,9 @@ import (
 
 // errLeftReach reports an account that left the actor's reach while its link was renewed.
 var errLeftReach = errors.New("authkit: account left reach")
+
+// nothingToRenew lists the failures that mean the actor holds no invitation to renew.
+var nothingToRenew = []error{gouncer.ErrUserNotFound, ErrAlreadyActivated, errLeftReach}
 
 // InviteSender delivers the link that activates an invited account.
 type InviteSender interface {
@@ -173,13 +177,18 @@ func (v *Invitations) renew(r *http.Request, email string) (gouncer.User, gounce
 	if err == nil {
 		err = v.settle(r, held, token)
 	}
-	if errors.Is(err, gouncer.ErrUserNotFound) || errors.Is(err, ErrAlreadyActivated) || errors.Is(err, errLeftReach) {
+	if renewsNothing(err) {
 		return gouncer.User{}, gouncer.Token{}, false, nil
 	}
 	if err != nil {
 		return gouncer.User{}, gouncer.Token{}, false, err
 	}
 	return held, token, true, nil
+}
+
+// renewsNothing reports whether err means the actor holds no invitation to renew.
+func renewsNothing(err error) bool {
+	return slices.ContainsFunc(nothingToRenew, func(target error) bool { return errors.Is(err, target) })
 }
 
 // settle keeps the staged link alone once the account still stands within the actor's reach.

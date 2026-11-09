@@ -130,16 +130,19 @@ func (i *Invites) ResendInvite(ctx context.Context, email string) (gouncer.Token
 	if err != nil {
 		return gouncer.Token{}, err
 	}
-	if err := awaitingActivation(u); err != nil {
-		return gouncer.Token{}, err
+	if u.Disabled {
+		return gouncer.Token{}, gouncer.ErrUserNotFound
+	}
+	if u.Confirmed || u.PasswordHash != "" {
+		return gouncer.Token{}, ErrAlreadyActivated
 	}
 	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.store.ReplaceToken)
 }
 
 // stageInvite stores a fresh invite token for the pending account beside the ones it already holds.
 func (i *Invites) stageInvite(ctx context.Context, u gouncer.User) (gouncer.Token, error) {
-	if err := awaitingActivation(u); err != nil {
-		return gouncer.Token{}, err
+	if u.Confirmed || u.PasswordHash != "" {
+		return gouncer.Token{}, ErrAlreadyActivated
 	}
 	return i.issue(ctx, u.ID, gouncer.PurposeInvite, i.inviteTTL, i.createWithin(anyStanding))
 }
@@ -148,17 +151,6 @@ func (i *Invites) stageInvite(ctx context.Context, u gouncer.User) (gouncer.Toke
 func (i *Invites) settleInvite(ctx context.Context, staged gouncer.Token) error {
 	staged.Token = ""
 	return i.store.ReplaceToken(ctx, staged)
-}
-
-// awaitingActivation answers gouncer.ErrUserNotFound for a disabled account, ErrAlreadyActivated for an active one.
-func awaitingActivation(u gouncer.User) error {
-	if u.Disabled {
-		return gouncer.ErrUserNotFound
-	}
-	if u.Confirmed || u.PasswordHash != "" {
-		return ErrAlreadyActivated
-	}
-	return nil
 }
 
 // RedeemInvite spends an invite token, storing the password, confirming
