@@ -5,6 +5,7 @@ import { __ } from '@wordpress/i18n'
 import { Button, Card, InputControl, Stack, Text } from '@wordpress/ui'
 import { useState } from 'react'
 
+import { fieldError } from '../admin/fieldError.js'
 import {
 	InvalidTokenError,
 	RateLimitedError,
@@ -26,7 +27,7 @@ function setPasswordErrorMessage(error: Error): string {
 		return __('This link is no longer valid. Ask the person who invited you for a new one.', DOMAIN)
 	}
 	if (error instanceof ValidationError) {
-		return error.message
+		return fieldError(error)?.message ?? error.message
 	}
 	if (error instanceof RateLimitedError) {
 		return __('Too many attempts. Please wait a minute and try again.', DOMAIN)

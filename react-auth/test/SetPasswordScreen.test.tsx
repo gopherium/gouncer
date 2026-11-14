@@ -181,6 +181,40 @@ test('shows the server validation message for a weak password', async () => {
 	)
 })
 
+const hintFor12 =
+	'Hint: The password should be at least 12 characters long. ' +
+	'To make it stronger, use upper and lower case letters, numbers, and symbols like ! " ? $ % ^ & ).'
+
+test.each([
+	{
+		case: 'a password too short',
+		body: { error: 'password must be at least 12 characters', code: 'password_too_short', meta: { min: 12 } },
+		words: hintFor12,
+	},
+	{
+		case: 'a password too long',
+		body: { error: 'password must be at most 1024 characters', code: 'password_too_long', meta: { max: 1024 } },
+		words: 'This password is too long.',
+	},
+	{
+		case: 'a password too short sent without a minimum',
+		body: { error: 'password must be at least 12 characters', code: 'password_too_short' },
+		words: 'password must be at least 12 characters',
+	},
+	{
+		case: 'a code it has no words for',
+		body: { error: 'the password matches the email', code: 'password_like_email' },
+		words: 'the password matches the email',
+	},
+])('shows the words Add User shows for $case', async ({ body, words }) => {
+	server.use(http.post('/api/auth/activate', () => HttpResponse.json(body, { status: 422 })))
+	renderSetPassword()
+
+	await submitPassword('short-but-typed')
+
+	expect((await screen.findByRole('alert')).textContent).toBe(words)
+})
+
 test('tells a throttled user to wait instead of retrying', async () => {
 	server.use(
 		http.post('/api/auth/activate', () =>
