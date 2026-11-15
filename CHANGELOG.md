@@ -9,7 +9,7 @@ at v0.x, minor releases may contain breaking changes.
 
 ### Changed
 
-- The module needs Go 1.27.3.
+- The module needs Go 1.27.4.
 - `NewUser` and `NewInvitedUser` keep U+0085 at the ends of a name.
 
 ### Fixed
