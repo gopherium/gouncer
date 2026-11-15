@@ -65,3 +65,13 @@ export function fieldError(error: unknown): FieldError | undefined {
 	const message = known?.[1](meta)
 	return known && message !== undefined ? { field: known[0], message } : undefined
 }
+
+/**
+ * Returns the words a link page shows for a password the server rejected.
+ * @param error - The validation error the activation or the reset threw.
+ * @returns The words Add User shows for the password, else the server's own.
+ */
+export function passwordWordsOf(error: ValidationError): string {
+	const known = fieldError(error)
+	return known?.field === 'password' ? known.message : error.message
+}

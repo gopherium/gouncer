@@ -95,7 +95,7 @@ async function tokenRefusal(response: Response): Promise<Error> {
 		if (refusal.code === 'token_invalid') {
 			return new InvalidTokenError('the link is no longer valid')
 		}
-		return new ValidationError(refusal.message)
+		return new ValidationError(refusal.message, refusal)
 	}
 	return new Error(`the request failed with status ${response.status}`)
 }

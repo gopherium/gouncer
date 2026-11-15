@@ -1,6 +1,6 @@
 module github.com/gopherium/gouncer/authkit/ratelimit
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/go-chi/chi/v5 v5.4.0

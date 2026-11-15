@@ -18,6 +18,10 @@ Releases of this module are tagged `authkit/vX.Y.Z`.
 - `LinkLimiter` caps the dead links one client spends on activate, and `ratelimit.Limiter` fits it. An IPv6 client counts by its /64 network, as at login.
 - `NewInvitations` panics when `InvitationsConfig.ActivationURL` is empty.
 
+### Changed
+
+- The module needs Go 1.27.4.
+
 ### Fixed
 
 - `CrossOriginGuard` logs the path percent-encoded and writes the method, host, origin and fetch site as printable ASCII, so a refused write cannot put a control character in the log.

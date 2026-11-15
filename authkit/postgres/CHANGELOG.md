@@ -8,6 +8,12 @@ releases may contain breaking changes.
 
 Releases of this module are tagged `authkit/postgres/vX.Y.Z`.
 
+## [Unreleased]
+
+### Changed
+
+- The module needs Go 1.27.4.
+
 ## [0.15.1] - 2026-11-04
 
 ### Changed

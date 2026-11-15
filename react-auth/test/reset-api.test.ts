@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	InvalidTokenError,
 	RateLimitedError,
+	ValidationError,
 	acceptInvite,
 	requestPasswordReset,
 	resetPassword,
@@ -21,6 +22,19 @@ import {
 	resetRequestRateLimited,
 	server,
 } from '../src/testing'
+
+const tooShort = {
+	error: 'password must be at least 12 characters',
+	code: 'password_too_short',
+	meta: { min: 12 },
+}
+
+async function thrownBy(attempt: Promise<unknown>): Promise<unknown> {
+	return attempt.then(
+		() => undefined,
+		(held: unknown) => held,
+	)
+}
 
 describe('acceptInvite', () => {
 	it('posts the token and password and answers the signed-in user', async () => {
@@ -58,6 +72,15 @@ describe('acceptInvite', () => {
 		)
 
 		await expect(acceptInvite('t-123', 'tiny')).rejects.toThrow('the password is too short')
+	})
+
+	it('keeps the code and meta the backend sent with a weak password', async () => {
+		server.use(http.post('/api/auth/activate', () => HttpResponse.json(tooShort, { status: 422 })))
+
+		const thrown = await thrownBy(acceptInvite('t-123', 'tiny'))
+
+		expect(thrown).toBeInstanceOf(ValidationError)
+		expect(thrown).toMatchObject({ message: tooShort.error, code: 'password_too_short', meta: { min: 12 } })
 	})
 
 	it('falls back to a readable message when the refusal body is not JSON', async () => {
@@ -166,6 +189,15 @@ describe('resetPassword', () => {
 		)
 
 		await expect(resetPassword('t-123', 'tiny')).rejects.toThrow('the password is too short')
+	})
+
+	it('keeps the code and meta the backend sent with a weak password', async () => {
+		server.use(http.post('/api/auth/password-reset/confirm', () => HttpResponse.json(tooShort, { status: 422 })))
+
+		const thrown = await thrownBy(resetPassword('t-123', 'tiny'))
+
+		expect(thrown).toBeInstanceOf(ValidationError)
+		expect(thrown).toMatchObject({ message: tooShort.error, code: 'password_too_short', meta: { min: 12 } })
 	})
 
 	it('throws RateLimitedError when throttled', async () => {
