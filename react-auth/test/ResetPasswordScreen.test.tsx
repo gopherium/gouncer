@@ -153,6 +153,11 @@ test.each([
 		body: { error: 'the password matches the email', code: 'password_like_email' },
 		words: 'the password matches the email',
 	},
+	{
+		case: 'a code about another field',
+		body: { error: 'this account cannot use that email', code: 'email_taken' },
+		words: 'this account cannot use that email',
+	},
 ])('shows the words Add User shows for $case', async ({ body, words }) => {
 	server.use(http.post('/api/auth/password-reset/confirm', () => HttpResponse.json(body, { status: 422 })))
 	renderResetPassword()
