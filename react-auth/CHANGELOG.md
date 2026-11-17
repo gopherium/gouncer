@@ -20,7 +20,7 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 ### Changed
 
 - **Breaking.** The `@wordpress` peers move to the packages of 4 November: components 44, dataviews 22, icons 20, theme 4 and ui 0.26. `@wordpress/i18n` starts at 7.1.0 and `@wordpress/date` at 6.1.0, as those packages ask.
-- **Breaking.** `/wpds/users` moves to godmin 0.33: the optional `@gopherium/godmin` peer is `>=0.33.0 <0.34.0`, where it was `>=0.32.0 <0.33.0`.
+- **Breaking.** `/wpds/users` moves to godmin 0.33: the optional `@gopherium/godmin` peer is `>=0.33.0 <0.35.0`, where it was `>=0.32.0 <0.33.0`.
 - The Change role and Resend invitation actions drop their trailing ellipsis wherever they show, as DataViews 22 asks, in Spanish and French too.
 - Below 782px wide the bulk bar gathers its actions in one Actions menu, where it drew each as an icon, as DataViews 22 does.
 

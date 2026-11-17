@@ -17,7 +17,7 @@ const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
 }
 
 const listPeers: [name: string, window: string][] = [
-	['@gopherium/godmin', '>=0.33.0 <0.34.0'],
+	['@gopherium/godmin', '>=0.33.0 <0.35.0'],
 	['@gopherium/gottext', '>=0.8.0 <0.9.0'],
 	['@wordpress/components', '>=44.0.0 <45.0.0'],
 	['@wordpress/dataviews', '>=22.0.0 <23.0.0'],
@@ -54,7 +54,7 @@ test.each(listPeers)('declares %s as an optional peer on the window %s', (name, 
 	expect(manifest.devDependencies[name]).toMatch(/^\d+\.\d+\.\d+$/)
 })
 
-test('tests the list against godmin 0.33.0, the one minor its window takes', () => {
+test('tests the list against godmin 0.33.0, the first minor its window takes', () => {
 	expect(manifest.devDependencies['@gopherium/godmin']).toBe('0.33.0')
 })
 
