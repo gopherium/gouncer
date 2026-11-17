@@ -101,6 +101,7 @@ interface AccountPost {
 	write: string
 	fallback: string
 	errorsByStatus: StatusErrors
+	signal?: AbortSignal
 }
 
 type InvitationRoute = Pick<AccountPost, 'path' | 'write'>
@@ -156,7 +157,7 @@ async function writeError(response: Response, post: AccountPost): Promise<Error>
 
 /**
  * Posts an account write over REST and returns the body it answers.
- * @param post - The route, the fields it reads and the error each known status throws.
+ * @param post - The route, the fields it reads, the error each known status throws and the signal that stops it.
  * @returns The answered body, still to be parsed.
  */
 async function postAccountWrite(post: AccountPost): Promise<unknown> {
@@ -164,6 +165,7 @@ async function postAccountWrite(post: AccountPost): Promise<unknown> {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(post.body),
+		signal: post.signal,
 	})
 	if (response.status === 401) {
 		throw new UnauthorizedError('session expired')
@@ -214,14 +216,16 @@ async function restCreateUser(input: NewUser): Promise<User> {
  * Posts an invitation write over REST and answers its delivery report.
  * @param route - The invitation route and the name its errors give the write.
  * @param body - The fields the route reads.
+ * @param signal - Aborts the in-flight request.
  * @returns The delivery report, carrying the link when nothing mailed it.
  */
-async function postInvitation(route: InvitationRoute, body: object): Promise<Invitation> {
+async function postInvitation(route: InvitationRoute, body: object, signal?: AbortSignal): Promise<Invitation> {
 	const report = await postAccountWrite({
 		...route,
 		body,
 		fallback: __('invalid invitation details', DOMAIN),
 		errorsByStatus: invitationStatusErrors,
+		signal,
 	})
 	return invitationSchema.parse(report)
 }
@@ -239,10 +243,11 @@ async function restInvite(input: NewInvite): Promise<Invitation> {
 /**
  * Sends a new invitation to a pending account over REST, ending the link sent before.
  * @param email - The address of the invited account.
+ * @param signal - Aborts the in-flight request.
  * @returns The delivery report, carrying the link when nothing mailed it.
  */
-async function restResendInvite(email: string): Promise<Invitation> {
-	return postInvitation(resendRoute, { email })
+async function restResendInvite(email: string, signal?: AbortSignal): Promise<Invitation> {
+	return postInvitation(resendRoute, { email }, signal)
 }
 
 /**
@@ -270,12 +275,14 @@ async function restSetUserDisabled(id: string, disabled: boolean): Promise<void>
  * Writes the role an account holds over REST.
  * @param id - The identifier of the account to update.
  * @param role - The role the account is to hold.
+ * @param signal - Aborts the in-flight request.
  */
-async function restSetUserRole(id: string, role: string): Promise<void> {
+async function restSetUserRole(id: string, role: string, signal?: AbortSignal): Promise<void> {
 	const response = await fetch(`/api/users/${id}/role`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ role }),
+		signal,
 	})
 	if (response.ok) {
 		return
@@ -319,9 +326,10 @@ export async function setUserDisabled(id: string, disabled: boolean): Promise<vo
  * Sets the role an account holds.
  * @param id - The identifier of the account to update.
  * @param role - The role the account is to hold.
+ * @param signal - Aborts the in-flight request.
  */
-export async function setUserRole(id: string, role: string): Promise<void> {
-	await resolveTransport('setUserRole', restSetUserRole)(id, role)
+export async function setUserRole(id: string, role: string, signal?: AbortSignal): Promise<void> {
+	await resolveTransport('setUserRole', restSetUserRole)(id, role, signal)
 }
 
 /**
@@ -338,8 +346,9 @@ export async function invite(input: NewInvite): Promise<Invitation> {
  * Sends a new invitation to a pending account, ending the link sent before,
  * and holds every transport to the invitation contract.
  * @param email - The address of the invited account.
+ * @param signal - Aborts the in-flight request.
  * @returns The delivery report, carrying the link when nothing mailed it.
  */
-export async function resendInvite(email: string): Promise<Invitation> {
-	return invitationSchema.parse(await resolveTransport('resendInvite', restResendInvite)(email))
+export async function resendInvite(email: string, signal?: AbortSignal): Promise<Invitation> {
+	return invitationSchema.parse(await resolveTransport('resendInvite', restResendInvite)(email, signal))
 }

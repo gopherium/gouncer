@@ -4,10 +4,12 @@ import { buttonClasses } from '@gopherium/godmin/testing'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import { beforeEach, expect, onTestFinished, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest'
 
+import type { Invitation } from '../src/admin'
 import { sessionQueryKey } from '../src/session'
 import { resendDelivered, resendRefused, resendUndelivered, server } from '../src/testing'
+import { configureAuthTransport, resetAuthTransport } from '../src/transport'
 import { accountOf, holding, longName, menuOf, renderUsers, rowOf, signedIn, toast } from './users-harness'
 
 const active = accountOf('ff', 'Ada Lovelace', { created_at: new Date('2026-07-06T10:00:00Z') })
@@ -15,6 +17,8 @@ const invited = accountOf('fd', 'Maria Perez', { confirmed: false })
 const barredInvite = accountOf('fe', 'Ana Lopez', { confirmed: false, disabled: true })
 
 beforeEach(() => holding([signedIn, active, invited, barredInvite]))
+
+afterEach(() => resetAuthTransport())
 
 function held() {
 	let release: () => void = () => {}
@@ -24,9 +28,24 @@ function held() {
 	return { gate, release }
 }
 
+function answeringLate(invitation: Invitation) {
+	const answer = held()
+	configureAuthTransport({
+		resendInvite: async () => {
+			await answer.gate
+			return invitation
+		},
+	})
+	return answer
+}
+
+async function pause(ms: number) {
+	await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function openResend(name = 'Maria Perez') {
 	await userEvent.click((await rowOf(name)).getByRole('button', { name: 'Actions' }))
-	await userEvent.click(await screen.findByRole('menuitem', { name: 'Resend invitation…' }))
+	await userEvent.click(await screen.findByRole('menuitem', { name: 'Resend invitation' }))
 	return within(await screen.findByRole('dialog', { name: 'Resend invitation' }))
 }
 
@@ -37,9 +56,9 @@ async function closed() {
 test('offers a resend only on the accounts still awaiting activation', async () => {
 	renderUsers()
 
-	expect(await menuOf('Maria Perez')).toContain('Resend invitation…')
-	expect(await menuOf('Ada Lovelace')).not.toContain('Resend invitation…')
-	expect(await menuOf('Ana Lopez')).not.toContain('Resend invitation…')
+	expect(await menuOf('Maria Perez')).toContain('Resend invitation')
+	expect(await menuOf('Ada Lovelace')).not.toContain('Resend invitation')
+	expect(await menuOf('Ana Lopez')).not.toContain('Resend invitation')
 })
 
 test('offers no resend on a pending account the reader may not edit', async () => {
@@ -50,10 +69,10 @@ test('offers no resend on a pending account the reader may not edit', async () =
 	expect((await rowOf('Maria Perez')).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
 })
 
-test('lists the actions that open a dialog first, with an ellipsis, and the one that acts at once last', async () => {
+test('lists the actions that open a dialog first, with no ellipsis, and the one that acts at once last', async () => {
 	renderUsers()
 
-	expect(await menuOf('Maria Perez')).toEqual(['Change role…', 'Resend invitation…', 'Disable'])
+	expect(await menuOf('Maria Perez')).toEqual(['Change role', 'Resend invitation', 'Disable'])
 })
 
 test('opens the resend under its title, the question as its help sentence, an outline neutral Cancel', async () => {
@@ -233,6 +252,60 @@ test('says plainly inside the open dialog that a resend failed when the server n
 	expect(screen.queryByText(words, { selector: '.godmin-toast' })).not.toBeInTheDocument()
 	expect(screen.queryByText('the relay refused')).not.toBeInTheDocument()
 	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
+})
+
+test('stops a resend at the time limit with the time-out words inside the dialog', async () => {
+	let seen: AbortSignal | undefined
+	server.use(
+		http.post('/api/users/invite/resend', ({ request }) => {
+			seen = request.signal
+			return new Promise<never>(() => {})
+		}),
+	)
+	renderUsers({ writeTimeout: 50 })
+	const modal = await openResend()
+
+	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
+
+	const words = 'Could not get a valid response from the server.'
+	expect(await modal.findByText(words)).toBeInTheDocument()
+	expect(screen.queryByText('The invitation could not be sent.')).not.toBeInTheDocument()
+	expect(seen?.aborted).toBe(true)
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
+})
+
+test('ignores an activation link a transport that ignores the signal answers after the time limit', async () => {
+	const answer = answeringLate({ delivered: false, activation_link: '/activate?token=t-9' })
+	renderUsers({ writeTimeout: 50 })
+	const modal = await openResend()
+	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
+	const words = 'Could not get a valid response from the server.'
+	await modal.findByText(words)
+
+	answer.release()
+	await pause(100)
+
+	const question = 'Send a new invitation to "Maria Perez" (maria@example.com)? The link sent before stops working.'
+	expect(screen.getByRole('dialog', { name: 'Resend invitation', description: question })).toBeVisible()
+	expect(modal.queryByLabelText('Activation link')).not.toBeInTheDocument()
+	expect(modal.getByText(words)).toBeInTheDocument()
+	expect(modal.getByRole('button', { name: 'Resend invitation' })).toBeInTheDocument()
+})
+
+test('shows no toast for an invitation a transport that ignores the signal sends after the time limit', async () => {
+	const answer = answeringLate({ delivered: true })
+	renderUsers({ writeTimeout: 50 })
+	const modal = await openResend()
+	await userEvent.click(modal.getByRole('button', { name: 'Resend invitation' }))
+	const words = 'Could not get a valid response from the server.'
+	await modal.findByText(words)
+
+	answer.release()
+	await pause(100)
+
+	expect(screen.queryByText('Invitation sent to "Maria Perez".')).not.toBeInTheDocument()
+	expect(screen.getByRole('dialog', { name: 'Resend invitation' })).toBeVisible()
+	expect(modal.getByText(words)).toBeInTheDocument()
 })
 
 test('sends again on a second press after a refused resend, and closes with the toast once it went out', async () => {

@@ -85,6 +85,15 @@ export function errorMessageOf(error: unknown, errorMessages: ErrorMessages, fal
 }
 
 /**
+ * Returns the time-out words a dialog's signal carries once its time limit ran out.
+ * @param signal - The signal the dialog handed its write.
+ * @returns The words, none while the signal has not fired.
+ */
+export function timeOutOf(signal: AbortSignal): string | undefined {
+	return signal.aborted ? (signal.reason as Error).message : undefined
+}
+
+/**
  * Returns the words a failed Add User reads as, WordPress's create sentence for a reader who may not manage users.
  * @param error - What the create or the invitation failed with.
  * @param errorMessages - The words the app gives the codes only it answers.
@@ -158,9 +167,10 @@ export function roleLineOf(accounts: readonly Account[]): string {
 /**
  * Returns the words a Change role run reports its outcome in, WordPress's Changed roles. for several.
  * @param errorMessages - The words the app gives the codes only it answers.
+ * @param signal - The signal the dialog handed the run, whose time-out words one failed account reads.
  * @returns The words for the accounts changed, naming one account whole, and for the ones that failed.
  */
-export function roleWords(errorMessages: ErrorMessages): BulkWords<Account> {
+export function roleWords(errorMessages: ErrorMessages, signal: AbortSignal): BulkWords<Account> {
 	return {
 		done: (_done, only) =>
 			only === undefined
@@ -168,7 +178,8 @@ export function roleWords(errorMessages: ErrorMessages): BulkWords<Account> {
 				: sprintf(__('Role changed for "%(name)s".', DOMAIN), { name: only.name }),
 		failed: (failures, asked) => {
 			if (asked === 1) {
-				return errorMessageOf(failures[0].error, errorMessages, __('The role could not be changed.', DOMAIN))
+				const fallback = __('The role could not be changed.', DOMAIN)
+				return timeOutOf(signal) ?? errorMessageOf(failures[0].error, errorMessages, fallback)
 			}
 			const count = failures.length
 			const template = _n(

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, expectTypeOf, test, vi } from 'vitest'
 
-import { createUser, fetchUsers, invite } from '../src/admin'
+import { createUser, fetchUsers, invite, resendInvite, setUserRole } from '../src/admin'
 import {
 	acceptInvite,
 	checkSetupCode,
@@ -15,6 +15,7 @@ import {
 	resetAuthTransport,
 	resetPassword,
 } from '../src/index'
+import type { AuthTransport } from '../src/index'
 import { defaultUser, loginOk, server, sessionOk } from '../src/testing'
 
 afterEach(() => {
@@ -58,6 +59,23 @@ test('a configured transport carries the admin operations', async () => {
 
 	expect(injectedUsers).toHaveBeenCalledOnce()
 	expect(injectedCreate).toHaveBeenCalledOnce()
+})
+
+test('a configured transport gets the signal of a role write', async () => {
+	const injected = vi.fn().mockResolvedValue(undefined)
+	configureAuthTransport({ setUserRole: injected })
+	const { signal } = new AbortController()
+
+	await setUserRole('u2', 'admin', signal)
+
+	expect(injected).toHaveBeenCalledWith('u2', 'admin', signal)
+})
+
+test('offers each account write the signal as an optional last argument', () => {
+	expectTypeOf<AuthTransport['setUserRole']>().parameter(2).toEqualTypeOf<AbortSignal | undefined>()
+	expectTypeOf<AuthTransport['resendInvite']>().parameter(1).toEqualTypeOf<AbortSignal | undefined>()
+	expectTypeOf(setUserRole).parameter(2).toEqualTypeOf<AbortSignal | undefined>()
+	expectTypeOf(resendInvite).parameter(1).toEqualTypeOf<AbortSignal | undefined>()
 })
 
 test('unconfigured operations keep using the REST transport', async () => {

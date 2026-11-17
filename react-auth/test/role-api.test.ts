@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
 	LastPrivilegedError,
@@ -104,6 +104,24 @@ describe('setUserRole', () => {
 
 		expect(seen.url).toBe(maria.id)
 		expect(seen.body).toEqual({ role: 'admin' })
+	})
+
+	it('hands its signal to the request, which stops once the signal fires', async () => {
+		let seen: AbortSignal | undefined
+		server.use(
+			http.put('/api/users/:id/role', ({ request }) => {
+				seen = request.signal
+				return new Promise<never>(() => {})
+			}),
+		)
+		const controller = new AbortController()
+		const writing = setUserRole(maria.id, 'admin', controller.signal)
+		await vi.waitFor(() => expect(seen).toBeDefined())
+
+		controller.abort(new DOMException('The write ran out of time.', 'TimeoutError'))
+
+		await vi.waitFor(() => expect(seen?.aborted).toBe(true))
+		await expect(writing).rejects.toMatchObject({ name: 'TimeoutError' })
 	})
 
 	it('reports an actor holding no privileged role', async () => {
