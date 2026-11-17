@@ -12,6 +12,18 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 
 ## [Unreleased]
 
+### Added
+
+- `setUserRole` and `resendInvite` in `/admin` take an optional last `signal`, as `fetchUsers` does, and so do the same two `AuthTransport` methods. Their REST requests stop once it fires, and a transport that takes no signal still type checks.
+- Change role and Resend invitation hand the dialog's signal to their write, so the request stops once the `writeTimeout` of godmin's `AdminRoot` runs out. On one account the dialog shows godmin's words for a write with no answer, and an answer that comes later is ignored.
+
+### Changed
+
+- **Breaking.** The `@wordpress` peers move to the packages of 4 November: components 44, dataviews 22, icons 20, theme 4 and ui 0.26. `@wordpress/i18n` starts at 7.1.0 and `@wordpress/date` at 6.1.0, as those packages ask.
+- **Breaking.** `/wpds/users` moves to godmin 0.33: the optional `@gopherium/godmin` peer is `>=0.33.0 <0.34.0`, where it was `>=0.32.0 <0.33.0`.
+- The Change role and Resend invitation actions drop their trailing ellipsis wherever they show, as DataViews 22 asks, in Spanish and French too.
+- Below 782px wide the bulk bar gathers its actions in one Actions menu, where it drew each as an icon, as DataViews 22 does.
+
 ### Fixed
 
 - The activation and reset pages show Add User's translated words for a password that is too short or too long, not the server's English words.
