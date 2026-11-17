@@ -36,7 +36,7 @@ function inFormatLocale(locale: string) {
 test('counts the accounts, because the list offers bulk actions', async () => {
 	renderUsers()
 
-	expect(await screen.findByText('3 Items')).toBeInTheDocument()
+	expect(await screen.findByText('3 items')).toBeInTheDocument()
 })
 
 test('offers no row action on the signed-in account', async () => {
@@ -67,7 +67,7 @@ test('offers nothing at all on an account the server says the reader may not edi
 	])
 	renderUsers()
 
-	expect(await menuOf('Maria Perez')).toEqual(['Change role…', 'Disable'])
+	expect(await menuOf('Maria Perez')).toEqual(['Change role', 'Disable'])
 	for (const name of ['Grace Hopper', 'Alan Turing']) {
 		const row = await rowOf(name)
 		expect(row.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
@@ -89,7 +89,7 @@ test('offers Enable only on a disabled account whose role the reader may give', 
 	for (const name of ['Grace Hopper', 'Alan Turing']) {
 		const row = await rowOf(name)
 		expect(row.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument()
-		expect(await menuOf(name)).toEqual(['Change role…'])
+		expect(await menuOf(name)).toEqual(['Change role'])
 	}
 })
 
@@ -109,13 +109,13 @@ test('offers no action at all while nobody is signed in', async () => {
 test('lists Change role first and Disable, the one that locks the account out, last', async () => {
 	renderUsers()
 
-	expect(await menuOf('Ada Lovelace')).toEqual(['Change role…', 'Disable'])
+	expect(await menuOf('Ada Lovelace')).toEqual(['Change role', 'Disable'])
 })
 
 test('lists the primary one click action first, as a WordPress row menu does', async () => {
 	renderUsers()
 
-	expect(await menuOf('Ana Lopez')).toEqual(['Enable', 'Change role…'])
+	expect(await menuOf('Ana Lopez')).toEqual(['Enable', 'Change role'])
 })
 
 test('draws Enable on a disabled row as its primary action, and never Disable', async () => {
@@ -249,7 +249,7 @@ test('offers Change role and Enable before Disable in the bulk bar, the one that
 	await select('Ada Lovelace', 'Ana Lopez')
 
 	const bar = await bulkBar()
-	const change = await bar.findByRole('button', { name: 'Change role…' })
+	const change = await bar.findByRole('button', { name: 'Change role' })
 	const enable = bar.getByRole('button', { name: 'Enable' })
 	const disable = bar.getByRole('button', { name: 'Disable' })
 	expect(change.compareDocumentPosition(enable) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -300,16 +300,17 @@ test('counts the accounts a bulk enable could not change in one toast, in the fo
 	expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
-test('draws each bulk action with an icon, the only part of it a medium screen shows', async () => {
+test('gathers the bulk actions in one Actions menu on a medium screen, in the order of the wide bar', async () => {
 	setViewport({ width: 700 })
 	renderUsers()
 
 	await select('Ada Lovelace', 'Ana Lopez')
 
 	const bar = await bulkBar()
-	for (const name of ['Change role…', 'Enable', 'Disable']) {
-		expect((await bar.findByRole('button', { name })).querySelector('svg'), name).not.toBeNull()
-	}
+	expect(bar.queryByRole('button', { name: 'Change role' })).not.toBeInTheDocument()
+	await userEvent.click(bar.getByRole('button', { name: 'Actions' }))
+	const items = (await screen.findAllByRole('menuitem')).map((item) => item.textContent)
+	expect(items).toEqual(['Change role', 'Enable', 'Disable'])
 })
 
 test('puts the focus on the list once a bulk disable ends with the reader still on it', async () => {
