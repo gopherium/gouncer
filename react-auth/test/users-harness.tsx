@@ -99,10 +99,11 @@ export interface RenderOptions extends Partial<Omit<UsersPageProps, 'list'>> {
 	session?: User | null
 	perPage?: number | null
 	columnIds?: string[]
+	writeTimeout?: number
 }
 
 export function renderUsers(options: RenderOptions = {}) {
-	const { at = '/users', session = reader, perPage = 20, columnIds, ...props } = options
+	const { at = '/users', session = reader, perPage = 20, columnIds, writeTimeout = Infinity, ...props } = options
 	const client = createAuthQueryClient({ queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } })
 	seedSession(client, session)
 	function Mount() {
@@ -117,7 +118,7 @@ export function renderUsers(options: RenderOptions = {}) {
 	})
 	render(
 		<QueryClientProvider client={client}>
-			<AdminRoot>
+			<AdminRoot writeTimeout={writeTimeout}>
 				<Toaster>
 					<RouterProvider router={router} />
 				</Toaster>
@@ -167,7 +168,7 @@ export async function select(...names: string[]) {
 export async function bulkBar() {
 	return within(
 		await waitFor(() => {
-			const bar = document.querySelector<HTMLElement>('.dataviews-bulk-actions-footer__action-buttons')
+			const bar = document.querySelector<HTMLElement>('.dataviews-bulk-actions__actions')
 			expect(bar).not.toBeNull()
 			return bar as HTMLElement
 		}),
