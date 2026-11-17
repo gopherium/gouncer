@@ -114,7 +114,7 @@ describe('the Users page on the REST default', () => {
 		server.use(http.put('/api/users/:id/role', () => HttpResponse.json(missing, { status: 403 })))
 		renderUsers({ errorMessages: appWords, roleLabels: { admin: 'Administrator', member: 'Member' } })
 
-		await act('Ada Lovelace', 'Change role…')
+		await act('Ada Lovelace', 'Change role')
 		const dialog = within(await screen.findByRole('dialog', { name: 'Change role' }))
 		await userEvent.click(dialog.getByRole('combobox', { name: 'Role' }))
 		await userEvent.click(await screen.findByRole('option', { name: 'Administrator' }))

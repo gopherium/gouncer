@@ -18,9 +18,9 @@ export interface AuthTransport {
 	fetchUsers(signal?: AbortSignal): Promise<Account[]>
 	createUser(input: NewUser): Promise<Account>
 	setUserDisabled(id: string, disabled: boolean): Promise<void>
-	setUserRole(id: string, role: string): Promise<void>
+	setUserRole(id: string, role: string, signal?: AbortSignal): Promise<void>
 	invite(input: NewInvite): Promise<Invitation>
-	resendInvite(email: string): Promise<Invitation>
+	resendInvite(email: string, signal?: AbortSignal): Promise<Invitation>
 	acceptInvite(token: string, password: string): Promise<User>
 	requestPasswordReset(email: string): Promise<void>
 	resetPassword(token: string, password: string): Promise<void>

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Account } from '../../account.js'
 import { resendInvite } from '../../admin/index.js'
 import { DOMAIN } from '../../domain.js'
-import { errorMessageOf } from './words.js'
+import { errorMessageOf, timeOutOf } from './words.js'
 import type { ErrorMessages } from './words.js'
 
 /** The Resend invitation dialog the page holds open, on its account and the trigger it opened from. */
@@ -32,13 +32,26 @@ interface ResendProps {
 }
 
 /**
+ * Returns the write, failing with the signal's reason once it fires, so an answer after the time limit is ignored.
+ * @param write - The write still running.
+ * @param signal - The signal the dialog handed the write.
+ * @returns The write, settled as it settles unless the signal fires first.
+ */
+function stopping<T>(write: Promise<T>, signal: AbortSignal): Promise<T> {
+	return new Promise((settle, fail) => {
+		signal.addEventListener('abort', () => fail(signal.reason), { once: true })
+		write.then(settle, fail)
+	})
+}
+
+/**
  * Renders the form sending a pending account a new invitation, then the activation link when no mail server sent it.
  * @param props - The account, the app's own error words and what takes the dialog away.
  * @returns The dialog, open until the write ends and open with the words of a refused resend.
  */
 export function ResendDialog({ account, errorMessages, onClose }: ResendProps) {
 	const toaster = useToaster()
-	const resend = useMutation({ mutationFn: () => resendInvite(account.email) })
+	const resend = useMutation({ mutationFn: (signal: AbortSignal) => resendInvite(account.email, signal) })
 	const [link, setLink] = useState<string>()
 	const linkField = useRef<HTMLInputElement>(null)
 	useEffect(() => {
@@ -46,8 +59,8 @@ export function ResendDialog({ account, errorMessages, onClose }: ResendProps) {
 			linkField.current?.focus()
 		}
 	}, [link])
-	const send = () =>
-		resend.mutateAsync().then(
+	const send = (signal: AbortSignal) =>
+		stopping(resend.mutateAsync(signal), signal).then(
 			(sent): DialogAnswer | undefined => {
 				if (sent.delivered) {
 					toaster.show(sprintf(__('Invitation sent to "%(name)s".', DOMAIN), { name: account.name }))
@@ -57,7 +70,8 @@ export function ResendDialog({ account, errorMessages, onClose }: ResendProps) {
 				return { close: false }
 			},
 			(error: unknown): DialogAnswer => ({
-				error: errorMessageOf(error, errorMessages, __('The invitation could not be sent.', DOMAIN)),
+				error:
+					timeOutOf(signal) ?? errorMessageOf(error, errorMessages, __('The invitation could not be sent.', DOMAIN)),
 			}),
 		)
 	const question = __('Send a new invitation to "%(name)s" (%(email)s)? The link sent before stops working.', DOMAIN)

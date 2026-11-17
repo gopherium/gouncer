@@ -63,13 +63,20 @@ function startingRole(accounts: readonly Account[], grantable: readonly string[]
 function ChangeRoleDialog({ accounts, tools, onClose, onSent }: DialogProps) {
 	const [start] = useState(() => startingRole(accounts, tools.grantable))
 	const [chosen, setChosen] = useState(start)
-	const send = () =>
-		tools.write(accounts, (account) => setUserRole(account.id, chosen), roleWords(tools.errorMessages)).then((answer) => {
-			if (answer === undefined) {
-				onSent()
-			}
-			return answer
-		})
+	const send = (signal: AbortSignal) =>
+		tools
+			.write(
+				accounts,
+				(account) => setUserRole(account.id, chosen, signal),
+				roleWords(tools.errorMessages, signal),
+				signal,
+			)
+			.then((answer) => {
+				if (answer === undefined) {
+					onSent()
+				}
+				return answer
+			})
 	return (
 		<FormDialog
 			title={__('Change role', DOMAIN)}

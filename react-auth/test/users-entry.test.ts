@@ -17,11 +17,11 @@ const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
 }
 
 const listPeers: [name: string, window: string][] = [
-	['@gopherium/godmin', '>=0.32.0 <0.33.0'],
+	['@gopherium/godmin', '>=0.33.0 <0.35.0'],
 	['@gopherium/gottext', '>=0.8.0 <0.9.0'],
-	['@wordpress/components', '>=43.0.0 <44.0.0'],
-	['@wordpress/dataviews', '>=21.0.0 <22.0.0'],
-	['@wordpress/date', '>=6.0.0 <7.0.0'],
+	['@wordpress/components', '>=44.0.0 <45.0.0'],
+	['@wordpress/dataviews', '>=22.0.0 <23.0.0'],
+	['@wordpress/date', '>=6.1.0 <7.0.0'],
 ]
 
 function sourceFiles(directory: string): string[] {
@@ -54,8 +54,8 @@ test.each(listPeers)('declares %s as an optional peer on the window %s', (name, 
 	expect(manifest.devDependencies[name]).toMatch(/^\d+\.\d+\.\d+$/)
 })
 
-test('tests the list against godmin 0.32.0, the one minor its window takes', () => {
-	expect(manifest.devDependencies['@gopherium/godmin']).toBe('0.32.0')
+test('tests the list against godmin 0.33.0, the first minor its window takes', () => {
+	expect(manifest.devDependencies['@gopherium/godmin']).toBe('0.33.0')
 })
 
 test('keeps every source file free of a router, so the app holds the view', () => {

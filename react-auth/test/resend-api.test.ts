@@ -24,6 +24,24 @@ describe('resendInvite', () => {
 		expect(body).toEqual({ email: 'maria@example.com' })
 	})
 
+	it('hands its signal to the request, which stops once the signal fires', async () => {
+		let seen: AbortSignal | undefined
+		server.use(
+			http.post('/api/users/invite/resend', ({ request }) => {
+				seen = request.signal
+				return new Promise<never>(() => {})
+			}),
+		)
+		const controller = new AbortController()
+		const sending = resendInvite('maria@example.com', controller.signal)
+		await vi.waitFor(() => expect(seen).toBeDefined())
+
+		controller.abort(new DOMException('The write ran out of time.', 'TimeoutError'))
+
+		await vi.waitFor(() => expect(seen?.aborted).toBe(true))
+		await expect(sending).rejects.toMatchObject({ name: 'TimeoutError' })
+	})
+
 	it('answers the by-hand link when the server has no mailer', async () => {
 		server.use(
 			http.post('/api/users/invite/resend', () =>
@@ -100,7 +118,17 @@ describe('resendInvite through a configured transport', () => {
 		configureAuthTransport({ resendInvite: injected })
 
 		await expect(resendInvite('maria@example.com')).resolves.toEqual({ delivered: true })
-		expect(injected).toHaveBeenCalledWith('maria@example.com')
+		expect(injected).toHaveBeenCalledWith('maria@example.com', undefined)
+	})
+
+	it('carries the signal to the transport', async () => {
+		const injected = vi.fn().mockResolvedValue({ delivered: true })
+		configureAuthTransport({ resendInvite: injected })
+		const { signal } = new AbortController()
+
+		await resendInvite('maria@example.com', signal)
+
+		expect(injected).toHaveBeenCalledWith('maria@example.com', signal)
 	})
 
 	it('holds the transport to the invitation contract', async () => {

@@ -65,7 +65,7 @@ export function useUsersActions(tools: ActionTools): Action<Account>[] {
 		const actions: Action<Account>[] = [
 			{
 				id: 'change-role',
-				label: __('Change role…', DOMAIN),
+				label: __('Change role', DOMAIN),
 				icon: pencil,
 				supportsBulk: true,
 				isEligible: (account) => mayChangeRole(reader, account),
@@ -73,7 +73,7 @@ export function useUsersActions(tools: ActionTools): Action<Account>[] {
 			},
 			{
 				id: 'resend-invitation',
-				label: __('Resend invitation…', DOMAIN),
+				label: __('Resend invitation', DOMAIN),
 				isEligible: (account) => mayEdit(reader, account) && !account.confirmed && !account.disabled,
 				callback: ([account]) => openResend(account, focusedTrigger()),
 			},

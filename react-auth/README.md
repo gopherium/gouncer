@@ -159,6 +159,17 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   account id, the text, the words a screen reader hears and an optional
   link element. Pass its id to `usersListDefaults` as well, to show it.
 - `showAvatars={false}` drops the Avatar field when the site shows none.
+- Change role and Resend invitation wait on their write for at most the
+  `writeTimeout` of godmin's `AdminRoot`. Once it runs out, the dialog's
+  signal fires and the request stops. On one account the dialog shows
+  godmin's words for a write with no answer, and several close with
+  one toast that counts them. The app sets the limit from its own
+  settings, as `<AdminRoot writeTimeout={settings.writeTimeout}>`.
+- A transport given to `configureAuthTransport` gets that signal as the
+  last argument of `setUserRole` and `resendInvite`. Pass it to the
+  request, so the request stops too. A transport that takes no signal
+  still type checks, but its request keeps running, and the dialog
+  ignores what it answers after the time limit.
 
 ## Consumer requirements
 
@@ -169,7 +180,7 @@ const list = useListView<View>(usersListDefaults({ perPage: settings?.pageSize }
   development, proxy `/api` to your backend so the `__Host-` session
   cookie is first-party.
 - `/wpds` needs the `@wordpress/ui` and `@wordpress/icons` peers.
-- `/wpds/users` also needs `@gopherium/godmin` 0.32,
+- `/wpds/users` also needs `@gopherium/godmin` 0.33 or 0.34,
   `@gopherium/gottext`, `@wordpress/dataviews`, `@wordpress/components`
   and `@wordpress/date`, and godmin's `Toaster` above the page, whose
   toasts show each name whole. The app loads the DataViews and

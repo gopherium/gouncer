@@ -71,10 +71,6 @@ msgstr "Changer le rôle"
 msgid "Change role to…"
 msgstr "Changer de rôle pour…"
 
-#, fuzzy
-msgid "Change role…"
-msgstr "Changer le rôle…"
-
 msgid "Changed roles."
 msgstr "Rôles modifiés."
 
@@ -205,10 +201,6 @@ msgstr "Veuillez indiquer un nom."
 #, fuzzy
 msgid "Resend invitation"
 msgstr "Renvoyer l’invitation"
-
-#, fuzzy
-msgid "Resend invitation…"
-msgstr "Renvoyer l’invitation…"
 
 msgid "Role"
 msgstr "Rôle"

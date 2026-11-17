@@ -37,7 +37,7 @@ async function avatarButton() {
 test.each([
 	{ door: 'title', open: async () => userEvent.click(await nameButton()) },
 	{ door: 'media', open: async () => userEvent.click(await avatarButton()) },
-	{ door: 'actions', open: async () => act('Ada Lovelace', 'Change role…') },
+	{ door: 'actions', open: async () => act('Ada Lovelace', 'Change role') },
 ])('hands back the $door Change role opened from once it closes', async ({ door, open }) => {
 	renderUsers()
 
@@ -61,7 +61,7 @@ test('hands back the bulk bar Change role opened from once it closes, the list t
 	renderUsers()
 
 	await select('Ada Lovelace', 'Maria Perez')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 	await cancel()
 
 	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(expect.any(String), 'bulk'))
@@ -72,7 +72,7 @@ test('hands back the actions menu Resend invitation opened from once it closes',
 	holding([signedIn, invited])
 	renderUsers()
 
-	await act('Maria Perez', 'Resend invitation…')
+	await act('Maria Perez', 'Resend invitation')
 	await cancel()
 
 	await waitFor(() => expect(focus.back).toHaveBeenLastCalledWith(invited.id, 'actions'))

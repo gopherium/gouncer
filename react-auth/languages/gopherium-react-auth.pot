@@ -57,9 +57,6 @@ msgstr ""
 msgid "Change role to…"
 msgstr ""
 
-msgid "Change role…"
-msgstr ""
-
 msgid "Changed roles."
 msgstr ""
 
@@ -170,9 +167,6 @@ msgid "Please provide a name."
 msgstr ""
 
 msgid "Resend invitation"
-msgstr ""
-
-msgid "Resend invitation…"
 msgstr ""
 
 msgid "Role"

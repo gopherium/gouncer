@@ -59,7 +59,7 @@ test('changes the role of another account from its row menu and names the accoun
 	const writes = writesRole()
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -74,7 +74,7 @@ test('names a long account whole in the toast, as WordPress does', async () => {
 	writesRole()
 	renderUsers({ roleLabels })
 
-	await act(longName, 'Change role…')
+	await act(longName, 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -84,7 +84,7 @@ test('names a long account whole in the toast, as WordPress does', async () => {
 test('asks the role of the one account by its name, starting on the role it holds', async () => {
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 
 	const opened = await dialog()
 	const description = 'Choose the role of Ada Lovelace.'
@@ -96,7 +96,7 @@ test('sends the role the account already holds when the reader asks, as every go
 	const writes = writesRole()
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await send()
 
 	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
@@ -107,7 +107,7 @@ test('offers only the roles the reader may give, the one with the fewest capabil
 	const session = userWithCapabilities('admin', ['manage_users'], ['admin', 'editor', 'author', 'member'])
 	renderUsers({ roleLabels, session })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await userEvent.click((await dialog()).getByRole('combobox', { name: 'Role' }))
 
 	const offered = (await screen.findAllByRole('option')).map((option) => option.textContent)
@@ -117,7 +117,7 @@ test('offers only the roles the reader may give, the one with the fewest capabil
 test('lifts the role choices into the overlay slot that stacks above the dialog', async () => {
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await userEvent.click((await dialog()).getByRole('combobox', { name: 'Role' }))
 
 	const choice = await screen.findByRole('option', { name: 'Administrator' })
@@ -127,7 +127,7 @@ test('lifts the role choices into the overlay slot that stacks above the dialog'
 test("opens as godmin's form dialog, an outline neutral Cancel before Change role", async () => {
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 
 	const cancel = (await dialog()).getByRole('button', { name: 'Cancel' })
 	expect([...cancel.classList]).toEqual(buttonClasses('outline', undefined, 'neutral'))
@@ -138,7 +138,7 @@ test('starts on an account whose role the reader may not give on Change role to�
 	holding([signedIn, accountOf('fd', 'Maria Perez', { role: 'auditor' })])
 	renderUsers({ roleLabels })
 
-	await act('Maria Perez', 'Change role…')
+	await act('Maria Perez', 'Change role')
 
 	expect((await dialog()).getByRole('combobox', { name: 'Role' })).toHaveTextContent('Change role to…')
 	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
@@ -148,7 +148,7 @@ test('stays open while the role is written, Change role, Cancel and the close ic
 	server.use(http.put('/api/users/:id/role', () => new Promise(() => {})))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -165,7 +165,7 @@ test('closes without writing when the reader cancels', async () => {
 	const writes = writesRole()
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
 
 	await closed()
@@ -178,7 +178,7 @@ test('changes the role of every selected account from the bulk bar with one toas
 	renderUsers({ roleLabels })
 
 	await select('Ada Lovelace', 'Maria Perez')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 	expect((await dialog()).getByText('Choose the role of 2 users.')).toBeInTheDocument()
 	await pick('Administrator')
 	await send()
@@ -193,7 +193,7 @@ test('starts several accounts on Change role to…, with Change role dimmed unti
 	renderUsers({ roleLabels })
 
 	await select('Ada Lovelace', 'Maria Perez')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 
 	const opened = await dialog()
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Change role to…')
@@ -208,7 +208,7 @@ test('says inside the open dialog why the role could not be changed, in the word
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -220,7 +220,7 @@ test('shows the toast as the role is written and marks the list until the accoun
 	writesRole()
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
@@ -233,7 +233,7 @@ test('marks nothing when every role write failed, while the accounts are read ag
 	server.use(roleRefused('role_unknown'))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
@@ -242,11 +242,58 @@ test('marks nothing when every role write failed, while the accounts are read ag
 	expect(document.querySelector('.dataviews-footer')).not.toHaveAttribute('inert')
 })
 
+function unansweredRoleWrites() {
+	const signals: AbortSignal[] = []
+	server.use(
+		http.put('/api/users/:id/role', ({ request }) => {
+			signals.push(request.signal)
+			return new Promise<never>(() => {})
+		}),
+	)
+	return signals
+}
+
+test('stops a role write at the time limit, says so inside the dialog and reads the accounts again', async () => {
+	let reads = 0
+	const signals = unansweredRoleWrites()
+	renderUsers({ roleLabels, writeTimeout: 50 })
+
+	await act('Ada Lovelace', 'Change role')
+	await pick('Administrator')
+	server.use(
+		http.get('/api/users', () => {
+			reads += 1
+			return HttpResponse.json(heldAccounts())
+		}),
+	)
+	await send()
+
+	await saidInside('Could not get a valid response from the server.')
+	expect(screen.queryByText('The role could not be changed.')).not.toBeInTheDocument()
+	expect(signals.map((signal) => signal.aborted)).toEqual([true])
+	await waitFor(() => expect(reads).toBe(1))
+})
+
+test('stops the role write of every selected account at the time limit and counts them in one toast', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez')])
+	const signals = unansweredRoleWrites()
+	renderUsers({ roleLabels, writeTimeout: 50 })
+
+	await select('Ada Lovelace', 'Maria Perez')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
+	await pick('Administrator')
+	await send()
+
+	expect(await toast('The roles of 2 users could not be changed.')).toBeInTheDocument()
+	expect(signals.map((signal) => signal.aborted)).toEqual([true, true])
+	await closed()
+})
+
 test("says in WordPress's words that the reader may not give the role it picked", async () => {
 	server.use(roleRefused('role_unknown'))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -258,7 +305,7 @@ test('says plainly that a role could not be changed when the server names no rea
 	server.use(http.put('/api/users/:id/role', () => HttpResponse.json({ error: 'internal error' }, { status: 500 })))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -277,7 +324,7 @@ test('counts the role changes that failed in one toast and marks the list for th
 	renderUsers({ roleLabels })
 
 	await select('Ada Lovelace', 'Maria Perez', 'Grace Hopper')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 	await pick('Administrator')
 	server.use(http.get('/api/users', () => new Promise(() => {})))
 	await send()
@@ -291,7 +338,7 @@ test('stays on the picked role after a refused change, and a second press closes
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 	await saidInside('The role of that account just changed. Reload the page and try again.')
@@ -308,14 +355,14 @@ test('stays on the picked role after a refused change, and a second press closes
 test('opens again on the role the account holds once a refused change was cancelled', async () => {
 	server.use(roleRefused('role_changed'))
 	renderUsers({ roleLabels })
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 	await saidInside('The role of that account just changed. Reload the page and try again.')
 	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
 	await closed()
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 
 	expect((await dialog()).getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
 })
@@ -325,7 +372,7 @@ test('keeps the tick of one account a refused change from the bulk bar was for, 
 	renderUsers({ roleLabels })
 
 	await select('Ada Lovelace')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 	await pick('Administrator')
 	await send()
 	await saidInside('The role of that account just changed. Reload the page and try again.')
@@ -385,7 +432,7 @@ test('opens nothing and selects nothing from a tap on a phone row the reader may
 test('puts the focus back on the actions menu Change role opened from once the reader cancels', async () => {
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
 
 	await closed()
@@ -428,7 +475,7 @@ test('reads the list again after a refused change, the row then showing the role
 	)
 	renderUsers({ roleLabels })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -443,7 +490,7 @@ test('keeps the focus in the list once a role change took the row out of the fil
 	const filters = encodeURIComponent(JSON.stringify([{ field: 'role', operator: 'isAny', value: ['member'] }]))
 	renderUsers({ roleLabels, at: `/users?filters=${filters}` })
 
-	await act('Ada Lovelace', 'Change role…')
+	await act('Ada Lovelace', 'Change role')
 	await pick('Administrator')
 	await send()
 
@@ -460,7 +507,7 @@ test('puts the focus on the list once a change opened from the bulk bar ends', a
 	renderUsers({ roleLabels })
 
 	await select('Ada Lovelace', 'Maria Perez')
-	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role…' }))
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
 	await pick('Administrator')
 	await send()
 
