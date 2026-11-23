@@ -92,15 +92,30 @@ test('asks the role of the one account by its name, starting on the role it hold
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
 })
 
-test('sends the role the account already holds when the reader asks, as every godmin form dialog does', async () => {
+test('dims Change role on the role the account holds, a click writing nothing, until another is picked', async () => {
 	const writes = writesRole()
 	renderUsers({ roleLabels })
 
 	await act('Ada Lovelace', 'Change role')
+	const opened = await dialog()
+	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+	await send()
+	await pick('Administrator')
+	expect(opened.getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
 	await send()
 
 	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
-	expect(writes).toEqual([{ id: colleague.id, role: 'member' }])
+	expect(writes).toEqual([{ id: colleague.id, role: 'admin' }])
+})
+
+test('dims Change role again once the role the account holds is picked back', async () => {
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role')
+	await pick('Administrator')
+	await pick('Member')
+
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('offers only the roles the reader may give, the one with the fewest capabilities first', async () => {
@@ -198,10 +213,35 @@ test('starts several accounts on Change role to…, with Change role dimmed unti
 	const opened = await dialog()
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Change role to…')
 	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
-	await pick('Member')
+	await pick('Administrator')
 	expect(opened.getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
 	await pick('Change role to…')
 	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test('dims Change role from the bulk bar while every selected account holds the picked role', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez')])
+	renderUsers({ roleLabels })
+
+	await select('Ada Lovelace', 'Maria Perez')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
+	await pick('Member')
+
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test('keeps Change role live from the bulk bar when one selected account holds another role', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez', { role: 'admin' })])
+	writesRole()
+	renderUsers({ roleLabels })
+
+	await select('Ada Lovelace', 'Maria Perez')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
+	await pick('Member')
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
+	await send()
+
+	expect(await toast('Changed roles.')).toBeInTheDocument()
 })
 
 test('says inside the open dialog why the role could not be changed, in the words the error code names', async () => {

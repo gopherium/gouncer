@@ -83,7 +83,7 @@ function ChangeRoleDialog({ accounts, tools, onClose, onSent }: DialogProps) {
 			description={roleLineOf(accounts)}
 			submitLabel={__('Change role', DOMAIN)}
 			cancelLabel={__('Cancel', DOMAIN)}
-			canSubmit={chosen !== ''}
+			canSubmit={chosen !== '' && accounts.some((account) => account.role !== chosen)}
 			onSubmit={send}
 			onClose={onClose}
 		>
