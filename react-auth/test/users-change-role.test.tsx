@@ -525,6 +525,49 @@ test('reads the list again after a refused change, the row then showing the role
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).getByText('Administrator')).toBeInTheDocument())
 })
 
+test('dims Change role on the role the list read again after a refused change, and sends another', async () => {
+	server.use(
+		http.put('/api/users/:id/role', () => {
+			holding([signedIn, { ...colleague, role: 'admin' }, barred])
+			return HttpResponse.json({ error: 'role changed', code: 'role_changed' }, { status: 409 })
+		}),
+	)
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role')
+	await pick('Administrator')
+	await send()
+	await saidInside('The role of that account just changed. Reload the page and try again.')
+
+	const opened = await dialog()
+	await waitFor(() =>
+		expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true'),
+	)
+	const writes = writesRole()
+	await pick('Member')
+	await send()
+
+	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
+	expect(writes).toEqual([{ id: colleague.id, role: 'member' }])
+})
+
+test('stays open on its account once the list read again after a refused change no longer holds it', async () => {
+	server.use(roleRefused('user_not_found'))
+	renderUsers({ roleLabels })
+	await act('Ada Lovelace', 'Change role')
+	server.use(http.get('/api/users', () => HttpResponse.json([signedIn, barred])))
+
+	await pick('Administrator')
+	await send()
+	await saidInside('Invalid user ID.')
+	const table = document.querySelector('.dataviews-view-table') as HTMLElement
+	await waitFor(() => expect(within(table).queryByText('Ada Lovelace')).not.toBeInTheDocument())
+
+	const opened = await dialog()
+	expect(opened.getByText('Choose the role of Ada Lovelace.')).toBeInTheDocument()
+	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Administrator')
+})
+
 test('keeps the focus in the list once a role change took the row out of the filtered view', async () => {
 	writesRole()
 	const filters = encodeURIComponent(JSON.stringify([{ field: 'role', operator: 'isAny', value: ['member'] }]))

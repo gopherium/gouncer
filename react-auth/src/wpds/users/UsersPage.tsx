@@ -222,6 +222,7 @@ export function UsersPage(props: UsersPageProps) {
 			)}
 			<OpenRoleDialog
 				opened={opened}
+				held={users.data ?? NO_ACCOUNTS}
 				tools={{ grantable, roleLabels, errorMessages, write }}
 				onClose={() => setOpened(undefined)}
 				onClearSelection={() => props.list.onChangeSelection([])}
