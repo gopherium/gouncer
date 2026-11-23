@@ -10,6 +10,12 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Fixed
+
+- Change role stays dimmed until the picked role would change at least one account.
+
 ## [0.22.0] - 2026-11-18
 
 ### Added
