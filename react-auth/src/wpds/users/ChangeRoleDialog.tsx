@@ -83,7 +83,7 @@ function ChangeRoleDialog({ accounts, tools, onClose, onSent }: DialogProps) {
 			description={roleLineOf(accounts)}
 			submitLabel={__('Change role', DOMAIN)}
 			cancelLabel={__('Cancel', DOMAIN)}
-			canSubmit={chosen !== ''}
+			canSubmit={chosen !== '' && accounts.some((account) => account.role !== chosen)}
 			onSubmit={send}
 			onClose={onClose}
 		>
@@ -99,18 +99,30 @@ function ChangeRoleDialog({ accounts, tools, onClose, onSent }: DialogProps) {
 }
 
 /**
+ * Returns the accounts as the list read them last, one the list no longer holds as the dialog opened on it.
+ * @param accounts - The accounts the dialog opened on.
+ * @param held - The accounts the list read last.
+ * @returns The accounts, in the order the dialog opened on them.
+ */
+function asHeld(accounts: readonly Account[], held: readonly Account[]): Account[] {
+	return accounts.map((account) => held.find((one) => one.id === account.id) ?? account)
+}
+
+/**
  * Renders the Change role dialog the page holds open, none while it holds none.
- * @param props - The dialog, what it needs, what takes it away, what clears the selection and the focus back.
+ * @param props - The dialog, the accounts the list read last, what it needs and what runs as it closes.
  * @returns The dialog, giving the focus back to its trigger once it closed.
  */
 export function OpenRoleDialog({
 	opened,
+	held,
 	tools,
 	onClose,
 	onClearSelection,
 	onBack,
 }: {
 	opened?: OpenedRole
+	held: readonly Account[]
 	tools: RoleTools
 	onClose: () => void
 	onClearSelection: () => void
@@ -128,5 +140,5 @@ export function OpenRoleDialog({
 			onClearSelection()
 		}
 	}
-	return <ChangeRoleDialog accounts={opened.accounts} tools={tools} onClose={close} onSent={sent} />
+	return <ChangeRoleDialog accounts={asHeld(opened.accounts, held)} tools={tools} onClose={close} onSent={sent} />
 }

@@ -92,15 +92,30 @@ test('asks the role of the one account by its name, starting on the role it hold
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Member')
 })
 
-test('sends the role the account already holds when the reader asks, as every godmin form dialog does', async () => {
+test('dims Change role on the role the account holds, a click writing nothing, until another is picked', async () => {
 	const writes = writesRole()
 	renderUsers({ roleLabels })
 
 	await act('Ada Lovelace', 'Change role')
+	const opened = await dialog()
+	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+	await send()
+	await pick('Administrator')
+	expect(opened.getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
 	await send()
 
 	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
-	expect(writes).toEqual([{ id: colleague.id, role: 'member' }])
+	expect(writes).toEqual([{ id: colleague.id, role: 'admin' }])
+})
+
+test('dims Change role again once the role the account holds is picked back', async () => {
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role')
+	await pick('Administrator')
+	await pick('Member')
+
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('offers only the roles the reader may give, the one with the fewest capabilities first', async () => {
@@ -198,10 +213,35 @@ test('starts several accounts on Change role to…, with Change role dimmed unti
 	const opened = await dialog()
 	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Change role to…')
 	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
-	await pick('Member')
+	await pick('Administrator')
 	expect(opened.getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
 	await pick('Change role to…')
 	expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test('dims Change role from the bulk bar while every selected account holds the picked role', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez')])
+	renderUsers({ roleLabels })
+
+	await select('Ada Lovelace', 'Maria Perez')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
+	await pick('Member')
+
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test('keeps Change role live from the bulk bar when one selected account holds another role', async () => {
+	holding([signedIn, colleague, accountOf('fd', 'Maria Perez', { role: 'admin' })])
+	writesRole()
+	renderUsers({ roleLabels })
+
+	await select('Ada Lovelace', 'Maria Perez')
+	await userEvent.click(await (await bulkBar()).findByRole('button', { name: 'Change role' }))
+	await pick('Member')
+	expect((await dialog()).getByRole('button', { name: 'Change role' })).not.toHaveAttribute('aria-disabled', 'true')
+	await send()
+
+	expect(await toast('Changed roles.')).toBeInTheDocument()
 })
 
 test('says inside the open dialog why the role could not be changed, in the words the error code names', async () => {
@@ -483,6 +523,49 @@ test('reads the list again after a refused change, the row then showing the role
 	await userEvent.click((await dialog()).getByRole('button', { name: 'Cancel' }))
 	await closed()
 	await waitFor(async () => expect((await rowOf('Ada Lovelace')).getByText('Administrator')).toBeInTheDocument())
+})
+
+test('dims Change role on the role the list read again after a refused change, and sends another', async () => {
+	server.use(
+		http.put('/api/users/:id/role', () => {
+			holding([signedIn, { ...colleague, role: 'admin' }, barred])
+			return HttpResponse.json({ error: 'role changed', code: 'role_changed' }, { status: 409 })
+		}),
+	)
+	renderUsers({ roleLabels })
+
+	await act('Ada Lovelace', 'Change role')
+	await pick('Administrator')
+	await send()
+	await saidInside('The role of that account just changed. Reload the page and try again.')
+
+	const opened = await dialog()
+	await waitFor(() =>
+		expect(opened.getByRole('button', { name: 'Change role' })).toHaveAttribute('aria-disabled', 'true'),
+	)
+	const writes = writesRole()
+	await pick('Member')
+	await send()
+
+	expect(await toast('Role changed for "Ada Lovelace".')).toBeInTheDocument()
+	expect(writes).toEqual([{ id: colleague.id, role: 'member' }])
+})
+
+test('stays open on its account once the list read again after a refused change no longer holds it', async () => {
+	server.use(roleRefused('user_not_found'))
+	renderUsers({ roleLabels })
+	await act('Ada Lovelace', 'Change role')
+	server.use(http.get('/api/users', () => HttpResponse.json([signedIn, barred])))
+
+	await pick('Administrator')
+	await send()
+	await saidInside('Invalid user ID.')
+	const table = document.querySelector('.dataviews-view-table') as HTMLElement
+	await waitFor(() => expect(within(table).queryByText('Ada Lovelace')).not.toBeInTheDocument())
+
+	const opened = await dialog()
+	expect(opened.getByText('Choose the role of Ada Lovelace.')).toBeInTheDocument()
+	expect(opened.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Administrator')
 })
 
 test('keeps the focus in the list once a role change took the row out of the filtered view', async () => {
