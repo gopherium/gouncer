@@ -10,6 +10,13 @@ Releases are tagged `react-auth@X.Y.Z` and publish to npm from CI. The
 npm-style tag stays invisible to the Go toolchain, unlike a
 `react-auth/vX.Y.Z` tag naming the directory's stub module.
 
+## [Unreleased]
+
+### Fixed
+
+- `createAuthQueryClient` drops every other cached read when the session answers a different account than the last one, also after a sign-out or an expired session.
+- `AuthGate` mounts its children again for each signed-in account.
+
 ## [0.22.1] - 2026-11-25
 
 ### Fixed
