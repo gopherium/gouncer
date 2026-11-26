@@ -16,6 +16,7 @@ npm-style tag stays invisible to the Go toolchain, unlike a
 
 - `createAuthQueryClient` drops every other cached read when the session answers a different account than the last one, also after a sign-out or an expired session.
 - `AuthGate` mounts its children again for each signed-in account.
+- `useLogout` and `adoptSession` keep the session when the client sets its own `queryKeyHashFn`.
 
 ## [0.22.1] - 2026-11-25
 

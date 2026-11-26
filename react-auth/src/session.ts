@@ -11,16 +11,16 @@ import type { User } from './api.js'
  */
 export const sessionQueryKey = ['session'] as const
 
-/** sessionQueryHash is the hash the session is filed under. */
+/** sessionQueryHash is the default hash of the session key. */
 const sessionQueryHash = hashKey(sessionQueryKey)
 
 /**
  * Reports whether a cached read is the session.
  * @param query - The cached read.
- * @returns Whether the read is filed under the session key.
+ * @returns Whether the read is keyed by the session key.
  */
 export function isSessionQuery(query: Query): boolean {
-	return query.queryHash === sessionQueryHash
+	return hashKey(query.queryKey) === sessionQueryHash
 }
 
 /**
