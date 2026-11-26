@@ -3,7 +3,8 @@
     {
       "matching_content_path": "react-auth/test/**",
       "rules": [
-        { "name": "String Heavy Function Arguments", "weight": 0.0 }
+        { "name": "String Heavy Function Arguments", "weight": 0.0 },
+        { "name": "Code Duplication", "weight": 0.0 }
       ]
     },
     {
