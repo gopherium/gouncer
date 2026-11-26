@@ -7,6 +7,9 @@ import { UnauthorizedError } from './api.js'
 import type { User } from './api.js'
 import { dropOtherQueries, isSessionQuery, sessionQueryKey } from './session.js'
 
+/** sessionWrites are the cache events that can write the session data. */
+const sessionWrites: ReadonlySet<QueryCacheNotifyEvent['type']> = new Set(['added', 'updated'])
+
 /**
  * Builds a query client that drops the session on an UnauthorizedError and every other read on an account change.
  * @param defaultOptions - Query and mutation defaults, mainly for tests.
@@ -37,11 +40,14 @@ export function createAuthQueryClient(defaultOptions?: DefaultOptions): QueryCli
 	 * @param event - The change the query cache reports.
 	 */
 	function dropOnAccountChange(event: QueryCacheNotifyEvent) {
-		if (event.type !== 'updated' || event.action.type !== 'success' || !isSessionQuery(event.query)) {
+		if (!sessionWrites.has(event.type) || !isSessionQuery(event.query)) {
 			return
 		}
-		const account = event.query.state.data as User | null
-		if (account === null) {
+		if (queryClient.getQueryCache().get(event.query.queryHash) !== event.query) {
+			return
+		}
+		const account = event.query.state.data as User | null | undefined
+		if (typeof account?.id !== 'string') {
 			return
 		}
 		if (lastAccountId !== undefined && account.id !== lastAccountId) {
