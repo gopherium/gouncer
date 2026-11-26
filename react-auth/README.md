@@ -42,6 +42,23 @@ const client = createAuthQueryClient()
 </QueryClientProvider>
 ```
 
+`createAuthQueryClient` keeps the id of the last account the session
+answered. When the session answers a different account, also after a
+sign-out or an expired session, it drops every other cached read
+before the screens render for that account. `AuthGate` mounts its
+children again for each signed-in account, so no screen below it keeps
+what it held for the last one. The same account coming back keeps its
+cached reads.
+
+The drop needs the client `createAuthQueryClient` builds. Objects built
+above the gate, such as the router, do not start afresh, so keep
+account data out of route loaders. Keep account reads below `AuthGate`
+too. A read mounted above it keeps showing its last answer until it
+renders again, then turns pending. One that keeps its previous data as
+placeholder data shows the last account's answer until the next one
+lands. If a read must stay above the gate, such as the check for the
+setup wizard, keep `AuthGate` in place while it reads again.
+
 ## Links under the form
 
 `LoginScreen`, `RequestResetScreen`, `ResetPasswordScreen` and
